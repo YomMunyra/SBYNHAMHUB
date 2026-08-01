@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Book a Table — SbyNhamHub</title>
+  <meta name="description" content="Reserve a table at SbyNhamHub in seconds. Free, instant, confirmed online.">
+  <link rel="icon" type="image/svg+xml" href="/img/logo.svg">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body data-page="/book">
+
+  <header class="nav" id="nav"></header>
+
+  <section class="page-hero">
+    <div class="container">
+      <p class="eyebrow">SbyNhamHub · Reservations</p>
+      <h1>Book your <span class="italic-accent">table.</span></h1>
+      <p class="lede">Free, instant and confirmed online — 24 hours a day. We'll send you a reminder before your visit.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container" style="max-width:860px">
+      <div class="form-card">
+        <span class="eyebrow">Reservation details</span>
+        <h3 style="margin-bottom:24px">Reserve a table for two, tonight at seven?</h3>
+
+        <form id="bookingForm" novalidate>
+          <div class="form">
+            <div class="form-grid">
+              <div class="field">
+                <label for="bName">Full name <span class="req">*</span></label>
+                <input class="input" id="bName" name="name" autocomplete="name" placeholder="Channa Sok" required>
+              </div>
+              <div class="field">
+                <label for="bPhone">Phone <span class="req">*</span></label>
+                <input class="input" id="bPhone" name="phone" autocomplete="tel" placeholder="+855 12 345 678" required>
+              </div>
+            </div>
+            <div class="field">
+              <label for="bEmail">Email <span class="muted" style="font-weight:400">(for the confirmation)</span></label>
+              <input class="input" id="bEmail" name="email" type="email" autocomplete="email" placeholder="you@example.com">
+            </div>
+            <div class="form-grid">
+              <div class="field">
+                <label for="bDate">Date <span class="req">*</span></label>
+                <input class="input" id="bDate" name="date" type="date" required>
+              </div>
+              <div class="field">
+                <label for="bTime">Time <span class="req">*</span></label>
+                <select class="select" id="bTime" name="time" required>
+                  <option value="11:00">11:00</option>
+                  <option value="11:30">11:30</option>
+                  <option value="12:00">12:00</option>
+                  <option value="12:30">12:30</option>
+                  <option value="13:00">13:00</option>
+                  <option value="17:30">17:30</option>
+                  <option value="18:00">18:00</option>
+                  <option value="18:30">18:30</option>
+                  <option value="19:00">19:00</option>
+                  <option value="19:30">19:30</option>
+                  <option value="20:00">20:00</option>
+                  <option value="20:30">20:30</option>
+                  <option value="21:00">21:00</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-grid">
+              <div class="field">
+                <label for="bGuests">Guests <span class="req">*</span></label>
+                <select class="select" id="bGuests" name="guests" required>
+                  <option value="1">1 guest</option>
+                  <option value="2" selected>2 guests</option>
+                  <option value="3">3 guests</option>
+                  <option value="4">4 guests</option>
+                  <option value="5">5 guests</option>
+                  <option value="6">6 guests</option>
+                  <option value="7">7 guests</option>
+                  <option value="8">8 guests</option>
+                  <option value="9">9 guests</option>
+                  <option value="10">10 guests</option>
+                  <option value="11">11 guests</option>
+                  <option value="12">12+ (large party)</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="bOccasion">Occasion</label>
+                <select class="select" id="bOccasion" name="occasion">
+                  <option value="">Just dinner</option>
+                  <option>Birthday</option>
+                  <option>Anniversary</option>
+                  <option>Date Night</option>
+                  <option>Business</option>
+                  <option>Family Gathering</option>
+                  <option>Other</option>
+                </select>
+              </div>
+            </div>
+            <div class="field">
+              <label for="bNotes">Special requests</label>
+              <textarea class="textarea" id="bNotes" name="notes" placeholder="Window seat, allergies, a cake on the table…"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary btn-lg btn-block" id="submitBtn">Confirm reservation</button>
+            <p class="hint" style="text-align:center;margin:0">No charge to book. Cancellation free up to 1 hour before your table.</p>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer" id="footer"></footer>
+
+  <!-- Success modal -->
+  <div class="modal-backdrop" id="modal">
+    <div class="modal">
+      <div class="icon-big">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#C4471A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      </div>
+      <h3>Table reserved!</h3>
+      <p id="modalText">We'll see you at the table.</p>
+      <button class="btn btn-primary btn-block mt-8" onclick="closeModal()">Done</button>
+    </div>
+  </div>
+
+  <script src="/js/main.js"></script>
+  <script>
+    (function () {
+      const form = document.getElementById('bookingForm');
+      const submitBtn = document.getElementById('submitBtn');
+      const modal = document.getElementById('modal');
+      const modalText = document.getElementById('modalText');
+
+      const today = new Date();
+      const iso = today.toISOString().slice(0, 10);
+      const dateInput = document.getElementById('bDate');
+      dateInput.min = iso;
+      dateInput.value = iso;
+
+      const qs = new URLSearchParams(location.search);
+      if (qs.get('date')) dateInput.value = qs.get('date');
+      if (qs.get('time')) document.getElementById('bTime').value = qs.get('time');
+      if (qs.get('guests')) document.getElementById('bGuests').value = qs.get('guests');
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Reserving…';
+
+        const payload = {
+          name: form.name.value.trim(),
+          email: form.email.value.trim(),
+          phone: form.phone.value.trim(),
+          date: form.date.value,
+          time: form.time.value,
+          guests: Number(form.guests.value),
+          occasion: form.occasion.value,
+          notes: form.notes.value.trim()
+        };
+
+        try {
+          const data = await api('/api/reservations', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+          });
+          const r = data.reservation;
+          modalText.textContent = `${r.name}, table for ${r.guests} on ${r.date} at ${r.time}. A confirmation is on its way — see you soon!`;
+          modal.classList.add('open');
+          form.reset();
+          dateInput.value = iso;
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Confirm reservation';
+        } catch (err) {
+          toast(err.message, 'error');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Confirm reservation';
+        }
+      });
+
+      window.closeModal = () => modal.classList.remove('open');
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.classList.remove('open');
+      });
+    })();
+  </script>
+</body>
+</html>

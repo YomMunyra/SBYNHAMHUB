@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin — SbyNhamHub</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" type="image/svg+xml" href="/img/logo.svg">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body data-page="/admin">
+
+  <header class="nav" id="nav"></header>
+
+  <section id="loginView">
+    <div class="container">
+      <div class="auth-box form-card">
+        <span class="eyebrow">Restricted area</span>
+        <h3>Admin sign in</h3>
+        <p class="muted" style="font-size:14px">Enter the staff password to manage reservations.</p>
+        <form id="loginForm" class="form mt-8">
+          <div class="field">
+            <label for="pw">Password</label>
+            <input class="input" id="pw" type="password" autocomplete="current-password" required>
+          </div>
+          <button class="btn btn-primary btn-block" type="submit">Sign in</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section id="dashView" style="display:none">
+    <section class="page-hero" style="padding:44px 0">
+      <div class="container flex-between">
+        <div>
+          <p class="eyebrow">SbyNhamHub · Back of house</p>
+          <h1 style="font-size:30px;margin:0">Reservation desk</h1>
+        </div>
+        <button class="btn btn-white" id="logoutBtn">Sign out</button>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <div class="stat-grid" id="statGrid">
+          <div class="stat-card"><div class="val">—</div><div class="lbl">Total bookings</div></div>
+          <div class="stat-card"><div class="val">—</div><div class="lbl">Bookings today</div></div>
+          <div class="stat-card"><div class="val">—</div><div class="lbl">Covers today</div></div>
+          <div class="stat-card"><div class="val">—</div><div class="lbl">Confirmed overall</div></div>
+        </div>
+
+        <div class="flex-between mb-4">
+          <h3 style="margin:0">Bookings</h3>
+          <div class="flex">
+            <input class="input" type="date" id="filterDate" style="max-width:190px">
+            <button class="btn btn-ghost" id="clearFilter">All dates</button>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="data">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Guest</th>
+                <th>Contact</th>
+                <th>Party</th>
+                <th>Occasion</th>
+                <th>Notes</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="resBody">
+              <tr><td colspan="9" style="text-align:center;color:#888780">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </section>
+
+  <footer class="footer" id="footer"></footer>
+
+  <script src="/js/main.js"></script>
+  <script>
+    (function () {
+      const TOKEN_KEY = 'sbynham_token';
+      const loginView = document.getElementById('loginView');
+      const dashView = document.getElementById('dashView');
+      const resBody = document.getElementById('resBody');
+      const statGrid = document.getElementById('statGrid');
+      const filterDate = document.getElementById('filterDate');
+
+      const token = () => localStorage.getItem(TOKEN_KEY) || '';
+
+      function showDash() {
+        loginView.style.display = 'none';
+        dashView.style.display = 'block';
+        load();
+      }
+
+      async function load() {
+        try {
+          const [stats, reservations] = await Promise.all([
+            api('/api/stats', { headers: { Authorization: 'Bearer ' + token() } }),
+            api('/api/reservations?date=' + (filterDate.value || ''), { headers: { Authorization: 'Bearer ' + token() } })
+          ]);
+
+          statGrid.innerHTML = `
+            <div class="stat-card"><div class="val">${stats.total}</div><div class="lbl">Total bookings</div></div>
+            <div class="stat-card"><div class="val">${stats.today}</div><div class="lbl">Bookings today</div></div>
+            <div class="stat-card"><div class="val">${stats.covers_today}</div><div class="lbl">Covers today</div></div>
+            <div class="stat-card"><div class="val">${stats.confirmed}</div><div class="lbl">Confirmed overall</div></div>
+          `;
+
+          if (!reservations.length) {
+            resBody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#888780">No reservations yet. When guests book, they\'ll appear here.</td></tr>';
+            return;
+          }
+
+          const statusBadge = (s) => {
+            const map = {
+              pending: 'badge-gold', confirmed: 'badge-brand', arrived: 'badge-green',
+              cancelled: 'badge-neutral', 'no-show': 'badge-red'
+            };
+            return `<span class="badge ${map[s] || 'badge-neutral'}">${s}</span>`;
+          };
+
+          resBody.innerHTML = reservations.map((r) => `
+            <tr data-id="${r.id}">
+              <td style="white-space:nowrap">${escapeHTML(r.date)}</td>
+              <td style="white-space:nowrap">${escapeHTML(r.time)}</td>
+              <td>
+                <strong>${escapeHTML(r.name)}</strong>
+                ${r.email ? `<div class="muted" style="font-size:12px">${escapeHTML(r.email)}</div>` : ''}
+              </td>
+              <td style="white-space:nowrap">${escapeHTML(r.phone)}</td>
+              <td>${r.guests}</td>
+              <td>${r.occasion ? escapeHTML(r.occasion) : '—'}</td>
+              <td style="max-width:200px">${r.notes ? escapeHTML(r.notes) : '—'}</td>
+              <td>
+                <select class="status-select" data-field="status" data-id="${r.id}">
+                  ${['pending', 'confirmed', 'arrived', 'cancelled', 'no-show'].map((s) =>
+                    `<option value="${s}" ${s === r.status ? 'selected' : ''}>${s}</option>`
+                  ).join('')}
+                </select>
+              </td>
+              <td>
+                <button class="btn btn-sm btn-ghost del" data-id="${r.id}" title="Delete booking">Delete</button>
+              </td>
+            </tr>
+          `).join('');
+        } catch (err) {
+          if (err.message === 'Unauthorized') {
+            localStorage.removeItem(TOKEN_KEY);
+            loginView.style.display = 'block';
+            dashView.style.display = 'none';
+          }
+          toast(err.message, 'error');
+        }
+      }
+
+      document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const pw = document.getElementById('pw').value;
+        try {
+          const data = await api('/api/auth', { method: 'POST', body: JSON.stringify({ password: pw }) });
+          localStorage.setItem(TOKEN_KEY, data.token);
+          document.getElementById('pw').value = '';
+          showDash();
+        } catch (err) {
+          toast('Wrong password', 'error');
+        }
+      });
+
+      document.getElementById('logoutBtn').addEventListener('click', () => {
+        localStorage.removeItem(TOKEN_KEY);
+        loginView.style.display = 'block';
+        dashView.style.display = 'none';
+      });
+
+      resBody.addEventListener('change', async (e) => {
+        const sel = e.target.closest('.status-select');
+        if (!sel) return;
+        try {
+          await api('/api/reservations/' + sel.dataset.id, {
+            method: 'PATCH',
+            headers: { Authorization: 'Bearer ' + token() },
+            body: JSON.stringify({ status: sel.value })
+          });
+          toast('Status updated');
+          load();
+        } catch (err) { toast(err.message, 'error'); }
+      });
+
+      resBody.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.del');
+        if (!btn) return;
+        if (!confirm('Delete this reservation?')) return;
+        try {
+          await api('/api/reservations/' + btn.dataset.id, {
+            method: 'DELETE',
+            headers: { Authorization: 'Bearer ' + token() }
+          });
+          toast('Reservation deleted');
+          load();
+        } catch (err) { toast(err.message, 'error'); }
+      });
+
+      filterDate.addEventListener('change', load);
+      document.getElementById('clearFilter').addEventListener('click', () => {
+        filterDate.value = '';
+        load();
+      });
+
+      if (token()) {
+        showDash();
+      } else {
+        loginView.style.display = 'block';
+      }
+    })();
+  </script>
+</body>
+</html>

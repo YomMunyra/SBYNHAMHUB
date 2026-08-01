@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600" fill="none">
+  <rect width="800" height="600" fill="url(#bg)"/>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="800" y2="600" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FBFAF6"/>
+      <stop offset="1" stop-color="#FFE9DD"/>
+    </linearGradient>
+  </defs>
+  <circle cx="400" cy="360" r="230" fill="#FFFFFF" stroke="#EAE6DF" stroke-width="3"/>
+  <ellipse cx="400" cy="540" rx="190" ry="22" fill="#F3EFEA"/>
+  <circle cx="400" cy="350" r="160" fill="#FFE9DD"/>
+  <circle cx="400" cy="350" r="150" fill="#FFF1E8"/>
+  <ellipse cx="400" cy="350" rx="120" ry="34" fill="#FFC46B"/>
+  <ellipse cx="400" cy="344" rx="112" ry="28" fill="#FFD98F"/>
+  <path d="M300 330 Q400 250 500 330 L490 368 Q400 300 310 368 Z" fill="#E8A93F"/>
+  <path d="M320 320 Q400 300 470 330" stroke="#D98F2B" stroke-width="4" fill="none"/>
+  <circle cx="352" cy="330" r="9" fill="#FBF3EA"/>
+  <circle cx="380" cy="322" r="9" fill="#FBF3EA"/>
+  <circle cx="410" cy="322" r="9" fill="#FBF3EA"/>
+  <circle cx="440" cy="330" r="9" fill="#FBF3EA"/>
+  <path d="M300 360 Q400 430 500 360" stroke="#E8A93F" stroke-width="8" fill="none"/>
+  <path d="M400 250 v-26" stroke="#8C9E73" stroke-width="5" stroke-linecap="round"/>
+  <path d="M400 196 l10 22 -20 0 Z" fill="#7C8E63"/>
+  <path d="M370 360 q-6 -26 10 -34" stroke="#7C8E63" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M370 358 l-16 -8 6 18 Z" fill="#7C8E63"/>
+  <path d="M430 360 q6 -26 -10 -34" stroke="#7C8E63" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M430 358 l16 -8 -6 18 Z" fill="#7C8E63"/>
+  <path d="M352 316 q-14 -30 -6 -52" stroke="#B0B9A0" stroke-width="4" fill="none" stroke-linecap="round" opacity="0.6"/>
+  <path d="M448 316 q14 -30 6 -52" stroke="#B0B9A0" stroke-width="4" fill="none" stroke-linecap="round" opacity="0.6"/>
+  <g opacity="0.5">
+    <path d="M300 210 q-6 20 -16 34 M288 206 q-8 20 -20 30" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" fill="none"/>
+  </g>
+</svg>

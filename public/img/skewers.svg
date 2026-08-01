@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="800" y2="600" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FBFAF6"/>
+      <stop offset="1" stop-color="#FFE9DD"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#bg)"/>
+  <circle cx="400" cy="370" r="235" fill="#FFFFFF" stroke="#EAE6DF" stroke-width="3"/>
+  <ellipse cx="400" cy="548" rx="200" ry="24" fill="#F3EFEA"/>
+  <path d="M285 300 h230 l-14 60 q-101 46 -202 0 Z" fill="#E8955C"/>
+  <path d="M285 300 q101 -34 202 0 l-14 60 q-87 -26 -174 0 Z" fill="#D97A3D"/>
+  <rect x="320" y="288" width="6" height="72" rx="3" fill="#8C6B3A" transform="rotate(-18 323 324)"/>
+  <rect x="352" y="282" width="6" height="72" rx="3" fill="#8C6B3A" transform="rotate(-18 355 318)"/>
+  <rect x="384" y="282" width="6" height="72" rx="3" fill="#8C6B3A" transform="rotate(-18 387 318)"/>
+  <rect x="416" y="282" width="6" height="72" rx="3" fill="#8C6B3A" transform="rotate(-18 419 318)"/>
+  <rect x="448" y="282" width="6" height="72" rx="3" fill="#8C6B3A" transform="rotate(-18 451 318)"/>
+  <circle cx="316" cy="312" r="9" fill="#FFD66B"/>
+  <circle cx="484" cy="312" r="9" fill="#FFD66B"/>
+  <circle cx="400" cy="300" r="9" fill="#FFD66B"/>
+  <path d="M300 410 q-18 34 -4 62" stroke="#D97A3D" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <path d="M340 410 q-16 40 6 66" stroke="#D97A3D" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <path d="M460 410 q16 40 -6 66" stroke="#D97A3D" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <path d="M500 410 q18 34 4 62" stroke="#D97A3D" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <ellipse cx="330" cy="250" rx="34" ry="16" fill="#FFD66B" transform="rotate(-24 330 250)"/>
+  <path d="M300 244 q26 -8 44 -14" stroke="#FFCE7A" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <ellipse cx="470" cy="250" rx="34" ry="16" fill="#FFD66B" transform="rotate(24 470 250)"/>
+  <path d="M500 244 q-26 -8 -44 -14" stroke="#FFCE7A" stroke-width="4" fill="none" stroke-linecap="round"/>
+</svg>

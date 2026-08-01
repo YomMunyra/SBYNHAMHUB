@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="220" height="54" viewBox="0 0 220 54" fill="none">
+  <rect x="0" y="6" width="42" height="42" rx="14" fill="#FF611F"/>
+  <g stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round">
+    <path d="M12 12v12a3.6 3.6 0 0 0 3.6 3.6V45M16.2 12v7.2M20.4 12v7.2"/>
+    <path d="M31.2 12c-1.8 1.2-3 3.6-3 6.6S29.4 24.6 31.2 25.8V45"/>
+  </g>
+  <text x="56" y="29" font-family="Fredoka, 'Segoe UI', sans-serif" font-weight="600" font-size="24" letter-spacing="-0.5" fill="#FF611F">SbyNham<span fill="#0F0F0E">Hub</span></text>
+  <text x="57" y="46" font-family="Fredoka, 'Segoe UI', sans-serif" font-size="9" letter-spacing="2.6" fill="#6B6862">TASTE · BOOK · ENJOY</text>
+</svg>

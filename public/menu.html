@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Menu — SbyNhamHub</title>
+  <meta name="description" content="Browse the SbyNhamHub menu — starters, mains, grills & seafood, desserts and drinks.">
+  <link rel="icon" type="image/svg+xml" href="/img/logo.svg">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body data-page="/menu">
+
+  <header class="nav" id="nav"></header>
+
+  <section class="page-hero">
+    <div class="container">
+      <p class="eyebrow">SbyNhamHub · The Menu</p>
+      <h1>Eat <span class="italic-accent">better.</span></h1>
+      <p class="lede">Seasonal Southeast-Asian cooking, made from scratch each day. Filter by category, or just trust the chef.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="filter-bar" id="filterBar">
+        <button class="filter-chip active" data-cat="">All dishes</button>
+      </div>
+      <div class="grid-3" id="menuGrid">
+        <div class="card-tile" style="padding:60px;text-align:center;grid-column:1/-1">
+          <p class="muted">Loading the menu…</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" style="padding-top:0">
+    <div class="container">
+      <div class="card-tile" style="padding:34px;background:#fff;display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap">
+        <div>
+          <h3 style="margin:0 0 6px">Hungry already?</h3>
+          <p class="muted" style="margin:0">Reserve a table and we'll keep your favourites warm.</p>
+        </div>
+        <a class="btn btn-primary btn-lg" href="/book">Book a table</a>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer" id="footer"></footer>
+
+  <script src="/js/main.js"></script>
+  <script>
+    (function () {
+      const filterBar = document.getElementById('filterBar');
+      const grid = document.getElementById('menuGrid');
+      let items = [];
+      let current = '';
+
+      Promise.all([fetch('/api/menu').then((r) => r.json()), fetch('/api/categories').then((r) => r.json())])
+        .then(([menu, cats]) => {
+          items = menu;
+          const chips = [
+            { slug: '', name: 'All dishes' },
+            ...cats.map((c) => ({ slug: c.slug, name: c.name }))
+          ];
+          filterBar.innerHTML = chips
+            .map((c) => `<button class="filter-chip ${c.slug === '' ? 'active' : ''}" data-cat="${escapeHTML(c.slug)}">${escapeHTML(c.name)}</button>`)
+            .join('');
+          filterBar.addEventListener('click', (e) => {
+            const chip = e.target.closest('.filter-chip');
+            if (!chip) return;
+            current = chip.dataset.cat;
+            filterBar.querySelectorAll('.filter-chip').forEach((c) => c.classList.toggle('active', c === chip));
+            render();
+          });
+          render();
+        })
+        .catch(() => {
+          grid.innerHTML = '<div class="card-tile" style="padding:60px;text-align:center;grid-column:1/-1"><p class="muted">Could not load the menu. Please try again later.</p></div>';
+        });
+
+      function render() {
+        const shown = current ? items.filter((d) => d.category_slug === current) : items;
+        if (!shown.length) {
+          grid.innerHTML = '<div class="card-tile" style="padding:60px;text-align:center;grid-column:1/-1"><p class="muted">No dishes in this category yet.</p></div>';
+          return;
+        }
+        grid.innerHTML = shown.map((d) => `
+          <article class="dish">
+            <div class="dish-img"><img src="/img/${escapeHTML(d.image)}" alt="${escapeHTML(d.name)}"></div>
+            <div class="dish-body">
+              <div class="dish-top">
+                <h3 class="dish-name">${escapeHTML(d.name)}</h3>
+                <span class="dish-price">${money(d.price)}</span>
+              </div>
+              <p class="dish-desc">${escapeHTML(d.description)}</p>
+              <div class="dish-meta">
+                ${d.tag ? `<span class="badge badge-gold">${escapeHTML(d.tag)}</span>` : ''}
+                <span class="badge badge-brand">${escapeHTML(d.category)}</span>
+              </div>
+            </div>
+          </article>
+        `).join('');
+      }
+    })();
+  </script>
+</body>
+</html>

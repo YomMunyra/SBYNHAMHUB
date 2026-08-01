@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="640" y2="480" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF1E8"/>
+      <stop offset="1" stop-color="#FFD9C2"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="480" fill="url(#bg)"/>
+  <circle cx="320" cy="290" r="180" fill="#FFFFFF" stroke="#F3D5BC" stroke-width="3"/>
+  <ellipse cx="320" cy="440" rx="150" ry="18" fill="#F3D5BC"/>
+  <circle cx="320" cy="282" r="120" fill="#FFE9DD"/>
+  <circle cx="320" cy="282" r="112" fill="#FFF9F0"/>
+  <path d="M262 320 q58 -120 116 0 q-26 60 -116 60 Z" fill="#FFD66B"/>
+  <path d="M262 320 q58 -120 116 0 Z" fill="#FFCE7A"/>
+  <path d="M290 300 q30 -42 60 -42 M350 300 q-20 30 -48 34" stroke="#E8A93F" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M238 352 q82 -66 164 0 q-34 70 -164 70 Z" fill="#7C8E63"/>
+  <path d="M238 352 q82 -66 164 0 Z" fill="#6C7E53"/>
+  <path d="M300 346 q24 20 52 16" stroke="#5A6B42" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <circle cx="430" cy="300" r="34" fill="#FF9A6B"/>
+  <circle cx="430" cy="300" r="18" fill="#FFD9C2"/>
+  <path d="M300 414 q-8 30 -18 44 M292 410 q-14 34 -28 48" stroke="#8C9E73" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M286 462 l10 22 -20 0 Z" fill="#8C9E73"/>
+  <path d="M344 414 q8 30 18 44 M352 410 q14 34 28 48" stroke="#8C9E73" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M358 462 l-10 22 20 0 Z" fill="#8C9E73"/>
+  <path d="M262 200 q6 -26 22 -36 M268 202 q14 -30 34 -38" stroke="#B0B9A0" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M392 200 q-6 -26 -22 -36 M386 202 q-14 -30 -34 -38" stroke="#B0B9A0" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <g opacity="0.5">
+    <path d="M200 140 q-8 30 -20 48 M188 138 q-12 36 -28 52" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" fill="none"/>
+  </g>
+  <circle cx="150" cy="180" r="34" fill="#FFFFFF" stroke="#F3D5BC" stroke-width="3"/>
+  <path d="M132 188 q18 -44 36 0 q-8 20 -36 20 Z" fill="#FFD66B"/>
+  <path d="M150 188 q0 -18 0 0 Z" fill="none"/>
+  <circle cx="500" cy="150" r="30" fill="#FFFFFF" stroke="#F3D5BC" stroke-width="3"/>
+  <path d="M486 158 q14 -38 28 0 q-6 16 -28 16 Z" fill="#FF9A6B"/>
+</svg>

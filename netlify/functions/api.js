@@ -40,14 +40,16 @@ function authorized(event) {
   try { return JSON.parse(Buffer.from(payload, 'base64url').toString()).exp > Date.now(); } catch { return false; }
 }
 
-async function reservationStore() {
+async function reservationStore(event) {
   // @netlify/blobs is ESM-only, while this function uses CommonJS.
-  const { getStore } = await import('@netlify/blobs');
+  const { connectLambda, getStore } = await import('@netlify/blobs');
+  // Netlify passes short-lived Blobs credentials in each Lambda event.
+  connectLambda(event);
   return getStore({ name: 'sbynhamhub-reservations', consistency: 'strong' });
 }
 
-async function reservations() {
-  const store = await reservationStore();
+async function reservations(event) {
+  const store = await reservationStore(event);
   const { blobs } = await store.list({ prefix: 'reservation/' });
   const values = await Promise.all(blobs.map(({ key }) => store.get(key, { type: 'json', consistency: 'strong' })));
   return values.filter(Boolean);
@@ -117,19 +119,19 @@ exports.handler = async (event) => {
     if (invalid.length) return json({ error: `Invalid fields: ${invalid.join(', ')}` }, 400);
     if (new Date(`${date} ${time}:00Z`).getTime() <= Date.now() - 15 * 60 * 1000) return json({ error: 'Please pick a future date and time.' }, 400);
     const reservation = { id: crypto.randomUUID(), name: String(name).trim(), email: String(email).trim(), phone: String(phone).trim(), date, time, guests: partySize, occasion: occasion || '', notes: String(notes || '').trim(), status: 'pending', created_at: new Date().toISOString() };
-    const store = await reservationStore();
+    const store = await reservationStore(event);
     await store.setJSON(`reservation/${reservation.id}`, reservation);
     return json({ ok: true, reservation }, 201);
   }
 
   if (method === 'GET' && path === '/reservations') {
     const date = url.searchParams.get('date');
-    const items = sortReservations(await reservations()).filter((item) => !date || item.date === date);
+    const items = sortReservations(await reservations(event)).filter((item) => !date || item.date === date);
     return json(items);
   }
 
   if (method === 'GET' && path === '/stats') {
-    const items = await reservations();
+    const items = await reservations(event);
     const today = new Date().toISOString().slice(0, 10);
     const todays = items.filter((item) => item.date === today);
     const by_status = VALID_STATUS.map((status) => ({ status, n: items.filter((item) => item.status === status).length })).filter((item) => item.n);
@@ -138,7 +140,7 @@ exports.handler = async (event) => {
 
   const match = path.match(/^\/reservations\/([^/]+)$/);
   if (match && (method === 'PATCH' || method === 'DELETE')) {
-    const store = await reservationStore();
+    const store = await reservationStore(event);
     const key = `reservation/${match[1]}`;
     const reservation = await store.get(key, { type: 'json', consistency: 'strong' });
     if (!reservation) return json({ error: 'Reservation not found' }, 404);

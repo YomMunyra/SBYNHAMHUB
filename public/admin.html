@@ -171,7 +171,7 @@
           document.getElementById('pw').value = '';
           showDash();
         } catch (err) {
-          toast('Wrong password', 'error');
+          toast(err.message, 'error');
         }
       });
 

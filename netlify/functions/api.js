@@ -8,8 +8,15 @@ const VALID_STATUS = ['pending', 'confirmed', 'arrived', 'cancelled', 'no-show']
 const VALID_OCCASIONS = ['', 'Birthday', 'Anniversary', 'Date Night', 'Business', 'Family Gathering', 'Other'];
 const TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
 
-function json(body, status = 200) {
-  return Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
+function json(body, statusCode = 200) {
+  return {
+    statusCode,
+    headers: {
+      'Cache-Control': 'no-store',
+      'Content-Type': 'application/json; charset=utf-8'
+    },
+    body: JSON.stringify(body)
+  };
 }
 
 function secret() {
@@ -25,8 +32,8 @@ function createToken() {
   return `${payload}.${sign(payload)}`;
 }
 
-function authorized(request) {
-  const token = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
+function authorized(event) {
+  const token = (event.headers?.authorization || event.headers?.Authorization || '').replace(/^Bearer\s+/i, '');
   const [payload, signature] = token.split('.');
   if (!payload || !signature || !secret()) return false;
   const expected = sign(payload);
@@ -49,19 +56,36 @@ function sortReservations(items) {
   return items.sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`) || String(b.created_at).localeCompare(String(a.created_at)));
 }
 
-function requestPath(request) {
-  return new URL(request.url).pathname
+function requestUrl(event) {
+  if (event.rawUrl) return new URL(event.rawUrl);
+  const host = event.headers?.host || 'localhost';
+  const protocol = event.headers?.['x-forwarded-proto'] || 'https';
+  return new URL(`${protocol}://${host}${event.path || '/'}${event.rawQuery ? `?${event.rawQuery}` : ''}`);
+}
+
+function requestPath(event) {
+  return requestUrl(event).pathname
     .replace(/^\/.netlify\/functions\/api/, '')
     .replace(/^\/api/, '') || '/';
 }
 
-exports.handler = async (request) => {
-  const path = requestPath(request);
-  const method = request.method;
+function readBody(event) {
+  if (!event.body) return {};
+  try {
+    const body = event.isBase64Encoded ? Buffer.from(event.body, 'base64').toString('utf8') : event.body;
+    return JSON.parse(body);
+  } catch {
+    return {};
+  }
+}
+
+exports.handler = async (event) => {
+  const path = requestPath(event);
+  const method = event.httpMethod;
+  const url = requestUrl(event);
 
   if (method === 'GET' && path === '/categories') return json(categories);
   if (method === 'GET' && path === '/menu') {
-    const url = new URL(request.url);
     let items = menu;
     if (url.searchParams.get('category')) items = items.filter((item) => item.category_slug === url.searchParams.get('category'));
     if (url.searchParams.get('featured') === '1') items = items.filter((item) => item.featured);
@@ -69,17 +93,17 @@ exports.handler = async (request) => {
   }
 
   if (method === 'POST' && path === '/auth') {
-    const { password } = await request.json().catch(() => ({}));
+    const { password } = readBody(event);
     if (!secret()) return json({ error: 'Admin login is not configured.' }, 503);
     return password === secret() ? json({ ok: true, token: createToken() }) : json({ error: 'Invalid password' }, 401);
   }
 
   if (path.startsWith('/reservations') || path === '/stats') {
-    if (!authorized(request) && !(method === 'POST' && path === '/reservations')) return json({ error: 'Unauthorized' }, 401);
+    if (!authorized(event) && !(method === 'POST' && path === '/reservations')) return json({ error: 'Unauthorized' }, 401);
   }
 
   if (method === 'POST' && path === '/reservations') {
-    const body = await request.json().catch(() => ({}));
+    const body = readBody(event);
     const { name = '', email = '', phone = '', date = '', time = '', guests = '', occasion = '', notes = '' } = body;
     const invalid = [];
     if (!String(name).trim()) invalid.push('name');
@@ -97,7 +121,7 @@ exports.handler = async (request) => {
   }
 
   if (method === 'GET' && path === '/reservations') {
-    const date = new URL(request.url).searchParams.get('date');
+    const date = url.searchParams.get('date');
     const items = sortReservations(await reservations()).filter((item) => !date || item.date === date);
     return json(items);
   }
@@ -117,7 +141,7 @@ exports.handler = async (request) => {
     const reservation = await store.get(key, { type: 'json', consistency: 'strong' });
     if (!reservation) return json({ error: 'Reservation not found' }, 404);
     if (method === 'DELETE') { await store.delete(key); return json({ ok: true }); }
-    const { status } = await request.json().catch(() => ({}));
+    const { status } = readBody(event);
     if (!VALID_STATUS.includes(status)) return json({ error: 'Invalid status' }, 400);
     reservation.status = status;
     await store.setJSON(key, reservation);

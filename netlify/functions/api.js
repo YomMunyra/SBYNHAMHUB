@@ -56,6 +56,31 @@ async function reservations(event) {
   return values.filter(Boolean);
 }
 
+function guestId(item) {
+  return crypto.createHash('sha256').update(`${String(item.email || '').trim().toLowerCase()}|${String(item.phone || '').trim()}`).digest('base64url').slice(0, 18);
+}
+
+async function guests(event) {
+  const items = await reservations(event);
+  const store = await reservationStore(event);
+  const grouped = new Map();
+  for (const item of items) {
+    const id = guestId(item);
+    const current = grouped.get(id) || { id, name: item.name, email: item.email, phone: item.phone, visits: [], preferences: '' };
+    current.visits.push(item);
+    if (item.created_at > (current.latest_created_at || '')) { current.name = item.name; current.email = item.email; current.phone = item.phone; current.latest_created_at = item.created_at; }
+    grouped.set(id, current);
+  }
+  return Promise.all([...grouped.values()].map(async (guest) => {
+    const profile = await store.get(`guest/${guest.id}`, { type: 'json' });
+    guest.preferences = profile?.preferences || '';
+    guest.visits = sortReservations(guest.visits);
+    guest.total_bookings = guest.visits.length;
+    guest.last_visit = guest.visits.at(-1)?.date || '';
+    return guest;
+  }));
+}
+
 function sortReservations(items) {
   return items.sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`) || String(b.created_at).localeCompare(String(a.created_at)));
 }
@@ -104,6 +129,19 @@ exports.handler = async (event) => {
 
   if (path.startsWith('/reservations') || path === '/stats') {
     if (!authorized(event) && !(method === 'POST' && path === '/reservations')) return json({ error: 'Unauthorized' }, 401);
+  }
+
+  if (path === '/guests' && !authorized(event)) return json({ error: 'Unauthorized' }, 401);
+
+  if (method === 'GET' && path === '/guests') return json(await guests(event));
+
+  const guestMatch = path.match(/^\/guests\/([^/]+)$/);
+  if (guestMatch && method === 'PATCH') {
+    const { preferences = '' } = readBody(event);
+    if (String(preferences).length > 1000) return json({ error: 'Preferences are too long' }, 400);
+    const store = await reservationStore(event);
+    await store.setJSON(`guest/${guestMatch[1]}`, { preferences: String(preferences).trim(), updated_at: new Date().toISOString() });
+    return json({ ok: true });
   }
 
   if (method === 'POST' && path === '/reservations') {

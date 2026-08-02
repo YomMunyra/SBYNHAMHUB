@@ -30,6 +30,7 @@
       <nav class="manager-nav" aria-label="Manager navigation">
         <button class="manager-nav-link active" data-view="overview"><span class="manager-icon">&#9632;</span>Overview</button>
         <button class="manager-nav-link" data-view="bookings"><span class="manager-icon">&#9783;</span>Bookings</button>
+        <button class="manager-nav-link" data-view="floor"><span class="manager-icon">&#9635;</span>Floor plan</button>
       </nav>
       <div class="manager-nav-soon">
         <p class="manager-label">Coming next</p>
@@ -55,6 +56,10 @@
         <div class="manager-date-row"><div><p class="eyebrow">Reservation desk</p><h2>Bookings</h2></div><div class="flex"><input class="input" type="date" id="filterDate" style="max-width:180px"><button class="btn btn-ghost btn-sm" id="clearFilter">All dates</button></div></div>
         <section class="manager-panel manager-table-panel"><div class="table-wrap"><table class="data"><thead><tr><th>Date</th><th>Time</th><th>Guest</th><th>Contact</th><th>Party</th><th>Occasion</th><th>Notes</th><th>Status</th><th></th></tr></thead><tbody id="resBody"><tr><td colspan="9" style="text-align:center;color:#888780">Loading...</td></tr></tbody></table></div></section>
       </div>
+      <div id="floorView" style="display:none">
+        <div class="manager-date-row"><div><p class="eyebrow">Floor management</p><h2>Today's table plan</h2><span>Assign confirmed guests to a table before service.</span></div></div>
+        <div class="floor-layout"><section class="manager-panel"><div class="floor-legend"><span><i class="table-free"></i>Available</span><span><i class="table-booked"></i>Reserved</span><span><i class="table-arrived"></i>Seated</span></div><div class="floor-zone"><span>Window seats</span><div class="table-grid" id="tableGrid"></div></div></section><section class="manager-panel assignment-panel"><p class="eyebrow">Assign a table</p><h2 id="selectedGuest">Select a booking</h2><p id="selectedGuestInfo">Choose a reservation from today's list, then choose an available table.</p><div id="unassignedBookings" class="unassigned-list"></div></section></div>
+      </div>
     </main>
   </section>
 
@@ -69,7 +74,10 @@
       document.getElementById('todayLabel').textContent = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date(today + 'T12:00:00'));
 
       function statusBadge(status) { const map = { pending:'badge-gold', confirmed:'badge-brand', arrived:'badge-green', cancelled:'badge-neutral', 'no-show':'badge-red' }; return `<span class="badge ${map[status] || 'badge-neutral'}">${escapeHTML(status)}</span>`; }
-      function showView(view) { const bookings = view === 'bookings'; document.getElementById('overviewView').style.display = bookings ? 'none' : 'block'; document.getElementById('bookingsView').style.display = bookings ? 'block' : 'none'; document.getElementById('viewTitle').textContent = bookings ? 'Reservation desk' : 'Good day, manager'; document.querySelectorAll('[data-view]').forEach((el) => el.classList.toggle('active', el.dataset.view === view && el.classList.contains('manager-nav-link'))); }
+      let floorBookings = [], selectedBookingId = '';
+      function showView(view) { document.getElementById('overviewView').style.display = view === 'overview' ? 'block' : 'none'; document.getElementById('bookingsView').style.display = view === 'bookings' ? 'block' : 'none'; document.getElementById('floorView').style.display = view === 'floor' ? 'block' : 'none'; document.getElementById('viewTitle').textContent = view === 'bookings' ? 'Reservation desk' : view === 'floor' ? 'Floor plan' : 'Good day, manager'; document.querySelectorAll('[data-view]').forEach((el) => el.classList.toggle('active', el.dataset.view === view && el.classList.contains('manager-nav-link'))); }
+      function tableOf(r) { return r.table || r.table_name || ''; }
+      function renderFloor() { const active = floorBookings.filter((r) => !['cancelled','no-show'].includes(r.status)); const selected = active.find((r) => r.id === selectedBookingId); document.getElementById('selectedGuest').textContent = selected ? selected.name : 'Select a booking'; document.getElementById('selectedGuestInfo').textContent = selected ? `${selected.guests} guests at ${selected.time}. Pick an available table.` : 'Choose a reservation from today\'s list, then choose an available table.'; document.getElementById('tableGrid').innerHTML = Array.from({length:12}, (_, i) => { const name = `T${i + 1}`, guest = active.find((r) => tableOf(r) === name), state = guest ? (guest.status === 'arrived' ? 'arrived' : 'booked') : 'free'; return `<button class="floor-table ${state}" data-table="${name}" ${!selected || guest ? 'disabled' : ''}><b>${name}</b><span>${guest ? escapeHTML(guest.name) : 'Available'}</span></button>`; }).join(''); document.getElementById('unassignedBookings').innerHTML = active.filter((r) => !tableOf(r)).length ? active.filter((r) => !tableOf(r)).map((r) => `<button class="unassigned-booking ${r.id === selectedBookingId ? 'selected' : ''}" data-booking="${r.id}"><b>${escapeHTML(r.time)} - ${escapeHTML(r.name)}</b><span>${r.guests} guests</span></button>`).join('') : '<p class="muted">All active bookings have a table.</p>'; }
       function showDash() { loginView.style.display = 'none'; dashView.style.display = 'flex'; load(); }
 
       function renderTable(items) {
@@ -85,6 +93,7 @@
           ]);
           statGrid.innerHTML = `<div class="stat-card"><div class="val">${stats.total}</div><div class="lbl">Total bookings</div></div><div class="stat-card"><div class="val">${stats.today}</div><div class="lbl">Bookings today</div></div><div class="stat-card"><div class="val">${stats.covers_today}</div><div class="lbl">Covers today</div></div><div class="stat-card"><div class="val">${stats.confirmed}</div><div class="lbl">Confirmed bookings</div></div>`;
           const active = todayItems.filter((r) => !['cancelled','no-show'].includes(r.status));
+          floorBookings = todayItems; renderFloor();
           document.getElementById('todayBookings').innerHTML = active.length ? active.map((r) => `<div class="timeline-booking"><strong>${escapeHTML(r.time)}</strong><div><b>${escapeHTML(r.name)}</b><span>${r.guests} guest${r.guests === 1 ? '' : 's'}${r.occasion ? ' - ' + escapeHTML(r.occasion) : ''}</span></div>${statusBadge(r.status)}</div>`).join('') : '<div class="empty-service"><strong>No bookings yet</strong><span>New reservations will appear here.</span></div>';
           const pending = todayItems.filter((r) => r.status === 'pending').length, confirmed = todayItems.filter((r) => r.status === 'confirmed').length, arrived = todayItems.filter((r) => r.status === 'arrived').length;
           document.getElementById('statusSummary').innerHTML = `<div><b>${pending}</b><span>Pending</span></div><div><b>${confirmed}</b><span>Confirmed</span></div><div><b>${arrived}</b><span>Arrived</span></div>`;
@@ -97,6 +106,8 @@
       document.getElementById('refreshBtn').addEventListener('click', load); filterDate.addEventListener('change', load); document.getElementById('clearFilter').addEventListener('click', () => { filterDate.value = ''; load(); });
       resBody.addEventListener('change', async (e) => { const sel = e.target.closest('.status-select'); if (!sel) return; try { await api('/api/reservations/' + sel.dataset.id, { method:'PATCH', headers:{ Authorization:'Bearer ' + token() }, body:JSON.stringify({ status:sel.value }) }); toast('Booking updated'); load(); } catch (err) { toast(err.message, 'error'); } });
       resBody.addEventListener('click', async (e) => { const btn = e.target.closest('.del'); if (!btn || !confirm('Delete this reservation?')) return; try { await api('/api/reservations/' + btn.dataset.id, { method:'DELETE', headers:{ Authorization:'Bearer ' + token() } }); toast('Reservation deleted'); load(); } catch (err) { toast(err.message, 'error'); } });
+      document.getElementById('unassignedBookings').addEventListener('click', (e) => { const btn = e.target.closest('[data-booking]'); if (!btn) return; selectedBookingId = btn.dataset.booking; renderFloor(); });
+      document.getElementById('tableGrid').addEventListener('click', async (e) => { const btn = e.target.closest('[data-table]'); if (!btn || !selectedBookingId) return; try { await api('/api/reservations/' + selectedBookingId, { method:'PATCH', headers:{ Authorization:'Bearer ' + token() }, body:JSON.stringify({ table:btn.dataset.table }) }); toast('Table assigned'); selectedBookingId = ''; load(); } catch (err) { toast(err.message, 'error'); } });
       if (token()) showDash(); else loginView.style.display = 'block';
     })();
   </script>

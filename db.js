@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS reservations (
 `;
 
 db.exec(SCHEMA);
+try { db.exec("ALTER TABLE reservations ADD COLUMN table_name TEXT NOT NULL DEFAULT ''"); } catch { /* Existing local databases already have this column. */ }
 
 function seed() {
   const count = db.prepare('SELECT COUNT(*) AS n FROM menu_items').get().n;

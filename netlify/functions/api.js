@@ -5,6 +5,7 @@ const { categories, menu } = require('./menu-data');
 
 const VALID_STATUS = ['pending', 'confirmed', 'arrived', 'cancelled', 'no-show'];
 const VALID_OCCASIONS = ['', 'Birthday', 'Anniversary', 'Date Night', 'Business', 'Family Gathering', 'Other'];
+const VALID_TABLES = Array.from({ length: 12 }, (_, index) => `T${index + 1}`);
 const TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
 
 function json(body, statusCode = 200) {
@@ -118,7 +119,7 @@ exports.handler = async (event) => {
     if (occasion && !VALID_OCCASIONS.includes(String(occasion))) invalid.push('occasion');
     if (invalid.length) return json({ error: `Invalid fields: ${invalid.join(', ')}` }, 400);
     if (new Date(`${date} ${time}:00Z`).getTime() <= Date.now() - 15 * 60 * 1000) return json({ error: 'Please pick a future date and time.' }, 400);
-    const reservation = { id: crypto.randomUUID(), name: String(name).trim(), email: String(email).trim(), phone: String(phone).trim(), date, time, guests: partySize, occasion: occasion || '', notes: String(notes || '').trim(), status: 'pending', created_at: new Date().toISOString() };
+    const reservation = { id: crypto.randomUUID(), name: String(name).trim(), email: String(email).trim(), phone: String(phone).trim(), date, time, guests: partySize, occasion: occasion || '', notes: String(notes || '').trim(), table: '', status: 'pending', created_at: new Date().toISOString() };
     const store = await reservationStore(event);
     await store.setJSON(`reservation/${reservation.id}`, reservation);
     return json({ ok: true, reservation }, 201);
@@ -145,9 +146,11 @@ exports.handler = async (event) => {
     const reservation = await store.get(key, { type: 'json' });
     if (!reservation) return json({ error: 'Reservation not found' }, 404);
     if (method === 'DELETE') { await store.delete(key); return json({ ok: true }); }
-    const { status } = readBody(event);
-    if (!VALID_STATUS.includes(status)) return json({ error: 'Invalid status' }, 400);
-    reservation.status = status;
+    const { status, table } = readBody(event);
+    if (status !== undefined && !VALID_STATUS.includes(status)) return json({ error: 'Invalid status' }, 400);
+    if (table !== undefined && table !== '' && !VALID_TABLES.includes(table)) return json({ error: 'Invalid table' }, 400);
+    if (status !== undefined) reservation.status = status;
+    if (table !== undefined) reservation.table = table;
     await store.setJSON(key, reservation);
     return json({ ok: true, reservation });
   }

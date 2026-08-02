@@ -29,6 +29,7 @@ function publicItem(row) {
 
 const VALID_STATUS = ['pending', 'confirmed', 'arrived', 'cancelled', 'no-show'];
 const VALID_OCCASIONS = ['', 'Birthday', 'Anniversary', 'Date Night', 'Business', 'Family Gathering', 'Other'];
+const VALID_TABLES = Array.from({ length: 12 }, (_, index) => `T${index + 1}`);
 
 function auth(req, res, next) {
   const header = req.get('authorization') || '';
@@ -139,13 +140,10 @@ app.post('/api/reservations', (req, res) => {
 
 app.patch('/api/reservations/:id', auth, (req, res) => {
   const id = Number(req.params.id);
-  const { status } = req.body;
-  if (!VALID_STATUS.includes(status)) {
-    return res.status(400).json({ error: 'Invalid status' });
-  }
-  const result = db
-    .prepare('UPDATE reservations SET status = ? WHERE id = ?')
-    .run(status, id);
+  const { status, table } = req.body;
+  if (status !== undefined && !VALID_STATUS.includes(status)) return res.status(400).json({ error: 'Invalid status' });
+  if (table !== undefined && table !== '' && !VALID_TABLES.includes(table)) return res.status(400).json({ error: 'Invalid table' });
+  const result = db.prepare('UPDATE reservations SET status = COALESCE(?, status), table_name = COALESCE(?, table_name) WHERE id = ?').run(status ?? null, table ?? null, id);
   if (result.changes === 0) {
     return res.status(404).json({ error: 'Reservation not found' });
   }

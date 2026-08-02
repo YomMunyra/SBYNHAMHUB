@@ -19,26 +19,29 @@ function json(body, statusCode = 200) {
   };
 }
 
-function secret() {
-  return process.env.ADMIN_PASSWORD || '';
+function secret(role = 'admin') {
+  return role === 'manager' ? (process.env.MANAGER_PASSWORD || process.env.ADMIN_PASSWORD || '') : (process.env.ADMIN_PASSWORD || '');
 }
 
-function sign(value) {
-  return crypto.createHmac('sha256', secret()).update(value).digest('base64url');
+function sign(value, role) {
+  return crypto.createHmac('sha256', secret(role)).update(value).digest('base64url');
 }
 
-function createToken() {
-  const payload = Buffer.from(JSON.stringify({ exp: Date.now() + TOKEN_TTL_MS })).toString('base64url');
-  return `${payload}.${sign(payload)}`;
+function createToken(role) {
+  const payload = Buffer.from(JSON.stringify({ role, exp: Date.now() + TOKEN_TTL_MS })).toString('base64url');
+  return `${payload}.${sign(payload, role)}`;
 }
 
 function authorized(event) {
   const token = (event.headers?.authorization || event.headers?.Authorization || '').replace(/^Bearer\s+/i, '');
   const [payload, signature] = token.split('.');
-  if (!payload || !signature || !secret()) return false;
-  const expected = sign(payload);
+  if (!payload || !signature) return false;
+  let decoded;
+  try { decoded = JSON.parse(Buffer.from(payload, 'base64url').toString()); } catch { return false; }
+  if (!secret(decoded.role)) return false;
+  const expected = sign(payload, decoded.role);
   if (signature.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return false;
-  try { return JSON.parse(Buffer.from(payload, 'base64url').toString()).exp > Date.now(); } catch { return false; }
+  return decoded.exp > Date.now();
 }
 
 async function reservationStore(event) {
@@ -121,10 +124,17 @@ exports.handler = async (event) => {
     return json(items);
   }
 
+  if (path === '/settings') {
+    if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
+    const store = await reservationStore(event);
+    if (method === 'GET') return json((await store.get('settings/restaurant', { type: 'json' })) || {});
+    if (method === 'PATCH') { const settings = readBody(event); await store.setJSON('settings/restaurant', settings); return json({ ok: true, settings }); }
+  }
+
   if (method === 'POST' && path === '/auth') {
-    const { password } = readBody(event);
-    if (!secret()) return json({ error: 'Admin login is not configured.' }, 503);
-    return password === secret() ? json({ ok: true, token: createToken() }) : json({ error: 'Invalid password' }, 401);
+    const { password, role = 'manager' } = readBody(event);
+    if (!['manager', 'admin'].includes(role) || !secret(role)) return json({ error: `${role === 'admin' ? 'Admin' : 'Manager'} login is not configured.` }, 503);
+    return password === secret(role) ? json({ ok: true, role, token: createToken(role) }) : json({ error: 'Invalid password' }, 401);
   }
 
   if (path.startsWith('/reservations') || path === '/stats') {

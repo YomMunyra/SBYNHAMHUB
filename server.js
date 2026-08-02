@@ -192,10 +192,9 @@ app.post('/api/auth', (req, res) => {
 
 /* ---------------- Pages ---------------- */
 
-const pages = ['/menu', '/book', '/admin'];
-app.get(pages, (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', req.path.slice(1) + '.html'));
-});
+app.get(['/menu', '/book'], (req, res) => res.sendFile(path.join(__dirname, 'public', req.path.slice(1) + '.html')));
+app.get('/manager', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
+app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'platform-admin.html')));
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
 

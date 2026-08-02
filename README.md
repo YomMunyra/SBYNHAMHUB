@@ -18,6 +18,21 @@ npm start
 
 Then open http://localhost:3000
 
+## Deploy to Netlify
+
+This repository includes Netlify configuration and a serverless API. Menu data is
+included with the deployment and reservations are stored persistently in Netlify
+Blobs.
+
+1. Push this project to GitHub.
+2. In Netlify, choose **Add new project** and import `YomMunyra/SBYNHAMHUB`.
+3. Leave the build command empty and use `public` as the publish directory.
+4. In **Project configuration → Environment variables**, add a strong
+   `ADMIN_PASSWORD` value. The default local password is deliberately not used on Netlify.
+5. Deploy. Future GitHub pushes will publish automatically.
+
+You can also deploy from a terminal after signing in: `npx netlify-cli deploy --prod`.
+
 | Page | URL |
 |---|---|
 | Home | http://localhost:3000/ |

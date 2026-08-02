@@ -1,7 +1,6 @@
 'use strict';
 
 const crypto = require('node:crypto');
-const { getStore } = require('@netlify/blobs');
 const { categories, menu } = require('./menu-data');
 
 const VALID_STATUS = ['pending', 'confirmed', 'arrived', 'cancelled', 'no-show'];
@@ -41,12 +40,14 @@ function authorized(event) {
   try { return JSON.parse(Buffer.from(payload, 'base64url').toString()).exp > Date.now(); } catch { return false; }
 }
 
-function reservationStore() {
+async function reservationStore() {
+  // @netlify/blobs is ESM-only, while this function uses CommonJS.
+  const { getStore } = await import('@netlify/blobs');
   return getStore({ name: 'sbynhamhub-reservations', consistency: 'strong' });
 }
 
 async function reservations() {
-  const store = reservationStore();
+  const store = await reservationStore();
   const { blobs } = await store.list({ prefix: 'reservation/' });
   const values = await Promise.all(blobs.map(({ key }) => store.get(key, { type: 'json', consistency: 'strong' })));
   return values.filter(Boolean);
@@ -116,7 +117,8 @@ exports.handler = async (event) => {
     if (invalid.length) return json({ error: `Invalid fields: ${invalid.join(', ')}` }, 400);
     if (new Date(`${date} ${time}:00Z`).getTime() <= Date.now() - 15 * 60 * 1000) return json({ error: 'Please pick a future date and time.' }, 400);
     const reservation = { id: crypto.randomUUID(), name: String(name).trim(), email: String(email).trim(), phone: String(phone).trim(), date, time, guests: partySize, occasion: occasion || '', notes: String(notes || '').trim(), status: 'pending', created_at: new Date().toISOString() };
-    await reservationStore().setJSON(`reservation/${reservation.id}`, reservation);
+    const store = await reservationStore();
+    await store.setJSON(`reservation/${reservation.id}`, reservation);
     return json({ ok: true, reservation }, 201);
   }
 
@@ -136,7 +138,7 @@ exports.handler = async (event) => {
 
   const match = path.match(/^\/reservations\/([^/]+)$/);
   if (match && (method === 'PATCH' || method === 'DELETE')) {
-    const store = reservationStore();
+    const store = await reservationStore();
     const key = `reservation/${match[1]}`;
     const reservation = await store.get(key, { type: 'json', consistency: 'strong' });
     if (!reservation) return json({ error: 'Reservation not found' }, 404);

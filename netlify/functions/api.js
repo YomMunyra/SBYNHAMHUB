@@ -45,13 +45,13 @@ async function reservationStore(event) {
   const { connectLambda, getStore } = await import('@netlify/blobs');
   // Netlify passes short-lived Blobs credentials in each Lambda event.
   connectLambda(event);
-  return getStore({ name: 'sbynhamhub-reservations', consistency: 'strong' });
+  return getStore('sbynhamhub-reservations');
 }
 
 async function reservations(event) {
   const store = await reservationStore(event);
   const { blobs } = await store.list({ prefix: 'reservation/' });
-  const values = await Promise.all(blobs.map(({ key }) => store.get(key, { type: 'json', consistency: 'strong' })));
+  const values = await Promise.all(blobs.map(({ key }) => store.get(key, { type: 'json' })));
   return values.filter(Boolean);
 }
 
@@ -142,7 +142,7 @@ exports.handler = async (event) => {
   if (match && (method === 'PATCH' || method === 'DELETE')) {
     const store = await reservationStore(event);
     const key = `reservation/${match[1]}`;
-    const reservation = await store.get(key, { type: 'json', consistency: 'strong' });
+    const reservation = await store.get(key, { type: 'json' });
     if (!reservation) return json({ error: 'Reservation not found' }, 404);
     if (method === 'DELETE') { await store.delete(key); return json({ ok: true }); }
     const { status } = readBody(event);

@@ -19,7 +19,10 @@ function renderHeader(active) {
     ['/menu', 'Menu'],
     ['/reviews', 'Reviews'],
     ['/book', 'Reservations'],
-    ['/points', 'Nyam Points'],
+    ['/points', 'Nyam Points']
+  ];
+  const portal = [
+    ['/manager', 'Manager'],
     ['/admin', 'Admin']
   ];
   const nav = document.getElementById('nav');
@@ -34,6 +37,11 @@ function renderHeader(active) {
       ${links.map(([href, label]) =>
         `<li><a href="${href}" class="${href === active ? 'active' : ''}">${label}</a></li>`
       ).join('')}
+      <li class="nav-portal">
+        ${portal.map(([href, label]) =>
+          `<a href="${href}" class="${href === active ? 'active' : ''}">${label}</a>`
+        ).join('')}
+      </li>
     </ul>
     <div class="nav-cta">
       <a class="btn btn-primary btn-sm" href="/book">Book a table</a>

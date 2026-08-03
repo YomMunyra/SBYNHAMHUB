@@ -31,8 +31,14 @@
       <p class="manager-label">Platform control</p>
       <nav class="manager-nav" aria-label="Admin navigation">
         <button class="manager-nav-link active"><span class="manager-icon">&#9632;</span>Overview</button>
-        <a class="manager-nav-link" href="/manager"><span class="manager-icon">&#8646;</span>Switch to Manager</a>
       </nav>
+      <div class="manager-role-switch">
+        <p class="manager-label">Quick switch</p>
+        <div class="role-switch-grid">
+          <a class="role-btn" href="/manager"><span class="manager-icon">&#9783;</span>Manager</a>
+          <span class="role-btn active"><span class="manager-icon">&#9672;</span>Admin</span>
+        </div>
+      </div>
       <div class="manager-user"><div class="manager-avatar">A</div><div><strong>Platform Admin</strong><small>Full access</small></div></div>
       <button class="manager-signout" id="logoutBtn">Sign out</button>
     </aside>

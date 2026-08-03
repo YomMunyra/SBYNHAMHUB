@@ -728,6 +728,13 @@ table.data tr:hover { background: var(--brand-soft); }
 .manager-user strong { font-size: 13px; }.manager-user small { color: rgba(255,255,255,.52); font-size: 11px; margin-top: 2px; }
 .manager-avatar { background: var(--brand); width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; font-size: 13px; font-weight: 600; }
 .manager-signout { color: rgba(255,255,255,.62); padding: 10px; }
+.manager-role-switch { margin-top: 16px; padding: 0 2px; }
+.manager-role-switch .manager-label { margin: 0 10px 8px; }
+.role-switch-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.role-btn { appearance: none; font: inherit; display: flex; align-items: center; justify-content: center; gap: 7px; padding: 9px 6px; border-radius: 10px; font-size: 12.5px; font-weight: 600; text-decoration: none; color: rgba(255,255,255,.72); background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14); cursor: pointer; transition: background .15s ease, border-color .15s ease, color .15s ease; }
+.role-btn .manager-icon { font-size: 13px; width: auto; }
+.role-btn:hover { color: #fff; border-color: var(--light-orange); }
+.role-btn.active { background: var(--brand); border-color: var(--brand); color: #fff; }
 .manager-main { min-width: 0; flex: 1; padding: 38px clamp(24px, 5vw, 76px) 60px; }
 .manager-topbar { display: flex; justify-content: space-between; gap: 20px; align-items: center; padding-bottom: 30px; border-bottom: 1px solid var(--hair); margin-bottom: 25px; }
 .manager-topbar .eyebrow { margin-bottom: 5px; }.manager-topbar h1 { font-size: clamp(25px, 3vw, 34px); margin: 0; }
@@ -850,7 +857,7 @@ table.data tr:hover { background: var(--brand-soft); }
   .page-hero { padding: 52px 0; }
   .manager-app { display: block; }
   .manager-sidebar { width: auto; min-height: auto; padding: 18px 20px; }
-  .manager-sidebar .manager-label, .manager-nav-soon, .manager-user, .manager-signout { display: none; }
+  .manager-sidebar .manager-label, .manager-nav-soon, .manager-user, .manager-signout, .manager-role-switch { display: none; }
   .manager-nav { display: flex; margin-top: 16px; overflow-x: auto; }
   .manager-nav-link { white-space: nowrap; padding: 9px 11px; }
   .manager-main { padding: 26px 18px 42px; }

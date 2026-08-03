@@ -19,6 +19,7 @@ function renderHeader(active) {
     ['/menu', 'Menu'],
     ['/reviews', 'Reviews'],
     ['/book', 'Reservations'],
+    ['/points', 'Nyam Points'],
     ['/admin', 'Admin']
   ];
   const nav = document.getElementById('nav');
@@ -66,6 +67,7 @@ function renderFooter() {
           <li><a href="/">Home</a></li>
           <li><a href="/menu">Menu</a></li>
           <li><a href="/reviews">Reviews</a></li>
+          <li><a href="/points">Nyam Points</a></li>
           <li><a href="/book">Book a table</a></li>
           <li><a href="/admin">Admin</a></li>
         </ul>

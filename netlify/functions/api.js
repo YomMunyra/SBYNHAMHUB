@@ -7,6 +7,9 @@ const VALID_STATUS = ['pending', 'confirmed', 'arrived', 'cancelled', 'no-show']
 const VALID_OCCASIONS = ['', 'Birthday', 'Anniversary', 'Date Night', 'Business', 'Family Gathering', 'Other'];
 const VALID_TABLES = Array.from({ length: 12 }, (_, index) => `T${index + 1}`);
 const TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
+const POINTS_PER_COVER = 100;
+const POINTS_UNIT = 100;
+const POINTS_RATE = 0.5;
 
 function json(body, statusCode = 200) {
   return {
@@ -80,6 +83,8 @@ async function guests(event) {
     guest.visits = sortReservations(guest.visits);
     guest.total_bookings = guest.visits.length;
     guest.last_visit = guest.visits.at(-1)?.date || '';
+    const account = await store.get(`points/${guest.id}`, { type: 'json' });
+    guest.points = account?.balance || 0;
     return guest;
   }));
 }
@@ -112,6 +117,35 @@ function publicReview(item) {
     reply: item.reply || '',
     created_at: item.created_at
   };
+}
+
+async function pointsAccount(store, key) {
+  return (await store.get(`points/${key}`, { type: 'json' })) || { guest_key: key, name: '', email: '', phone: '', balance: 0, lifetime: 0 };
+}
+
+async function pointsLookup(event, store, email, phone) {
+  const key = guestId({ email, phone });
+  const account = await pointsAccount(store, key);
+  const { blobs } = await store.list({ prefix: `ledger/${key}/` });
+  const ledger = await Promise.all(blobs.map(({ key: blobKey }) => store.get(blobKey, { type: 'json' })));
+  return { balance: account.balance, lifetime: account.lifetime, name: account.name, history: (ledger.filter(Boolean).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))).slice(0, 50) };
+}
+
+async function awardPoints(event, store, reservation) {
+  if (Number(reservation.points_awarded)) return null;
+  const key = guestId(reservation);
+  const earned = Number(reservation.guests) * POINTS_PER_COVER;
+  const account = await pointsAccount(store, key);
+  account.balance += earned;
+  account.lifetime += earned;
+  if (String(reservation.name || '').trim()) account.name = String(reservation.name).trim();
+  if (String(reservation.email || '').trim()) account.email = String(reservation.email).trim();
+  if (String(reservation.phone || '').trim()) account.phone = String(reservation.phone).trim();
+  await store.setJSON(`points/${key}`, account);
+  await store.setJSON(`ledger/${key}/${crypto.randomUUID()}`, { delta: earned, reason: 'earned', ref_id: String(reservation.id), note: `Arrived booking #${reservation.id}`, created_at: new Date().toISOString() });
+  reservation.points_awarded = 1;
+  await store.setJSON(`reservation/${reservation.id}`, reservation);
+  return { key, earned };
 }
 
 function requestUrl(event) {
@@ -182,7 +216,7 @@ exports.handler = async (event) => {
 
   if (method === 'POST' && path === '/reservations') {
     const body = readBody(event);
-    const { name = '', email = '', phone = '', date = '', time = '', guests = '', occasion = '', notes = '' } = body;
+    const { name = '', email = '', phone = '', date = '', time = '', guests = '', occasion = '', notes = '', redeem_points = '' } = body;
     const invalid = [];
     if (!String(name).trim()) invalid.push('name');
     if (!String(phone).trim()) invalid.push('phone');
@@ -193,9 +227,29 @@ exports.handler = async (event) => {
     if (occasion && !VALID_OCCASIONS.includes(String(occasion))) invalid.push('occasion');
     if (invalid.length) return json({ error: `Invalid fields: ${invalid.join(', ')}` }, 400);
     if (new Date(`${date} ${time}:00Z`).getTime() <= Date.now() - 15 * 60 * 1000) return json({ error: 'Please pick a future date and time.' }, 400);
-    const reservation = { id: crypto.randomUUID(), name: String(name).trim(), email: String(email).trim(), phone: String(phone).trim(), date, time, guests: partySize, occasion: occasion || '', notes: String(notes || '').trim(), table: '', status: 'pending', created_at: new Date().toISOString() };
+
+    let points_redeemed = 0;
+    let discount = 0;
+    const rp = Number(redeem_points);
+    if (rp) {
+      if (!String(email).trim()) return json({ error: 'Add an email to redeem points.' }, 400);
+      if (!Number.isInteger(rp) || rp < POINTS_UNIT || rp % POINTS_UNIT !== 0) return json({ error: `Points must be a multiple of ${POINTS_UNIT}.` }, 400);
+      const store = await reservationStore(event);
+      const key = guestId({ email, phone });
+      const account = await pointsAccount(store, key);
+      if (account.balance < rp) return json({ error: 'Not enough points for that email.' }, 400);
+      account.balance -= rp;
+      await store.setJSON(`points/${key}`, account);
+      discount = (rp / POINTS_UNIT) * POINTS_RATE;
+      points_redeemed = rp;
+    }
+
+    const reservation = { id: crypto.randomUUID(), name: String(name).trim(), email: String(email).trim(), phone: String(phone).trim(), date, time, guests: partySize, occasion: occasion || '', notes: String(notes || '').trim(), table: '', status: 'pending', points_awarded: 0, points_redeemed, discount, created_at: new Date().toISOString() };
     const store = await reservationStore(event);
     await store.setJSON(`reservation/${reservation.id}`, reservation);
+    if (points_redeemed) {
+      await store.setJSON(`ledger/${guestId({ email, phone })}/${crypto.randomUUID()}`, { delta: -points_redeemed, reason: 'redeemed', ref_id: String(reservation.id), note: `Discount $${discount.toFixed(2)} on booking #${reservation.id}`, created_at: new Date().toISOString() });
+    }
     return json({ ok: true, reservation }, 201);
   }
 
@@ -211,6 +265,12 @@ exports.handler = async (event) => {
     const todays = items.filter((item) => item.date === today);
     const by_status = VALID_STATUS.map((status) => ({ status, n: items.filter((item) => item.status === status).length })).filter((item) => item.n);
     return json({ total: items.length, today: todays.length, covers_today: todays.reduce((total, item) => total + Number(item.guests), 0), confirmed: items.filter((item) => item.status === 'confirmed').length, by_status });
+  }
+
+  if (method === 'GET' && path === '/points/lookup') {
+    const store = await reservationStore(event);
+    const result = await pointsLookup(event, store, url.searchParams.get('email') || '', url.searchParams.get('phone') || '');
+    return json({ balance: result.balance, lifetime: result.lifetime, name: result.name, history: result.history });
   }
 
   if (method === 'GET' && path === '/reviews/summary') {
@@ -308,7 +368,8 @@ exports.handler = async (event) => {
     if (status !== undefined) reservation.status = status;
     if (table !== undefined) reservation.table = table;
     await store.setJSON(key, reservation);
-    return json({ ok: true, reservation });
+    const points = reservation.status === 'arrived' ? await awardPoints(event, store, reservation) : null;
+    return json({ ok: true, reservation, points });
   }
 
   return json({ error: 'Not found' }, 404);

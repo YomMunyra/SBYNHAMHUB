@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Menu — SbyNhamHub</title>
   <meta name="description" content="Browse the SbyNhamHub menu — starters, mains, grills & seafood, desserts and drinks.">
-  <link rel="icon" type="image/svg+xml" href="/img/logo.svg">
-  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="stylesheet" href="/assets/css/style.css">
 </head>
 <body data-page="/menu">
 
@@ -47,7 +47,7 @@
 
   <footer class="footer" id="footer"></footer>
 
-  <script src="/js/main.js"></script>
+  <script src="/assets/js/main.js"></script>
   <script>
     (function () {
       const filterBar = document.getElementById('filterBar');
@@ -86,7 +86,7 @@
         }
         grid.innerHTML = shown.map((d) => `
           <article class="dish">
-            <div class="dish-img"><img src="/img/${escapeHTML(d.image)}" alt="${escapeHTML(d.name)}"></div>
+            <div class="dish-img"><img src="/assets/img/${escapeHTML(d.image)}" alt="${escapeHTML(d.name)}"></div>
             <div class="dish-body">
               <div class="dish-top">
                 <h3 class="dish-name">${escapeHTML(d.name)}</h3>

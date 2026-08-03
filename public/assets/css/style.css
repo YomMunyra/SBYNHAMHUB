@@ -522,6 +522,33 @@ p { margin: 0 0 1em; }
 
 .booking-ref { margin-top: 12px; font-size: 13px; font-weight: 500; color: var(--brand-mid); background: var(--brand-soft); border-radius: var(--r-md); padding: 12px 16px; }
 
+/* ---------- Nyam Points ---------- */
+
+.points-card { border: 1px solid var(--hair); background: #FFFAF5; border-radius: var(--r-lg); padding: 20px; margin-bottom: 20px; }
+.points-card-head { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; }
+.points-card-head strong { font-size: 15px; }
+.points-status { background: #fff; border: 1px solid var(--hair); border-radius: var(--r-md); padding: 12px 16px; font-size: 14px; margin-bottom: 14px; }
+.points-status strong { color: var(--brand); }
+.points-status.muted { color: var(--muted); }
+
+.points-balance-card { background: var(--ink); color: #fff; border-radius: var(--r-lg); padding: 28px; display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; }
+.points-balance { display: flex; gap: 14px; align-items: flex-start; }
+.points-balance .icon-chip { background: rgba(255, 255, 255, 0.1); color: #FF611F; }
+.points-balance-card .muted { color: rgba(255, 255, 255, 0.7); }
+.points-total { display: flex; align-items: baseline; gap: 8px; margin-top: 2px; }
+.points-total b { font-size: 38px; line-height: 1; color: var(--brand); }
+.points-total span { font-size: 14px; color: rgba(255, 255, 255, 0.85); }
+.points-actions { text-align: center; }
+.points-actions .hint { color: rgba(255, 255, 255, 0.6); }
+
+.points-history-row { display: grid; grid-template-columns: 90px 1fr auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px dashed var(--hair); font-size: 13.5px; }
+.points-history-row:last-child { border-bottom: 0; }
+.points-history-row b { font-weight: 700; }
+.points-history-row.plus b { color: var(--green, #1B7F4B); }
+.points-history-row.minus b { color: var(--brand); }
+.points-history-row span { color: #3A3A37; }
+.points-history-row i { font-style: normal; color: var(--muted); font-size: 12.5px; }
+
 /* ---------- Gallery ---------- */
 
 .gallery { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }

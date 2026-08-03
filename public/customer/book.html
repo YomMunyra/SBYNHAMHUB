@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Book a Table — SbyNhamHub</title>
   <meta name="description" content="Reserve a table at SbyNhamHub in seconds. Free, instant, confirmed online.">
-  <link rel="icon" type="image/svg+xml" href="/img/logo.svg">
-  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="stylesheet" href="/assets/css/style.css">
 </head>
 <body data-page="/book">
 
@@ -101,6 +101,38 @@
               <label for="bNotes">Special requests</label>
               <textarea class="textarea" id="bNotes" name="notes" placeholder="Window seat, allergies, a cake on the table…"></textarea>
             </div>
+            <div class="points-card" id="pointsCard">
+              <div class="points-card-head">
+                <div class="icon-chip">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF611F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                </div>
+                <div>
+                  <strong>Nyam Points</strong>
+                  <p class="muted" style="margin:0;font-size:13.5px">Earn 100 points per cover. Redeem 100 points = $0.50 off.</p>
+                </div>
+              </div>
+              <div class="form-grid">
+                <div class="field">
+                  <label for="pEmail">Points email</label>
+                  <input class="input" id="pEmail" type="email" placeholder="you@example.com">
+                </div>
+                <div class="field">
+                  <label for="pCheck">&nbsp;</label>
+                  <button type="button" class="btn btn-secondary btn-block" id="pCheckBtn">Check balance</button>
+                </div>
+              </div>
+              <div class="points-status muted" id="pointsStatus" style="display:none"></div>
+              <div class="form-grid" id="redeemRow" style="display:none">
+                <div class="field">
+                  <label for="pRedeem">Redeem points</label>
+                  <select class="select" id="pRedeem"></select>
+                </div>
+                <div class="field">
+                  <label for="pDiscount">Discount</label>
+                  <input class="input" id="pDiscount" value="$0.00" readonly>
+                </div>
+              </div>
+            </div>
             <button type="submit" class="btn btn-primary btn-lg btn-block" id="submitBtn">Confirm reservation</button>
             <p class="hint" style="text-align:center;margin:0">No charge to book. Cancellation free up to 1 hour before your table.</p>
           </div>
@@ -120,12 +152,13 @@
       <h3>Table reserved!</h3>
       <p id="modalText">We'll see you at the table.</p>
       <div class="booking-ref" id="modalRef" style="display:none"></div>
+      <div class="booking-ref" id="modalDiscount" style="display:none"></div>
       <a class="btn btn-primary btn-block mt-8" id="modalReviewLink" href="/reviews" style="display:none">Leave a review</a>
       <button class="btn btn-ghost btn-block mt-8" onclick="closeModal()">Done</button>
     </div>
   </div>
 
-  <script src="/js/main.js"></script>
+  <script src="/assets/js/main.js"></script>
   <script>
     (function () {
       const form = document.getElementById('bookingForm');
@@ -144,6 +177,47 @@
       if (qs.get('time')) document.getElementById('bTime').value = qs.get('time');
       if (qs.get('guests')) document.getElementById('bGuests').value = qs.get('guests');
 
+      const pointsStatus = document.getElementById('pointsStatus');
+      const redeemRow = document.getElementById('redeemRow');
+      const pRedeem = document.getElementById('pRedeem');
+      const pDiscount = document.getElementById('pDiscount');
+
+      function updateDiscount() {
+        const pts = Number(pRedeem.value || 0);
+        pDiscount.value = '$' + ((pts / 100) * 0.5).toFixed(2);
+      }
+
+      document.getElementById('pCheckBtn').addEventListener('click', async () => {
+        const email = document.getElementById('pEmail').value.trim();
+        const phone = form.phone.value.trim();
+        if (!email) { toast('Enter an email to check points.', 'error'); return; }
+        try {
+          const data = await api(`/api/points/lookup?email=${encodeURIComponent(email)}&phone=${encodeURIComponent(phone)}`);
+          pointsStatus.style.display = 'block';
+          const balance = data.balance || 0;
+          if (balance >= 100) {
+            pointsStatus.className = 'points-status';
+            pointsStatus.innerHTML = `You have <strong>${balance} points</strong> — worth up to <strong>$${((Math.floor(balance / 100) * 50) / 100).toFixed(2)} off</strong> this booking.`;
+            const max = Math.floor(balance / 100) * 100;
+            const opts = ['<option value="0">0 — don\'t redeem</option>'];
+            for (let n = 100; n <= max; n += 100) opts.push(`<option value="${n}">${n} points</option>`);
+            pRedeem.innerHTML = opts.join('');
+            redeemRow.style.display = '';
+            updateDiscount();
+          } else {
+            pointsStatus.className = 'points-status muted';
+            pointsStatus.innerHTML = 'No points found for that email. Book and honour a visit to start earning 100 points per cover.';
+            redeemRow.style.display = 'none';
+          }
+        } catch (err) {
+          toast(err.message, 'error');
+        }
+      });
+      pRedeem.addEventListener('change', updateDiscount);
+      form.email.addEventListener('input', () => {
+        document.getElementById('pEmail').value = form.email.value.trim();
+      });
+
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
         submitBtn.disabled = true;
@@ -157,7 +231,8 @@
           time: form.time.value,
           guests: Number(form.guests.value),
           occasion: form.occasion.value,
-          notes: form.notes.value.trim()
+          notes: form.notes.value.trim(),
+          redeem_points: Number(pRedeem.value || 0)
         };
 
         try {
@@ -170,11 +245,21 @@
           const ref = document.getElementById('modalRef');
           ref.textContent = `Booking reference: ${r.id} — keep it to leave a verified review after your visit.`;
           ref.style.display = 'block';
+          if (r.discount > 0) {
+            const discount = document.getElementById('modalDiscount');
+            discount.textContent = `Nyam Points applied: ${r.points_redeemed} pts — $${r.discount.toFixed(2)} off your bill.`;
+            discount.style.display = 'block';
+          }
           const reviewLink = document.getElementById('modalReviewLink');
           reviewLink.style.display = 'inline-flex';
           modal.classList.add('open');
           form.reset();
           dateInput.value = iso;
+          pointsStatus.style.display = 'none';
+          redeemRow.style.display = 'none';
+          pRedeem.innerHTML = '';
+          pDiscount.value = '$0.00';
+          document.getElementById('pEmail').value = '';
           submitBtn.disabled = false;
           submitBtn.textContent = 'Confirm reservation';
         } catch (err) {

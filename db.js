@@ -62,10 +62,39 @@ CREATE TABLE IF NOT EXISTS reviews (
   status TEXT NOT NULL DEFAULT 'pending',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS guest_profiles (
+  guest_key TEXT PRIMARY KEY,
+  preferences TEXT NOT NULL DEFAULT '',
+  updated_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS points_accounts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  guest_key TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL DEFAULT '',
+  email TEXT,
+  phone TEXT,
+  balance INTEGER NOT NULL DEFAULT 0,
+  lifetime INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS points_ledger (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  guest_key TEXT NOT NULL,
+  delta INTEGER NOT NULL,
+  reason TEXT NOT NULL DEFAULT 'earned',
+  ref_id TEXT NOT NULL DEFAULT '',
+  note TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `;
 
 db.exec(SCHEMA);
 try { db.exec("ALTER TABLE reservations ADD COLUMN table_name TEXT NOT NULL DEFAULT ''"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE reservations ADD COLUMN points_awarded INTEGER NOT NULL DEFAULT 0"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE reservations ADD COLUMN points_redeemed INTEGER NOT NULL DEFAULT 0"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE reservations ADD COLUMN discount REAL NOT NULL DEFAULT 0"); } catch { /* Existing local databases already have this column. */ }
 
 function seed() {
   const count = db.prepare('SELECT COUNT(*) AS n FROM menu_items').get().n;

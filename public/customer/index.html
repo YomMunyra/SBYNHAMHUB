@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SbyNhamHub — Taste · Book · Enjoy</title>
   <meta name="description" content="SbyNhamHub is a next-generation restaurant. Discover our menu, book a table in seconds and earn rewards on every visit.">
-  <link rel="icon" type="image/svg+xml" href="/img/logo.svg">
-  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="stylesheet" href="/assets/css/style.css">
 </head>
 <body data-page="/">
 
@@ -65,7 +65,7 @@
         </div>
         <div class="hero-visual">
           <div class="hero-card">
-            <img src="/img/hero-plate.svg" alt="SbyNhamHub signature plate">
+            <img src="/assets/img/hero-plate.svg" alt="SbyNhamHub signature plate">
           </div>
         </div>
       </div>
@@ -299,14 +299,14 @@
         <h2>A table worth sharing</h2>
       </div>
       <div class="gallery">
-        <a href="/menu"><img src="/img/amok.svg" alt="Fish Amok Bites"></a>
-        <a href="/menu"><img src="/img/burger.svg" alt="SbyNham Smash Burger"></a>
-        <a href="/menu"><img src="/img/seafood.svg" alt="Whole Grilled Sea Bass"></a>
-        <a href="/menu"><img src="/img/dessert.svg" alt="Sticky Rice & Mango"></a>
-        <a href="/menu"><img src="/img/skewers.svg" alt="Satay Platter"></a>
-        <a href="/menu"><img src="/img/curry.svg" alt="Khmer Beef Lok Lak"></a>
-        <a href="/menu"><img src="/img/drink.svg" alt="House Sangria"></a>
-        <a href="/menu"><img src="/img/noodles.svg" alt="Char Kway Teow"></a>
+        <a href="/menu"><img src="/assets/img/amok.svg" alt="Fish Amok Bites"></a>
+        <a href="/menu"><img src="/assets/img/burger.svg" alt="SbyNham Smash Burger"></a>
+        <a href="/menu"><img src="/assets/img/seafood.svg" alt="Whole Grilled Sea Bass"></a>
+        <a href="/menu"><img src="/assets/img/dessert.svg" alt="Sticky Rice & Mango"></a>
+        <a href="/menu"><img src="/assets/img/skewers.svg" alt="Satay Platter"></a>
+        <a href="/menu"><img src="/assets/img/curry.svg" alt="Khmer Beef Lok Lak"></a>
+        <a href="/menu"><img src="/assets/img/drink.svg" alt="House Sangria"></a>
+        <a href="/menu"><img src="/assets/img/noodles.svg" alt="Char Kway Teow"></a>
       </div>
     </div>
   </section>
@@ -356,7 +356,7 @@
 
   <footer class="footer" id="footer"></footer>
 
-  <script src="/js/main.js"></script>
+  <script src="/assets/js/main.js"></script>
   <script>
     (function () {
       const today = new Date();
@@ -384,7 +384,7 @@
           if (!items.length) { wrap.innerHTML = ''; return; }
           wrap.innerHTML = items.map((d) => `
             <article class="dish">
-              <div class="dish-img"><img src="/img/${escapeHTML(d.image)}" alt="${escapeHTML(d.name)}"></div>
+              <div class="dish-img"><img src="/assets/img/${escapeHTML(d.image)}" alt="${escapeHTML(d.name)}"></div>
               <div class="dish-body">
                 <div class="dish-top">
                   <h3 class="dish-name">${escapeHTML(d.name)}</h3>

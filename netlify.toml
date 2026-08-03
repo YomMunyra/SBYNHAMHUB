@@ -10,20 +10,30 @@
 
 [[redirects]]
   from = "/menu"
-  to = "/menu.html"
+  to = "/customer/menu.html"
   status = 200
 
 [[redirects]]
   from = "/book"
-  to = "/book.html"
+  to = "/customer/book.html"
   status = 200
 
 [[redirects]]
-from = "/admin"
-to = "/platform-admin.html"
-status = 200
+  from = "/reviews"
+  to = "/customer/reviews.html"
+  status = 200
 
 [[redirects]]
-from = "/manager"
-to = "/admin.html"
-status = 200
+  from = "/points"
+  to = "/customer/points.html"
+  status = 200
+
+[[redirects]]
+  from = "/manager"
+  to = "/manager/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/admin"
+  to = "/admin/index.html"
+  status = 200

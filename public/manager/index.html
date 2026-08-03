@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Manager - SbyNhamHub</title>
   <meta name="robots" content="noindex">
-  <link rel="icon" type="image/svg+xml" href="/img/logo.svg">
-  <link rel="stylesheet" href="/css/style.css">
-  <link rel="stylesheet" href="/css/manager.css">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="stylesheet" href="/assets/css/manager.css">
 </head>
-<body data-page="/admin" class="manager-body">
+<body data-page="/manager" class="manager-body">
   <section id="loginView">
     <header class="nav" id="nav"></header>
     <div class="container"><div class="auth-box form-card">
@@ -26,7 +26,7 @@
 
   <section id="dashView" style="display:none" class="manager-app">
     <aside class="manager-sidebar">
-      <a class="manager-brand" href="/" aria-label="SbyNhamHub home"><img src="/img/logo.svg" alt=""><span>SbyNham<strong>Hub</strong></span></a>
+      <a class="manager-brand" href="/" aria-label="SbyNhamHub home"><img src="/assets/img/logo.svg" alt=""><span>SbyNham<strong>Hub</strong></span></a>
       <p class="manager-label">Restaurant workspace</p>
       <nav class="manager-nav" aria-label="Manager navigation">
         <button class="manager-nav-link active" data-view="overview"><span class="manager-icon">&#9632;</span>Overview</button>
@@ -61,15 +61,15 @@
         <div class="manager-date-row"><div><p class="eyebrow">Floor management</p><h2>Today's table plan</h2><span>Assign confirmed guests to a table before service.</span></div></div>
         <div class="floor-layout"><section class="manager-panel"><div class="floor-legend"><span><i class="table-free"></i>Available</span><span><i class="table-booked"></i>Reserved</span><span><i class="table-arrived"></i>Seated</span></div><div class="floor-zone"><span>Window seats</span><div class="table-grid" id="tableGrid"></div></div></section><section class="manager-panel assignment-panel"><p class="eyebrow">Assign a table</p><h2 id="selectedGuest">Select a booking</h2><p id="selectedGuestInfo">Choose a reservation from today's list, then choose an available table.</p><div id="unassignedBookings" class="unassigned-list"></div></section></div>
       </div>
-      <div id="guestsView" style="display:none"><div class="manager-date-row"><div><p class="eyebrow">Guest CRM</p><h2>Guest profiles</h2><span>Remember preferences and make repeat guests feel recognised.</span></div><input class="input" id="guestSearch" placeholder="Search name, email or phone" style="max-width:300px"></div><div class="guest-layout"><section class="manager-panel"><div id="guestList" class="guest-list"><p class="muted">Loading guests...</p></div></section><section class="manager-panel guest-detail"><p class="eyebrow">Guest details</p><h2 id="guestName">Select a guest</h2><p id="guestContact" class="muted">Their booking history will appear here.</p><div id="guestHistory" class="guest-history"></div><div class="field"><label for="guestPreferences">Service notes and preferences</label><textarea class="textarea" id="guestPreferences" placeholder="Favourite table, allergies, celebrations..." disabled></textarea></div><button class="btn btn-primary" id="saveGuest" disabled>Save preferences</button></section></div></div>
+      <div id="guestsView" style="display:none"><div class="manager-date-row"><div><p class="eyebrow">Guest CRM</p><h2>Guest profiles</h2><span>Remember preferences, track visits and Nyam Points for repeat guests.</span></div><input class="input" id="guestSearch" placeholder="Search name, email or phone" style="max-width:300px"></div><div class="guest-layout"><section class="manager-panel"><div id="guestList" class="guest-list"><p class="muted">Loading guests...</p></div></section><section class="manager-panel guest-detail"><p class="eyebrow">Guest details</p><h2 id="guestName">Select a guest</h2><p id="guestContact" class="muted">Their booking history will appear here.</p><div id="guestHistory" class="guest-history"></div><div id="guestPoints" class="guest-points"></div><div class="field"><label for="guestPreferences">Service notes and preferences</label><textarea class="textarea" id="guestPreferences" placeholder="Favourite table, allergies, celebrations..." disabled></textarea></div><button class="btn btn-primary" id="saveGuest" disabled>Save preferences</button></section></div></div>
       <div id="menuView" style="display:none"><div class="manager-date-row"><div><p class="eyebrow">Restaurant menu</p><h2>Menu management</h2><span>Your published dishes and current prices.</span></div><a class="btn btn-primary btn-sm" href="/menu">View public menu</a></div><section class="manager-panel"><div id="managerMenu" class="guest-list"><p class="muted">Loading menu...</p></div></section></div>
       <div id="reviewsView" style="display:none"><div class="manager-date-row"><div><p class="eyebrow">Guest feedback</p><h2>Reviews & moderation</h2><span>Check what guests are saying, reply on behalf of the restaurant, and publish what goes live.</span></div><a class="btn btn-primary btn-sm" href="/reviews">View public page</a></div><section class="manager-panel manager-table-panel"><div class="table-wrap"><table class="data"><thead><tr><th>Guest</th><th>Booking</th><th>Rating</th><th>Review</th><th>Status</th><th>Reply</th><th></th></tr></thead><tbody id="reviewBody"><tr><td colspan="7" style="text-align:center;color:#888780">Loading...</td></tr></tbody></table></div></section></div>
       <div id="settingsView" style="display:none"><div class="manager-date-row"><div><p class="eyebrow">Restaurant setup</p><h2>Restaurant profile</h2></div></div><section class="manager-panel"><div class="form"><div class="form-grid"><div class="field"><label>Restaurant name</label><input class="input" value="SbyNhamHub"></div><div class="field"><label>Phone</label><input class="input" value="+855 12 345 678"></div></div><div class="field"><label>Address</label><input class="input" value="123 Riverside Walk, Phnom Penh"></div><div class="field"><label>Opening hours</label><textarea class="textarea">Mon-Thu: 11:00-22:00&#10;Fri-Sat: 11:00-23:00&#10;Sun: 11:00-21:00</textarea></div><button class="btn btn-primary" type="button" onclick="toast('Settings editor is ready; persistent saving is next.','success')">Save changes</button></div></section></div>
     </main>
   </section>
 
-  <script src="/js/main.js"></script>
-  <script src="/js/manager.js"></script>
+  <script src="/assets/js/main.js"></script>
+  <script src="/assets/js/manager.js"></script>
   <script>
     (function () {
       const TOKEN_KEY = 'sbynham_token';
@@ -91,7 +91,28 @@
           return `<tr data-id="${r.id}"><td><strong>${escapeHTML(r.name)}</strong><div class="muted" style="font-size:12px">${escapeHTML(r.email || r.phone || '')}</div></td><td>${r.reservation_id ? '#' + escapeHTML(r.reservation_id) : 'Featured'}</td><td>${'★'.repeat(overall)}${'☆'.repeat(5 - overall)}<div class="muted" style="font-size:12px">Food ${r.rating_food} · Service ${r.rating_service} · Ambience ${r.rating_ambience} · Value ${r.rating_value}</div></td><td style="max-width:260px">${escapeHTML(r.comment)}<div class="muted" style="font-size:11px;margin-top:4px">${new Date(r.created_at).toLocaleString()}</div></td><td><select class="status-select review-status" data-id="${r.id}">${['pending','published','hidden'].map((s) => `<option value="${s}" ${s === r.status ? 'selected' : ''}>${s}</option>`).join('')}</select></td><td><textarea class="textarea review-reply" data-id="${r.id}" rows="2" style="min-height:50px" placeholder="Reply as SbyNhamHub…">${escapeHTML(r.reply || '')}</textarea></td><td><button class="btn btn-sm btn-ghost save-reply" data-id="${r.id}">Save</button></td></tr>`;
         }).join('');
       }
-      function renderGuests() { const q = document.getElementById('guestSearch').value.toLowerCase(); const items = guestItems.filter((g) => `${g.name} ${g.email} ${g.phone}`.toLowerCase().includes(q)); document.getElementById('guestList').innerHTML = items.length ? items.map((g) => `<button class="guest-row ${g.id === selectedGuestId ? 'selected' : ''}" data-guest="${g.id}"><b>${escapeHTML(g.name)}</b><span>${g.total_bookings} booking${g.total_bookings === 1 ? '' : 's'}${g.preferences ? ' - notes saved' : ''}</span></button>`).join('') : '<p class="muted">No guests found.</p>'; const g = guestItems.find((item) => item.id === selectedGuestId); document.getElementById('guestName').textContent = g ? g.name : 'Select a guest'; document.getElementById('guestContact').textContent = g ? `${g.email || 'No email'} - ${g.phone}` : 'Their booking history will appear here.'; document.getElementById('guestHistory').innerHTML = g ? `<h3>Booking history</h3>${g.visits.slice().reverse().map((r) => `<div><b>${escapeHTML(r.date)} at ${escapeHTML(r.time)}</b><span>${r.guests} guests - ${escapeHTML(r.status)}</span></div>`).join('')}` : ''; const notes = document.getElementById('guestPreferences'); notes.disabled = !g; notes.value = g?.preferences || ''; document.getElementById('saveGuest').disabled = !g; }
+      function renderGuests() {
+        const q = document.getElementById('guestSearch').value.toLowerCase();
+        const items = guestItems.filter((g) => `${g.name} ${g.email} ${g.phone}`.toLowerCase().includes(q));
+        document.getElementById('guestList').innerHTML = items.length ? items.map((g) => `<button class="guest-row ${g.id === selectedGuestId ? 'selected' : ''}" data-guest="${g.id}"><b>${escapeHTML(g.name)}</b><span>${g.total_bookings} booking${g.total_bookings === 1 ? '' : 's'}${g.points ? ' - ' + g.points + ' pts' : ''}${g.preferences ? ' - notes saved' : ''}</span></button>`).join('') : '<p class="muted">No guests found.</p>';
+        const g = guestItems.find((item) => item.id === selectedGuestId);
+        document.getElementById('guestName').textContent = g ? g.name : 'Select a guest';
+        document.getElementById('guestContact').textContent = g ? `${g.email || 'No email'} - ${g.phone}` : 'Their booking history will appear here.';
+        document.getElementById('guestHistory').innerHTML = g ? `<h3>Booking history</h3>${g.visits.slice().reverse().map((r) => `<div><b>${escapeHTML(r.date)} at ${escapeHTML(r.time)}</b><span>${r.guests} guests - ${escapeHTML(r.status)}${r.points_redeemed ? ' - redeemed ' + r.points_redeemed + ' pts' : ''}</span></div>`).join('')}` : '';
+        document.getElementById('guestPoints').innerHTML = g ? `<h3>Nyam Points</h3><div class="points-balance"><b>${g.points || 0}</b> pts available</div><div id="guestPointsHistory"></div>` : '';
+        if (g) {
+          api(`/api/points/lookup?email=${encodeURIComponent(g.email || '')}&phone=${encodeURIComponent(g.phone || '')}`)
+            .then((p) => {
+              if (selectedGuestId !== g.id) return;
+              const history = (p.history || []).map((h) => `<div><b>${h.delta > 0 ? '+' : ''}${h.delta} pts</b><span>${escapeHTML(h.note)}<i>${new Date(h.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</i></span></div>`).join('');
+              document.getElementById('guestPointsHistory').innerHTML = history || '<p class="muted">No points activity yet.</p>';
+            })
+            .catch(() => {});
+        }
+        const notes = document.getElementById('guestPreferences');
+        notes.disabled = !g; notes.value = g?.preferences || '';
+        document.getElementById('saveGuest').disabled = !g;
+      }
       function tableOf(r) { return r.table || r.table_name || ''; }
       function renderFloor() { const active = floorBookings.filter((r) => !['cancelled','no-show'].includes(r.status)); const selected = active.find((r) => r.id === selectedBookingId); document.getElementById('selectedGuest').textContent = selected ? selected.name : 'Select a booking'; document.getElementById('selectedGuestInfo').textContent = selected ? `${selected.guests} guests at ${selected.time}. Pick an available table.` : 'Choose a reservation from today\'s list, then choose an available table.'; document.getElementById('tableGrid').innerHTML = Array.from({length:12}, (_, i) => { const name = `T${i + 1}`, guest = active.find((r) => tableOf(r) === name), state = guest ? (guest.status === 'arrived' ? 'arrived' : 'booked') : 'free'; return `<button class="floor-table ${state}" data-table="${name}" ${!selected || guest ? 'disabled' : ''}><b>${name}</b><span>${guest ? escapeHTML(guest.name) : 'Available'}</span></button>`; }).join(''); document.getElementById('unassignedBookings').innerHTML = active.filter((r) => !tableOf(r)).length ? active.filter((r) => !tableOf(r)).map((r) => `<button class="unassigned-booking ${r.id === selectedBookingId ? 'selected' : ''}" data-booking="${r.id}"><b>${escapeHTML(r.time)} - ${escapeHTML(r.name)}</b><span>${r.guests} guests</span></button>`).join('') : '<p class="muted">All active bookings have a table.</p>'; }
       function showDash() { loginView.style.display = 'none'; dashView.style.display = 'flex'; load(); }

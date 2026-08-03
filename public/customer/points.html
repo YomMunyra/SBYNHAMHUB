@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nyam Points — SbyNhamHub</title>
+  <meta name="description" content="Check your SbyNhamHub Nyam Points balance, history and what you can redeem.">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body data-page="/points">
+
+  <header class="nav" id="nav"></header>
+
+  <section class="page-hero">
+    <div class="container">
+      <p class="eyebrow">SbyNhamHub · Loyalty</p>
+      <h1>Your <span class="italic-accent">Nyam Points.</span></h1>
+      <p class="lede">Earn 100 points for every cover you book and honour. Redeem 100 points for $0.50 off your bill — at every single visit.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container" style="max-width:760px">
+      <div class="form-card">
+        <span class="eyebrow">Check your balance</span>
+        <h3 style="margin-bottom:20px">Enter the email or phone you booked with</h3>
+        <div class="form">
+          <div class="form-grid">
+            <div class="field">
+              <label for="pEmail">Email</label>
+              <input class="input" id="pEmail" type="email" placeholder="you@example.com">
+            </div>
+            <div class="field">
+              <label for="pPhone">Phone</label>
+              <input class="input" id="pPhone" type="tel" placeholder="+855 12 345 678">
+            </div>
+          </div>
+          <button class="btn btn-primary btn-lg btn-block" id="pLookup">Check my points</button>
+        </div>
+      </div>
+
+      <div class="points-balance-card" id="pointsResult" style="display:none">
+        <div class="points-balance">
+          <div class="icon-chip">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF611F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          </div>
+          <div>
+            <p class="muted" style="margin:0;font-size:13px" id="pName">Balance</p>
+            <div class="points-total"><b id="pBalance">0</b><span>Nyam Points</span></div>
+            <p class="muted" style="margin:4px 0 0;font-size:13px">Worth up to <strong id="pWorth">$0.00</strong> off your next table</p>
+          </div>
+        </div>
+        <div class="points-actions">
+          <a class="btn btn-primary" href="/book">Redeem on a booking</a>
+          <p class="hint" style="margin:10px 0 0;text-align:center">Redeem at booking time — 100 points = $0.50 off.</p>
+        </div>
+      </div>
+
+      <div class="card-tile" id="pointsHistory" style="display:none;margin-top:24px;padding:26px;background:#fff">
+        <p class="eyebrow">Activity</p>
+        <h3 style="margin:0 0 16px">Points history</h3>
+        <div class="points-history" id="pHistoryList"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" style="padding-top:0">
+    <div class="container" style="max-width:760px">
+      <div class="grid-3" style="text-align:center">
+        <div class="tile center"><div class="num">100</div><div class="cap">Points per cover booked &amp; honoured</div></div>
+        <div class="tile center"><div class="num">$0.50</div><div class="cap">Off per 100 points redeemed</div></div>
+        <div class="tile center"><div class="num">2×</div><div class="cap">Points on special-occasion tables</div></div>
+      </div>
+      <div class="callout blue mt-8">
+        <strong>How it works:</strong> book through the site, arrive and be seated, and points are
+        credited automatically. Your balance is tied to the email or phone on your booking.
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer" id="footer"></footer>
+
+  <script src="/assets/js/main.js"></script>
+  <script>
+    (function () {
+      const lookup = document.getElementById('pLookup');
+      const email = document.getElementById('pEmail');
+      const phone = document.getElementById('pPhone');
+
+      lookup.addEventListener('click', async () => {
+        const e = email.value.trim();
+        const p = phone.value.trim();
+        if (!e && !p) { toast('Enter an email or phone.', 'error'); return; }
+        try {
+          const data = await api(`/api/points/lookup?email=${encodeURIComponent(e)}&phone=${encodeURIComponent(p)}`);
+          const balance = data.balance || 0;
+          document.getElementById('pName').textContent = data.name ? `${data.name}'s balance` : 'Balance';
+          document.getElementById('pBalance').textContent = balance;
+          document.getElementById('pWorth').textContent = '$' + ((Math.floor(balance / 100) * 50) / 100).toFixed(2);
+          document.getElementById('pointsResult').style.display = 'block';
+          const history = data.history || [];
+          const historyCard = document.getElementById('pointsHistory');
+          if (history.length) {
+            document.getElementById('pHistoryList').innerHTML = history.map((h) => `
+              <div class="points-history-row ${h.delta > 0 ? 'plus' : 'minus'}">
+                <b>${h.delta > 0 ? '+' : ''}${h.delta} pts</b>
+                <span>${escapeHTML(h.note)}</span>
+                <i>${new Date(h.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</i>
+              </div>`).join('');
+            historyCard.style.display = 'block';
+          } else {
+            historyCard.style.display = 'none';
+          }
+        } catch (err) {
+          toast(err.message, 'error');
+        }
+      });
+
+      ['keydown'].forEach(() => {});
+      [email, phone].forEach((input) => {
+        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') lookup.click(); });
+      });
+    })();
+  </script>
+</body>
+</html>

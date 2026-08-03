@@ -409,6 +409,17 @@
       document.querySelectorAll('#hoursList .hours-row .day').forEach((el) => {
         if (el.textContent === todayLabel) el.closest('.hours-row').classList.add('today');
       });
+      fetch('/api/settings')
+        .then((r) => r.json())
+        .then((s) => {
+          const list = document.getElementById('hoursList');
+          if (!list || !(s.hours || []).length) return;
+          list.innerHTML = s.hours.map((h) => `<div class="hours-row"><span class="day">${escapeHTML(h.day)}</span><span>${escapeHTML(h.hours)}</span></div>`).join('');
+          document.querySelectorAll('#hoursList .hours-row .day').forEach((el) => {
+            if (el.textContent === todayLabel) el.closest('.hours-row').classList.add('today');
+          });
+        })
+        .catch(() => {});
 
       fetch('/api/reviews/summary')
         .then((r) => r.json())

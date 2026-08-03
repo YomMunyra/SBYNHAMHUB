@@ -9,6 +9,10 @@ const reservationRoutes = require('./routes/reservations');
 const guestRoutes = require('./routes/guests');
 const pointRoutes = require('./routes/points');
 const reviewRoutes = require('./routes/reviews');
+const analyticsRoutes = require('./routes/analytics');
+const settingsRoutes = require('./routes/settings');
+const waitlistRoutes = require('./routes/waitlist');
+const manageRoutes = require('./routes/manage');
 
 function createApp() {
   const app = express();
@@ -22,6 +26,10 @@ function createApp() {
   app.use('/api', guestRoutes);
   app.use('/api', pointRoutes);
   app.use('/api', reviewRoutes);
+  app.use('/api', analyticsRoutes);
+  app.use('/api', settingsRoutes);
+  app.use('/api', waitlistRoutes);
+  app.use('/api', manageRoutes);
 
   const publicDir = path.join(__dirname, '..', 'public');
   app.use(express.static(publicDir));
@@ -32,6 +40,7 @@ function createApp() {
     '/book': ['customer', 'book.html'],
     '/reviews': ['customer', 'reviews.html'],
     '/points': ['customer', 'points.html'],
+    '/manage': ['customer', 'manage.html'],
     '/manager': ['manager', 'index.html'],
     '/admin': ['admin', 'index.html']
   };

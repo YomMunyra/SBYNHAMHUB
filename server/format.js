@@ -11,6 +11,8 @@ function publicItem(row) {
     image: row.image,
     tag: row.tag,
     featured: !!row.featured,
+    available: row.available !== 0,
+    category_id: row.category_id,
     category: row.category,
     category_slug: row.category_slug
   };

@@ -30,9 +30,11 @@
       <p class="manager-label">Restaurant workspace</p>
       <nav class="manager-nav" aria-label="Manager navigation">
         <button class="manager-nav-link active" data-view="overview"><span class="manager-icon">&#9632;</span>Overview</button>
+        <button class="manager-nav-link" data-view="analytics"><span class="manager-icon">&#9650;</span>Analytics</button>
         <button class="manager-nav-link" data-view="bookings"><span class="manager-icon">&#9783;</span>Bookings</button>
         <button class="manager-nav-link" data-view="floor"><span class="manager-icon">&#9635;</span>Floor plan</button>
         <button class="manager-nav-link" data-view="guests"><span class="manager-icon">&#9786;</span>Guests</button>
+        <button class="manager-nav-link" data-view="waitlist"><span class="manager-icon">&#9775;</span>Waitlist <span class="manager-nav-badge" id="waitlistBadge" style="display:none">0</span></button>
         <button class="manager-nav-link" data-view="menu"><span class="manager-icon">&#9776;</span>Menu</button>
         <button class="manager-nav-link" data-view="reviews"><span class="manager-icon">&#9734;</span>Reviews <span class="manager-nav-badge" id="reviewBadge" style="display:none">0</span></button>
         <button class="manager-nav-link" data-view="settings"><span class="manager-icon">&#9881;</span>Restaurant settings</button>
@@ -53,6 +55,17 @@
         </div>
       </div>
 
+      <div id="analyticsView" style="display:none">
+        <div class="manager-date-row"><div><p class="eyebrow">Restaurant intelligence</p><h2>Analytics</h2><span>Last 30 days of bookings, covers, no-shows and loyalty activity.</span></div></div>
+        <div class="stat-grid manager-stats" id="analyticsStats"></div>
+        <div class="manager-dashboard-grid" style="grid-template-columns:1fr 1fr">
+          <section class="manager-panel"><div class="manager-panel-head"><div><p class="eyebrow">Trend</p><h2>Bookings &amp; covers</h2></div></div><div id="trendChart" class="analytics-bars"></div></section>
+          <section class="manager-panel"><div class="manager-panel-head"><div><p class="eyebrow">Service times</p><h2>Bookings by hour</h2></div></div><div id="hourChart" class="analytics-bars"></div></section>
+          <section class="manager-panel"><div class="manager-panel-head"><div><p class="eyebrow">Week pattern</p><h2>Bookings by weekday</h2></div></div><div id="dowChart" class="analytics-bars"></div></section>
+          <section class="manager-panel"><div class="manager-panel-head"><div><p class="eyebrow">Occasions</p><h2>Most popular occasions</h2></div></div><div id="occasionList" class="guest-list"></div></section>
+        </div>
+      </div>
+
       <div id="bookingsView" style="display:none">
         <div class="manager-date-row"><div><p class="eyebrow">Reservation desk</p><h2>Bookings</h2></div><div class="flex"><input class="input" type="date" id="filterDate" style="max-width:180px"><button class="btn btn-ghost btn-sm" id="clearFilter">All dates</button></div></div>
         <section class="manager-panel manager-table-panel"><div class="table-wrap"><table class="data"><thead><tr><th>Date</th><th>Time</th><th>Guest</th><th>Contact</th><th>Party</th><th>Occasion</th><th>Notes</th><th>Status</th><th></th></tr></thead><tbody id="resBody"><tr><td colspan="9" style="text-align:center;color:#888780">Loading...</td></tr></tbody></table></div></section>
@@ -62,9 +75,43 @@
         <div class="floor-layout"><section class="manager-panel"><div class="floor-legend"><span><i class="table-free"></i>Available</span><span><i class="table-booked"></i>Reserved</span><span><i class="table-arrived"></i>Seated</span></div><div class="floor-zone"><span>Window seats</span><div class="table-grid" id="tableGrid"></div></div></section><section class="manager-panel assignment-panel"><p class="eyebrow">Assign a table</p><h2 id="selectedGuest">Select a booking</h2><p id="selectedGuestInfo">Choose a reservation from today's list, then choose an available table.</p><div id="unassignedBookings" class="unassigned-list"></div></section></div>
       </div>
       <div id="guestsView" style="display:none"><div class="manager-date-row"><div><p class="eyebrow">Guest CRM</p><h2>Guest profiles</h2><span>Remember preferences, track visits and Nyam Points for repeat guests.</span></div><input class="input" id="guestSearch" placeholder="Search name, email or phone" style="max-width:300px"></div><div class="guest-layout"><section class="manager-panel"><div id="guestList" class="guest-list"><p class="muted">Loading guests...</p></div></section><section class="manager-panel guest-detail"><p class="eyebrow">Guest details</p><h2 id="guestName">Select a guest</h2><p id="guestContact" class="muted">Their booking history will appear here.</p><div id="guestHistory" class="guest-history"></div><div id="guestPoints" class="guest-points"></div><div class="field"><label for="guestPreferences">Service notes and preferences</label><textarea class="textarea" id="guestPreferences" placeholder="Favourite table, allergies, celebrations..." disabled></textarea></div><button class="btn btn-primary" id="saveGuest" disabled>Save preferences</button></section></div></div>
-      <div id="menuView" style="display:none"><div class="manager-date-row"><div><p class="eyebrow">Restaurant menu</p><h2>Menu management</h2><span>Your published dishes and current prices.</span></div><a class="btn btn-primary btn-sm" href="/menu">View public menu</a></div><section class="manager-panel"><div id="managerMenu" class="guest-list"><p class="muted">Loading menu...</p></div></section></div>
+      <div id="waitlistView" style="display:none"><div class="manager-date-row"><div><p class="eyebrow">Standby list</p><h2>Waitlist</h2><span>Guests who couldn't find a table — call them when space opens up.</span></div><div class="flex"><input class="input" type="date" id="waitlistDate" style="max-width:180px"><button class="btn btn-ghost btn-sm" id="clearWaitlist">All dates</button></div></div><section class="manager-panel manager-table-panel"><div class="table-wrap"><table class="data"><thead><tr><th>Name</th><th>Contact</th><th>Party</th><th>Preferred</th><th>Notes</th><th>Status</th><th></th></tr></thead><tbody id="waitlistBody"><tr><td colspan="7" style="text-align:center;color:#888780">Loading...</td></tr></tbody></table></div></section></div>
+      <div id="menuView" style="display:none">
+        <div class="manager-date-row"><div><p class="eyebrow">Restaurant menu</p><h2>Menu management</h2><span>Add, edit, price and de-list dishes. Changes go live instantly.</span></div><a class="btn btn-primary btn-sm" href="/menu">View public menu</a></div>
+        <section class="manager-panel" style="margin-bottom:16px">
+          <div class="manager-panel-head"><div><p class="eyebrow">Categories</p><h2>Dish categories</h2></div></div>
+          <div class="form-grid" style="grid-template-columns:1fr 200px auto">
+            <div class="field"><label>New category</label><input class="input" id="catName" placeholder="e.g. Brunch"></div>
+            <div class="field"><label>&nbsp;</label><button class="btn btn-secondary btn-block" id="addCatBtn">Add category</button></div>
+            <div class="field"><label>&nbsp;</label><div id="catList" class="category-chips"></div></div>
+          </div>
+        </section>
+        <section class="manager-panel manager-table-panel">
+          <div class="manager-panel-head"><div><p class="eyebrow">Dishes</p><h2>Menu items</h2></div><button class="btn btn-secondary btn-sm" id="newDishBtn">+ Add dish</button></div>
+          <div class="form-card" id="dishForm" style="display:none;margin:0 0 16px;border:1px dashed var(--brand)">
+            <span class="eyebrow">New dish</span>
+            <div class="form">
+              <div class="form-grid">
+                <div class="field"><label>Name <span class="req">*</span></label><input class="input" id="dName"></div>
+                <div class="field"><label>Category <span class="req">*</span></label><select class="select" id="dCategory"></select></div>
+              </div>
+              <div class="form-grid">
+                <div class="field"><label>Price ($) <span class="req">*</span></label><input class="input" id="dPrice" type="number" step="0.1" min="0"></div>
+                <div class="field"><label>Image file</label><input class="input" id="dImage" placeholder="amok.svg"></div>
+              </div>
+              <div class="field"><label>Description</label><textarea class="textarea" id="dDesc"></textarea></div>
+              <div class="form-grid">
+                <div class="field"><label>Tag</label><input class="input" id="dTag" placeholder="Chef's Pick"></div>
+                <div class="field flex"><label class="check"><input type="checkbox" id="dFeatured"> Featured</label><label class="check"><input type="checkbox" id="dAvailable" checked> Available</label></div>
+              </div>
+              <div class="flex" style="gap:10px"><button class="btn btn-primary" id="saveDishBtn">Save dish</button><button class="btn btn-ghost" id="cancelDishBtn">Cancel</button></div>
+            </div>
+          </div>
+          <div class="table-wrap"><table class="data"><thead><tr><th>Dish</th><th>Category</th><th>Price</th><th>Tag</th><th>Flags</th><th></th></tr></thead><tbody id="managerMenu"><tr><td colspan="6" style="text-align:center;color:#888780">Loading menu...</td></tr></tbody></table></div>
+        </section>
+      </div>
       <div id="reviewsView" style="display:none"><div class="manager-date-row"><div><p class="eyebrow">Guest feedback</p><h2>Reviews & moderation</h2><span>Check what guests are saying, reply on behalf of the restaurant, and publish what goes live.</span></div><a class="btn btn-primary btn-sm" href="/reviews">View public page</a></div><section class="manager-panel manager-table-panel"><div class="table-wrap"><table class="data"><thead><tr><th>Guest</th><th>Booking</th><th>Rating</th><th>Review</th><th>Status</th><th>Reply</th><th></th></tr></thead><tbody id="reviewBody"><tr><td colspan="7" style="text-align:center;color:#888780">Loading...</td></tr></tbody></table></div></section></div>
-      <div id="settingsView" style="display:none"><div class="manager-date-row"><div><p class="eyebrow">Restaurant setup</p><h2>Restaurant profile</h2></div></div><section class="manager-panel"><div class="form"><div class="form-grid"><div class="field"><label>Restaurant name</label><input class="input" value="SbyNhamHub"></div><div class="field"><label>Phone</label><input class="input" value="+855 12 345 678"></div></div><div class="field"><label>Address</label><input class="input" value="123 Riverside Walk, Phnom Penh"></div><div class="field"><label>Opening hours</label><textarea class="textarea">Mon-Thu: 11:00-22:00&#10;Fri-Sat: 11:00-23:00&#10;Sun: 11:00-21:00</textarea></div><button class="btn btn-primary" type="button" onclick="toast('Settings editor is ready; persistent saving is next.','success')">Save changes</button></div></section></div>
+      <div id="settingsView" style="display:none"><div class="manager-date-row"><div><p class="eyebrow">Restaurant setup</p><h2>Restaurant profile</h2><span>Saved settings appear on the public site.</span></div></div><section class="manager-panel"><div class="form"><div class="form-grid"><div class="field"><label>Restaurant name</label><input class="input" id="setName"></div><div class="field"><label>Phone</label><input class="input" id="setPhone"></div></div><div class="field"><label>Address</label><input class="input" id="setAddress"></div><div class="field"><label>Opening hours <span class="muted">(one per line: Label | 11:00 - 22:00)</span></label><textarea class="textarea" id="setHours" rows="5"></textarea></div><button class="btn btn-primary" id="saveSettings">Save settings</button></div></section></div>
     </main>
   </section>
 
@@ -80,8 +127,8 @@
       document.getElementById('todayLabel').textContent = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date(today + 'T12:00:00'));
 
       function statusBadge(status) { const map = { pending:'badge-gold', confirmed:'badge-brand', arrived:'badge-green', cancelled:'badge-neutral', 'no-show':'badge-red' }; return `<span class="badge ${map[status] || 'badge-neutral'}">${escapeHTML(status)}</span>`; }
-      let floorBookings = [], selectedBookingId = '', guestItems = [], selectedGuestId = '', reviewItems = [];
-      function showView(view) { ['overview','bookings','floor','guests','menu','reviews','settings'].forEach((name) => document.getElementById(name + 'View').style.display = view === name ? 'block' : 'none'); document.getElementById('viewTitle').textContent = view === 'settings' ? 'Restaurant settings' : view === 'bookings' ? 'Reservation desk' : view === 'floor' ? 'Floor plan' : view === 'guests' ? 'Guest profiles' : view === 'menu' ? 'Menu management' : view === 'reviews' ? 'Reviews & moderation' : 'Good day, manager'; document.querySelectorAll('[data-view]').forEach((el) => el.classList.toggle('active', el.dataset.view === view && el.classList.contains('manager-nav-link'))); }
+      let floorBookings = [], selectedBookingId = '', guestItems = [], selectedGuestId = '', reviewItems = [], menuItems = [], categories = [], waitlistItems = [], analyticsData = null;
+      function showView(view) { ['overview','analytics','bookings','floor','guests','waitlist','menu','reviews','settings'].forEach((name) => document.getElementById(name + 'View').style.display = view === name ? 'block' : 'none'); document.getElementById('viewTitle').textContent = view === 'settings' ? 'Restaurant settings' : view === 'bookings' ? 'Reservation desk' : view === 'floor' ? 'Floor plan' : view === 'guests' ? 'Guest profiles' : view === 'waitlist' ? 'Waitlist' : view === 'menu' ? 'Menu management' : view === 'reviews' ? 'Reviews & moderation' : view === 'analytics' ? 'Analytics' : 'Good day, manager'; document.querySelectorAll('[data-view]').forEach((el) => el.classList.toggle('active', el.dataset.view === view && el.classList.contains('manager-nav-link'))); }
       function renderReviews() {
         const rows = document.getElementById('reviewBody');
         if (!reviewItems.length) { rows.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888780">No reviews yet. Guest reviews will appear here once submitted.</td></tr>'; return; }
@@ -132,7 +179,10 @@
           const active = todayItems.filter((r) => !['cancelled','no-show'].includes(r.status));
           floorBookings = todayItems; renderFloor();
           guestItems = await api('/api/guests', { headers }); renderGuests();
-          const menuItems = await api('/api/menu'); document.getElementById('managerMenu').innerHTML = menuItems.map((item) => `<div class="guest-row"><b>${escapeHTML(item.name)} <span style="float:right;color:var(--brand)">$${Number(item.price).toFixed(2)}</span></b><span>${escapeHTML(item.category)} - ${escapeHTML(item.description)}</span></div>`).join('');
+          menuItems = await api('/api/menu'); categories = await api('/api/categories'); renderMenu(); renderCategories();
+          waitlistItems = await api('/api/waitlist', { headers }); renderWaitlist();
+          analyticsData = await api('/api/analytics', { headers }); renderAnalytics();
+          await loadSettings();
           reviewItems = await api('/api/reviews?all=1', { headers }); renderReviews();
           const pendingCount = reviewItems.filter((r) => r.status === 'pending').length;
           const badge = document.getElementById('reviewBadge');
@@ -143,6 +193,160 @@
           renderTable(tableItems);
         } catch (err) { if (err.message === 'Unauthorized') { localStorage.removeItem(TOKEN_KEY); loginView.style.display = 'block'; dashView.style.display = 'none'; } toast(err.message, 'error'); }
       }
+      let editingDishId = '';
+      function openDishForm(item) {
+        editingDishId = item ? item.id : '';
+        document.getElementById('dName').value = item ? item.name : '';
+        document.getElementById('dCategory').value = item ? item.category_id : '';
+        document.getElementById('dPrice').value = item ? item.price : '';
+        document.getElementById('dImage').value = item ? item.image : '';
+        document.getElementById('dDesc').value = item ? item.description : '';
+        document.getElementById('dTag').value = item ? (item.tag || '') : '';
+        document.getElementById('dFeatured').checked = item ? item.featured : false;
+        document.getElementById('dAvailable').checked = item ? item.available !== false : true;
+        document.getElementById('dishForm').style.display = 'block';
+        document.getElementById('dishForm').scrollIntoView({ block: 'nearest' });
+      }
+      function renderMenu() {
+        const body = document.getElementById('managerMenu');
+        if (!menuItems.length) { body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#888780">No dishes yet — add your first one.</td></tr>'; return; }
+        body.innerHTML = menuItems.map((item) => `
+          <tr data-id="${item.id}" class="${item.available ? '' : 'dish-off'}">
+            <td><strong>${escapeHTML(item.name)}</strong><div class="muted" style="font-size:12px">${escapeHTML(item.description)}</div></td>
+            <td>${escapeHTML(item.category)}</td>
+            <td>$${Number(item.price).toFixed(2)}</td>
+            <td>${item.tag ? `<span class="badge badge-gold">${escapeHTML(item.tag)}</span>` : '-'}</td>
+            <td class="flex" style="gap:8px">
+              <label class="check"><input type="checkbox" data-id="${item.id}" data-field="available" ${item.available ? 'checked' : ''}> On</label>
+              <label class="check"><input type="checkbox" data-id="${item.id}" data-field="featured" ${item.featured ? 'checked' : ''}> Star</label>
+            </td>
+            <td class="flex" style="gap:6px"><button class="btn btn-sm btn-ghost edit" data-id="${item.id}">Edit</button><button class="btn btn-sm btn-ghost del" data-id="${item.id}">Delete</button></td>
+          </tr>`).join('');
+      }
+      function renderCategories() {
+        document.getElementById('dCategory').innerHTML = categories.map((c) => `<option value="${c.id}">${escapeHTML(c.name)}</option>`).join('');
+        document.getElementById('catList').innerHTML = categories.map((c) => `<span class="chip">${escapeHTML(c.name)}<button class="chip-x" data-delcat="${c.id}" title="Delete if empty">×</button></span>`).join('');
+      }
+      function barRow(label, value, max, color) {
+        const pct = max ? Math.round((value / max) * 100) : 0;
+        return `<div class="bar-row"><span>${escapeHTML(label)}</span><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color || 'var(--brand)'}"></div></div><b>${value}</b></div>`;
+      }
+      function renderAnalytics() {
+        if (!analyticsData) return;
+        const d = analyticsData;
+        const maxTrend = Math.max(1, ...d.trend.map((t) => t.bookings));
+        document.getElementById('analyticsStats').innerHTML = `
+          <div class="stat-card"><div class="val">${d.totals.bookings}</div><div class="lbl">Bookings all-time</div></div>
+          <div class="stat-card"><div class="val">${d.totals.covers}</div><div class="lbl">Covers</div></div>
+          <div class="stat-card"><div class="val">${d.noShowRate}%</div><div class="lbl">No-show rate</div></div>
+          <div class="stat-card"><div class="val">${d.reviews.avg}<span style="color:#BA7517">★</span></div><div class="lbl">Avg rating · ${d.reviews.count} reviews</div></div>
+          <div class="stat-card"><div class="val">${d.points.earned}</div><div class="lbl">Points earned</div></div>
+          <div class="stat-card"><div class="val">$${Number(d.points.discount).toFixed(2)}</div><div class="lbl">Points discounts</div></div>`;
+        document.getElementById('trendChart').innerHTML = d.trend.map((t) => barRow(t.date.slice(5), t.bookings, maxTrend)).join('');
+        const maxHour = Math.max(1, ...d.byHour.map((h) => h.count));
+        document.getElementById('hourChart').innerHTML = d.byHour.length ? d.byHour.map((h) => barRow(h.time, h.count, maxHour)).join('') : '<p class="muted">No bookings yet.</p>';
+        const maxDow = Math.max(1, ...d.byDay.map((x) => x.bookings));
+        document.getElementById('dowChart').innerHTML = d.byDay.map((x) => barRow(x.day, x.bookings, maxDow, 'var(--gold)')).join('');
+        document.getElementById('occasionList').innerHTML = d.topOccasions.length ? d.topOccasions.map((o) => `<div class="guest-row"><b>${escapeHTML(o.name)}</b><span>${o.count} booking${o.count === 1 ? '' : 's'}</span></div>`).join('') : '<p class="muted">No occasion bookings yet.</p>';
+      }
+      function renderWaitlist() {
+        const body = document.getElementById('waitlistBody');
+        const q = document.getElementById('waitlistDate').value;
+        const items = q ? waitlistItems.filter((w) => w.preferred_date === q) : waitlistItems;
+        const badge = document.getElementById('waitlistBadge');
+        if (waitlistItems.length) { badge.textContent = waitlistItems.length; badge.style.display = 'inline-flex'; } else { badge.style.display = 'none'; }
+        if (!items.length) { body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888780">No one on the waitlist.</td></tr>'; return; }
+        body.innerHTML = items.map((w) => `
+          <tr data-id="${w.id}">
+            <td><strong>${escapeHTML(w.name)}</strong></td>
+            <td>${escapeHTML(w.phone)}${w.email ? `<div class="muted" style="font-size:12px">${escapeHTML(w.email)}</div>` : ''}</td>
+            <td>${w.party_size}</td>
+            <td>${escapeHTML(w.preferred_date)} at ${escapeHTML(w.preferred_time)}</td>
+            <td style="max-width:200px">${w.notes ? escapeHTML(w.notes) : '-'}</td>
+            <td><select class="status-select wait-status" data-id="${w.id}">${['waiting','notified','seated','cancelled'].map((s) => `<option value="${s}" ${s === w.status ? 'selected' : ''}>${s}</option>`).join('')}</select></td>
+            <td><button class="btn btn-sm btn-ghost del" data-id="${w.id}">Remove</button></td>
+          </tr>`).join('');
+      }
+      async function loadSettings() {
+        try {
+          const s = await api('/api/settings');
+          document.getElementById('setName').value = s.name || '';
+          document.getElementById('setPhone').value = s.phone || '';
+          document.getElementById('setAddress').value = s.address || '';
+          document.getElementById('setHours').value = (s.hours || []).map((h) => `${h.day} | ${h.hours}`).join('\n');
+        } catch (e) { /* settings are optional on first load */ }
+      }
+
+      document.getElementById('newDishBtn').addEventListener('click', () => openDishForm(null));
+      document.getElementById('cancelDishBtn').addEventListener('click', () => { document.getElementById('dishForm').style.display = 'none'; editingDishId = ''; });
+      document.getElementById('saveDishBtn').addEventListener('click', async () => {
+        const payload = {
+          name: document.getElementById('dName').value.trim(),
+          category_id: Number(document.getElementById('dCategory').value),
+          price: Number(document.getElementById('dPrice').value),
+          description: document.getElementById('dDesc').value.trim(),
+          image: document.getElementById('dImage').value.trim(),
+          tag: document.getElementById('dTag').value.trim(),
+          featured: document.getElementById('dFeatured').checked,
+          available: document.getElementById('dAvailable').checked
+        };
+        try {
+          if (editingDishId) await api('/api/menu/' + editingDishId, { method: 'PATCH', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify(payload) });
+          else await api('/api/menu', { method: 'POST', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify(payload) });
+          toast('Dish saved'); document.getElementById('dishForm').style.display = 'none'; editingDishId = ''; load();
+        } catch (err) { toast(err.message, 'error'); }
+      });
+      document.getElementById('addCatBtn').addEventListener('click', async () => {
+        const name = document.getElementById('catName').value.trim();
+        if (!name) return;
+        try { await api('/api/categories', { method: 'POST', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify({ name }) }); document.getElementById('catName').value = ''; toast('Category added'); load(); } catch (err) { toast(err.message, 'error'); }
+      });
+      document.getElementById('catList').addEventListener('click', async (e) => {
+        const btn = e.target.closest('[data-delcat]');
+        if (!btn) return;
+        try { await api('/api/categories/' + btn.dataset.delcat, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token() } }); toast('Category deleted'); load(); } catch (err) { toast(err.message, 'error'); }
+      });
+      document.getElementById('managerMenu').addEventListener('click', async (e) => {
+        const btn = e.target.closest('.edit, .del');
+        if (!btn) return;
+        const id = btn.dataset.id;
+        if (btn.classList.contains('edit')) { openDishForm(menuItems.find((m) => m.id === id)); return; }
+        if (!confirm('Delete this dish?')) return;
+        try { await api('/api/menu/' + id, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token() } }); toast('Dish deleted'); load(); } catch (err) { toast(err.message, 'error'); }
+      });
+      document.getElementById('managerMenu').addEventListener('change', async (e) => {
+        const box = e.target.closest('input[data-field]');
+        if (!box) return;
+        try { await api('/api/menu/' + box.dataset.id, { method: 'PATCH', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify({ [box.dataset.field]: box.checked }) }); toast('Menu updated'); load(); } catch (err) { toast(err.message, 'error'); }
+      });
+      document.getElementById('waitlistBody').addEventListener('change', async (e) => {
+        const sel = e.target.closest('.wait-status');
+        if (!sel) return;
+        try { await api('/api/waitlist/' + sel.dataset.id, { method: 'PATCH', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify({ status: sel.value }) }); toast('Waitlist updated'); load(); } catch (err) { toast(err.message, 'error'); }
+      });
+      document.getElementById('waitlistBody').addEventListener('click', async (e) => {
+        const btn = e.target.closest('.del');
+        if (!btn) return;
+        try { await api('/api/waitlist/' + btn.dataset.id, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token() } }); toast('Entry removed'); load(); } catch (err) { toast(err.message, 'error'); }
+      });
+      document.getElementById('saveSettings').addEventListener('click', async () => {
+        const hours = document.getElementById('setHours').value.split('\n').map((line) => line.trim()).filter(Boolean).map((line) => {
+          const [day, ...rest] = line.split('|');
+          return { day: (day || '').trim(), hours: (rest.join('|') || '').trim() };
+        });
+        try {
+          await api('/api/settings', { method: 'PATCH', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify({
+            name: document.getElementById('setName').value.trim(),
+            phone: document.getElementById('setPhone').value.trim(),
+            address: document.getElementById('setAddress').value.trim(),
+            hours
+          }) });
+          toast('Settings saved');
+        } catch (err) { toast(err.message, 'error'); }
+      });
+      document.getElementById('waitlistDate').addEventListener('change', renderWaitlist);
+      document.getElementById('clearWaitlist').addEventListener('click', () => { document.getElementById('waitlistDate').value = ''; renderWaitlist(); });
+
       document.getElementById('loginForm').addEventListener('submit', async (e) => { e.preventDefault(); try { const data = await api('/api/auth', { method:'POST', body:JSON.stringify({ password: document.getElementById('pw').value, role:'manager' }) }); localStorage.setItem(TOKEN_KEY, data.token); document.getElementById('pw').value = ''; showDash(); } catch (err) { toast(err.message, 'error'); } });
       document.getElementById('logoutBtn').addEventListener('click', () => { localStorage.removeItem(TOKEN_KEY); loginView.style.display = 'block'; dashView.style.display = 'none'; });
       document.querySelectorAll('[data-view]').forEach((button) => button.addEventListener('click', () => showView(button.dataset.view)));

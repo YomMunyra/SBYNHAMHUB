@@ -12,6 +12,7 @@ const {
   POINTS_RATE
 } = require('../constants');
 const { guestId } = require('../format');
+const { sendBookingConfirmation } = require('../lib/mailer');
 
 const router = express.Router();
 
@@ -129,6 +130,7 @@ router.post('/reservations', (req, res) => {
   }
 
   const row = db.prepare('SELECT * FROM reservations WHERE id = ?').get(id);
+  sendBookingConfirmation(row).catch(() => {});
   res.status(201).json({ ok: true, reservation: row });
 });
 

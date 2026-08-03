@@ -88,6 +88,28 @@ CREATE TABLE IF NOT EXISTS points_ledger (
   note TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS waitlist (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  email TEXT,
+  party_size INTEGER NOT NULL,
+  preferred_date TEXT NOT NULL,
+  preferred_time TEXT NOT NULL,
+  notes TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'waiting',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS settings (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  name TEXT NOT NULL DEFAULT 'SbyNhamHub',
+  phone TEXT NOT NULL DEFAULT '+855 12 345 678',
+  address TEXT NOT NULL DEFAULT '123 Riverside Walk, Phnom Penh',
+  hours TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT
+);
 `;
 
 db.exec(SCHEMA);
@@ -95,6 +117,24 @@ try { db.exec("ALTER TABLE reservations ADD COLUMN table_name TEXT NOT NULL DEFA
 try { db.exec("ALTER TABLE reservations ADD COLUMN points_awarded INTEGER NOT NULL DEFAULT 0"); } catch { /* Existing local databases already have this column. */ }
 try { db.exec("ALTER TABLE reservations ADD COLUMN points_redeemed INTEGER NOT NULL DEFAULT 0"); } catch { /* Existing local databases already have this column. */ }
 try { db.exec("ALTER TABLE reservations ADD COLUMN discount REAL NOT NULL DEFAULT 0"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE menu_items ADD COLUMN available INTEGER NOT NULL DEFAULT 1"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE reservations ADD COLUMN reminder_24h INTEGER NOT NULL DEFAULT 0"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE reservations ADD COLUMN reminder_2h INTEGER NOT NULL DEFAULT 0"); } catch { /* Existing local databases already have this column. */ }
+
+function seedSettings() {
+  const existing = db.prepare('SELECT id FROM settings WHERE id = 1').get();
+  if (existing) return;
+  db.prepare(
+    `INSERT INTO settings (id, name, phone, address, hours)
+     VALUES (1, 'SbyNhamHub', '+855 12 345 678', '123 Riverside Walk, Phnom Penh', ?)`
+  ).run(
+    JSON.stringify([
+      { day: 'Monday – Thursday', hours: '11:00 – 22:00' },
+      { day: 'Friday – Saturday', hours: '11:00 – 23:00' },
+      { day: 'Sunday', hours: '11:00 – 21:00' }
+    ])
+  );
+}
 
 function seed() {
   const count = db.prepare('SELECT COUNT(*) AS n FROM menu_items').get().n;
@@ -184,5 +224,6 @@ function seedReviews() {
 
 seed();
 seedReviews();
+seedSettings();
 
 module.exports = { db, DB_PATH, seed };

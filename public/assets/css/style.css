@@ -129,6 +129,8 @@ p { margin: 0 0 1em; }
 
 .btn-ghost { background: transparent; color: var(--ink); border-color: var(--hair); }
 .btn-ghost:hover { background: var(--paper); border-color: var(--sub); }
+.btn-danger { background: #C4471A; border-color: #C4471A; }
+.btn-danger:hover { background: #A83A15; border-color: #A83A15; }
 
 .btn-white { background: #fff; color: var(--brand-mid); }
 .btn-white:hover { background: var(--light-peach); color: var(--brand-mid); }

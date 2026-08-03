@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Manage Booking — SbyNhamHub</title>
+  <meta name="description" content="Look up, modify or cancel your SbyNhamHub reservation.">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body data-page="/manage">
+
+  <header class="nav" id="nav"></header>
+
+  <section class="page-hero">
+    <div class="container">
+      <p class="eyebrow">SbyNhamHub · Your booking</p>
+      <h1>Manage your <span class="italic-accent">table.</span></h1>
+      <p class="lede">Change the time, tweak the party size, or cancel — free up to 1 hour before your visit.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container" style="max-width:760px">
+      <div class="form-card" id="lookupCard">
+        <span class="eyebrow">Find your booking</span>
+        <h3 style="margin-bottom:20px">Enter your reference and the email or phone you booked with</h3>
+        <div class="form">
+          <div class="form-grid">
+            <div class="field">
+              <label for="mRef">Booking reference <span class="req">*</span></label>
+              <input class="input" id="mRef" placeholder="e.g. 42" required>
+            </div>
+            <div class="field">
+              <label for="mContact">Email or phone <span class="req">*</span></label>
+              <input class="input" id="mContact" placeholder="you@example.com or +855 12 345 678" required>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-lg btn-block" id="mLookup">Find my booking</button>
+        </div>
+      </div>
+
+      <div class="form-card" id="manageCard" style="display:none">
+        <div class="flex-between">
+          <div>
+            <span class="eyebrow" id="mName">Booking</span>
+            <h3 style="margin:0">Reference #<span id="mRefNum"></span></h3>
+          </div>
+          <span class="badge" id="mStatusBadge"></span>
+        </div>
+        <div class="booking-details" id="mDetails" style="margin:18px 0"></div>
+
+        <div id="mActions">
+          <span class="eyebrow">Change your booking</span>
+          <div class="form">
+            <div class="form-grid">
+              <div class="field">
+                <label for="mDate">New date</label>
+                <input class="input" id="mDate" type="date">
+              </div>
+              <div class="field">
+                <label for="mTime">New time</label>
+                <select class="select" id="mTime">
+                  <option value="11:00">11:00</option>
+                  <option value="11:30">11:30</option>
+                  <option value="12:00">12:00</option>
+                  <option value="12:30">12:30</option>
+                  <option value="13:00">13:00</option>
+                  <option value="17:30">17:30</option>
+                  <option value="18:00">18:00</option>
+                  <option value="18:30">18:30</option>
+                  <option value="19:00">19:00</option>
+                  <option value="19:30">19:30</option>
+                  <option value="20:00">20:00</option>
+                  <option value="20:30">20:30</option>
+                  <option value="21:00">21:00</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="mGuests">Guests</label>
+                <select class="select" id="mGuests"></select>
+              </div>
+            </div>
+            <div class="flex" style="gap:10px;flex-wrap:wrap">
+              <button class="btn btn-primary" id="mModify">Save changes</button>
+              <button class="btn btn-danger" id="mCancel">Cancel this booking</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout blue mt-8">
+        <strong>Need a table when we're full?</strong> Join the waitlist from the booking page and we'll call you the moment a table opens up.
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer" id="footer"></footer>
+
+  <script src="/assets/js/main.js"></script>
+  <script>
+    (function () {
+      const mRef = document.getElementById('mRef');
+      const mContact = document.getElementById('mContact');
+      let current = null;
+      const today = new Date().toISOString().slice(0, 10);
+
+      function statusBadge(status) { const map = { pending: 'badge-gold', confirmed: 'badge-brand', arrived: 'badge-green', cancelled: 'badge-neutral', 'no-show': 'badge-red' }; return map[status] || 'badge-neutral'; }
+
+      function fillGuests(selected) {
+        const sel = document.getElementById('mGuests');
+        sel.innerHTML = Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}" ${String(i + 1) === String(selected) ? 'selected' : ''}>${i + 1} guest${i ? 's' : ''}</option>`);
+      }
+
+      document.getElementById('mLookup').addEventListener('click', async () => {
+        if (!mRef.value.trim() || !mContact.value.trim()) { toast('Enter your reference and contact.', 'error'); return; }
+        try {
+          const data = await api('/api/reservations/lookup', {
+            method: 'POST',
+            body: JSON.stringify({ id: mRef.value.trim(), contact: mContact.value.trim() })
+          });
+          current = data.reservation;
+          const closed = ['cancelled', 'no-show'].includes(current.status);
+          document.getElementById('lookupCard').style.display = 'none';
+          document.getElementById('manageCard').style.display = 'block';
+          document.getElementById('mName').textContent = current.name;
+          document.getElementById('mRefNum').textContent = current.id;
+          const badge = document.getElementById('mStatusBadge');
+          badge.textContent = current.status;
+          badge.className = 'badge ' + statusBadge(current.status);
+          document.getElementById('mDetails').innerHTML = `
+            <div class="info-card" style="gap:14px;background:#fff;border:1px solid var(--hair);border-radius:var(--r-lg);padding:16px 18px">
+              <div class="icon-chip"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C4471A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+              <div style="flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;font-size:13.5px">
+                <div><span class="muted">Date</span><br><b>${escapeHTML(current.date)}</b></div>
+                <div><span class="muted">Time</span><br><b>${escapeHTML(current.time)}</b></div>
+                <div><span class="muted">Party</span><br><b>${current.guests} guest${current.guests === 1 ? '' : 's'}</b></div>
+                ${current.discount ? `<div><span class="muted">Nyam Points</span><br><b>${current.points_redeemed} pts · $${Number(current.discount).toFixed(2)} off</b></div>` : ''}
+              </div>
+            </div>`;
+          if (closed) {
+            document.getElementById('mActions').style.display = 'none';
+            document.getElementById('mDetails').insertAdjacentHTML('afterend', '<div class="callout mt-8"><strong>This booking is closed.</strong> Need a new table? <a href="/book">Book again</a>.</div>');
+            return;
+          }
+          document.getElementById('mActions').style.display = 'block';
+          document.getElementById('mDate').value = current.date;
+          document.getElementById('mDate').min = today;
+          document.getElementById('mTime').value = current.time;
+          fillGuests(current.guests);
+        } catch (err) {
+          toast(err.message, 'error');
+        }
+      });
+
+      document.getElementById('mModify').addEventListener('click', async () => {
+        try {
+          const data = await api('/api/reservations/' + current.id + '/modify', {
+            method: 'PATCH',
+            body: JSON.stringify({
+              contact: mContact.value.trim(),
+              date: document.getElementById('mDate').value,
+              time: document.getElementById('mTime').value,
+              guests: Number(document.getElementById('mGuests').value)
+            })
+          });
+          current = data.reservation;
+          toast('Booking updated — a fresh confirmation is on its way.');
+          document.getElementById('mDate').value = current.date;
+          document.getElementById('mTime').value = current.time;
+          fillGuests(current.guests);
+        } catch (err) { toast(err.message, 'error'); }
+      });
+
+      document.getElementById('mCancel').addEventListener('click', async () => {
+        if (!confirm('Cancel this booking for good?')) return;
+        try {
+          const data = await api('/api/reservations/' + current.id + '/cancel', {
+            method: 'POST',
+            body: JSON.stringify({ contact: mContact.value.trim() })
+          });
+          current = data.reservation;
+          toast('Your booking has been cancelled.');
+          document.getElementById('mActions').style.display = 'none';
+          document.getElementById('mStatusBadge').textContent = 'cancelled';
+          document.getElementById('mStatusBadge').className = 'badge ' + statusBadge('cancelled');
+        } catch (err) { toast(err.message, 'error'); }
+      });
+
+      [mRef, mContact].forEach((el) => el.addEventListener('keydown', (e) => { if (e.key === 'Enter') document.getElementById('mLookup').click(); }));
+    })();
+  </script>
+</body>
+</html>

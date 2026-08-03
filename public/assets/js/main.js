@@ -69,6 +69,7 @@ function renderFooter() {
           <li><a href="/reviews">Reviews</a></li>
           <li><a href="/points">Nyam Points</a></li>
           <li><a href="/book">Book a table</a></li>
+          <li><a href="/manage">Manage booking</a></li>
           <li><a href="/admin">Admin</a></li>
         </ul>
       </div>

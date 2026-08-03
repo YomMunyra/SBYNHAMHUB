@@ -141,6 +141,53 @@
     </div>
   </section>
 
+  <section class="section" style="padding-top:0">
+    <div class="container" style="max-width:860px">
+      <div class="callout blue">
+        <strong>Tables full for your slot?</strong> Join the waitlist and we'll call you the moment a table opens up.
+        <div class="form" style="margin-top:14px">
+          <div class="form-grid">
+            <div class="field">
+              <label for="wName">Name</label>
+              <input class="input" id="wName" placeholder="Channa Sok">
+            </div>
+            <div class="field">
+              <label for="wPhone">Phone</label>
+              <input class="input" id="wPhone" type="tel" placeholder="+855 12 345 678">
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="field">
+              <label for="wDate">Preferred date</label>
+              <input class="input" id="wDate" type="date">
+            </div>
+            <div class="field">
+              <label for="wTime">Preferred time</label>
+              <select class="select" id="wTime">
+                <option value="18:00">18:00</option>
+                <option value="18:30">18:30</option>
+                <option value="19:00" selected>19:00</option>
+                <option value="19:30">19:30</option>
+                <option value="20:00">20:00</option>
+                <option value="20:30">20:30</option>
+                <option value="21:00">21:00</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="wParty">Party size</label>
+              <select class="select" id="wParty">
+                <option>1</option><option selected>2</option><option>3</option>
+                <option>4</option><option>5</option><option>6</option>
+                <option>7</option><option>8</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-secondary" id="waitlistBtn" type="button">Join the waitlist</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <footer class="footer" id="footer"></footer>
 
   <!-- Success modal -->
@@ -267,6 +314,27 @@
           submitBtn.disabled = false;
           submitBtn.textContent = 'Confirm reservation';
         }
+      });
+
+      const wDate = document.getElementById('wDate');
+      wDate.min = iso;
+      wDate.value = iso;
+      document.getElementById('waitlistBtn').addEventListener('click', async () => {
+        try {
+          await api('/api/waitlist', {
+            method: 'POST',
+            body: JSON.stringify({
+              name: document.getElementById('wName').value.trim(),
+              phone: document.getElementById('wPhone').value.trim(),
+              preferred_date: wDate.value,
+              preferred_time: document.getElementById('wTime').value,
+              party_size: Number(document.getElementById('wParty').value)
+            })
+          });
+          toast('You\'re on the waitlist! We\'ll call when a table frees up.');
+          document.getElementById('wName').value = '';
+          document.getElementById('wPhone').value = '';
+        } catch (err) { toast(err.message, 'error'); }
       });
 
       window.closeModal = () => modal.classList.remove('open');

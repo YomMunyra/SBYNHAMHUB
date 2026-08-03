@@ -2,6 +2,7 @@
 
 const crypto = require('node:crypto');
 const { categories, menu } = require('./menu-data');
+const { sendBookingConfirmation, sendReminder } = require('../../server/lib/mailer');
 
 const VALID_STATUS = ['pending', 'confirmed', 'arrived', 'cancelled', 'no-show'];
 const VALID_OCCASIONS = ['', 'Birthday', 'Anniversary', 'Date Night', 'Business', 'Family Gathering', 'Other'];
@@ -148,6 +149,52 @@ async function awardPoints(event, store, reservation) {
   return { key, earned };
 }
 
+const DEFAULT_HOURS = [
+  { day: 'Mon–Thu', hours: '11:00 AM – 10:00 PM' },
+  { day: 'Fri–Sat', hours: '11:00 AM – 11:30 PM' },
+  { day: 'Sunday', hours: '12:00 PM – 9:00 PM' }
+];
+
+async function nextCounter(store, name, min = 0) {
+  const current = (await store.get(`meta/${name}`, { type: 'json' }))?.value || 0;
+  const next = Math.max(current, min) + 1;
+  await store.setJSON(`meta/${name}`, { value: next });
+  return next;
+}
+
+async function loadCategories(store) {
+  const { blobs } = await store.list({ prefix: 'cat/' });
+  if (blobs.length) {
+    const values = await Promise.all(blobs.map(({ key }) => store.get(key, { type: 'json' })));
+    return values.filter(Boolean).sort((a, b) => a.id - b.id);
+  }
+  for (const category of categories) await store.setJSON(`cat/${category.id}`, category);
+  return loadCategories(store);
+}
+
+async function loadMenu(store) {
+  const { blobs } = await store.list({ prefix: 'menu/' });
+  if (blobs.length) {
+    const values = await Promise.all(blobs.map(({ key }) => store.get(key, { type: 'json' })));
+    return values.filter(Boolean).sort((a, b) => a.id - b.id);
+  }
+  for (const item of menu) {
+    const category = categories.find((c) => c.slug === item.category_slug);
+    await store.setJSON(`menu/${item.id}`, { ...item, category_id: category ? category.id : 1, available: true });
+  }
+  return loadMenu(store);
+}
+
+function contactMatches(reservation, contact) {
+  const c = String(contact || '').trim().toLowerCase();
+  return c === String(reservation.email || '').trim().toLowerCase() || c === String(reservation.phone || '').trim();
+}
+
+async function storeGetJson(event, key) {
+  const store = await reservationStore(event);
+  return store.get(key, { type: 'json' });
+}
+
 function requestUrl(event) {
   if (event.rawUrl) return new URL(event.rawUrl);
   const host = event.headers?.host || 'localhost';
@@ -176,19 +223,113 @@ exports.handler = async (event) => {
   const method = event.httpMethod;
   const url = requestUrl(event);
 
-  if (method === 'GET' && path === '/categories') return json(categories);
+  if (method === 'GET' && path === '/categories') {
+    const store = await reservationStore(event);
+    return json(await loadCategories(store));
+  }
   if (method === 'GET' && path === '/menu') {
-    let items = menu;
+    const store = await reservationStore(event);
+    let items = await loadMenu(store);
     if (url.searchParams.get('category')) items = items.filter((item) => item.category_slug === url.searchParams.get('category'));
     if (url.searchParams.get('featured') === '1') items = items.filter((item) => item.featured);
     return json(items);
   }
 
-  if (path === '/settings') {
+  if (method === 'POST' && path === '/categories') {
+    if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
+    const { name = '' } = readBody(event);
+    if (!String(name).trim()) return json({ error: 'Category name is required' }, 400);
+    const store = await reservationStore(event);
+    const cats = await loadCategories(store);
+    const slug = String(name).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'category';
+    if (cats.some((c) => c.slug === slug)) return json({ error: 'A category with that name already exists.' }, 409);
+    const id = await nextCounter(store, 'cat-counter', 5);
+    const category = { id, name: String(name).trim(), slug };
+    await store.setJSON(`cat/${id}`, category);
+    return json({ ok: true, category }, 201);
+  }
+
+  if (method === 'POST' && path === '/menu') {
+    if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
+    const { name = '', category_id = '', price = '', description = '', image = '', tag = '', featured = 0, available = 1 } = readBody(event);
+    if (!String(name).trim()) return json({ error: 'Dish name is required' }, 400);
+    const store = await reservationStore(event);
+    const cats = await loadCategories(store);
+    const cat = cats.find((c) => c.id === Number(category_id));
+    if (!cat) return json({ error: 'Invalid category' }, 400);
+    const priceNum = Number(price);
+    if (!Number.isFinite(priceNum) || priceNum < 0) return json({ error: 'Invalid price' }, 400);
+    const id = await nextCounter(store, 'menu-counter', 25);
+    const item = { id, name: String(name).trim(), description: String(description || '').trim(), price: priceNum, image: String(image || 'plate.svg').trim(), tag: String(tag || '').trim() || null, featured: Boolean(featured), available: !(available === 0 || available === false || available === '0' || available === 'false'), category_id: cat.id, category: cat.name, category_slug: cat.slug };
+    await store.setJSON(`menu/${id}`, item);
+    return json({ ok: true, item }, 201);
+  }
+
+  const menuMatch = path.match(/^\/menu\/(\d+)$/);
+  if (menuMatch && method === 'PATCH') {
     if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
     const store = await reservationStore(event);
-    if (method === 'GET') return json((await store.get('settings/restaurant', { type: 'json' })) || {});
-    if (method === 'PATCH') { const settings = readBody(event); await store.setJSON('settings/restaurant', settings); return json({ ok: true, settings }); }
+    const key = `menu/${Number(menuMatch[1])}`;
+    const item = await store.get(key, { type: 'json' });
+    if (!item) return json({ error: 'Dish not found' }, 404);
+    const body = readBody(event);
+    if (body.name !== undefined) {
+      if (!String(body.name).trim()) return json({ error: 'Dish name is required' }, 400);
+      item.name = String(body.name).trim();
+    }
+    if (body.category_id !== undefined) {
+      const cat = (await loadCategories(store)).find((c) => c.id === Number(body.category_id));
+      if (!cat) return json({ error: 'Invalid category' }, 400);
+      item.category_id = cat.id;
+      item.category = cat.name;
+      item.category_slug = cat.slug;
+    }
+    if (body.price !== undefined) {
+      const priceNum = Number(body.price);
+      if (!Number.isFinite(priceNum) || priceNum < 0) return json({ error: 'Invalid price' }, 400);
+      item.price = priceNum;
+    }
+    if (body.description !== undefined) item.description = String(body.description).trim();
+    if (body.image !== undefined) item.image = String(body.image || 'plate.svg').trim();
+    if (body.tag !== undefined) item.tag = String(body.tag).trim() || null;
+    if (body.featured !== undefined) item.featured = Boolean(body.featured);
+    if (body.available !== undefined) item.available = Boolean(body.available);
+    await store.setJSON(key, item);
+    return json({ ok: true, item });
+  }
+
+  if (menuMatch && method === 'DELETE') {
+    if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
+    const store = await reservationStore(event);
+    const key = `menu/${Number(menuMatch[1])}`;
+    const item = await store.get(key, { type: 'json' });
+    if (!item) return json({ error: 'Dish not found' }, 404);
+    await store.delete(key);
+    return json({ ok: true });
+  }
+
+  const catMatch = path.match(/^\/categories\/(\d+)$/);
+  if (catMatch && method === 'DELETE') {
+    if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
+    const store = await reservationStore(event);
+    const items = await loadMenu(store);
+    if (items.some((i) => i.category_id === Number(catMatch[1]))) return json({ error: 'Move or delete dishes in this category first.' }, 409);
+    await store.delete(`cat/${Number(catMatch[1])}`);
+    return json({ ok: true });
+  }
+
+  if (path === '/settings') {
+    const store = await reservationStore(event);
+    if (method === 'GET') {
+      const saved = (await store.get('settings/restaurant', { type: 'json' })) || {};
+      return json({ name: saved.name || 'SbyNhamHub', phone: saved.phone || '+855 12 345 678', address: saved.address || '123 Riverside Walk, Phnom Penh', hours: saved.hours || DEFAULT_HOURS });
+    }
+    if (method === 'PATCH') {
+      if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
+      const settings = readBody(event);
+      await store.setJSON('settings/restaurant', settings);
+      return json({ ok: true, settings });
+    }
   }
 
   if (method === 'POST' && path === '/auth') {
@@ -197,8 +338,12 @@ exports.handler = async (event) => {
     return password === secret(role) ? json({ ok: true, role, token: createToken(role) }) : json({ error: 'Invalid password' }, 401);
   }
 
-  if (path.startsWith('/reservations') || path === '/stats') {
-    if (!authorized(event) && !(method === 'POST' && path === '/reservations')) return json({ error: 'Unauthorized' }, 401);
+  if (path.startsWith('/reservations') || path === '/stats' || path === '/analytics' || path === '/waitlist' || path === '/reminders') {
+    const publicEndpoints =
+      (method === 'POST' && (path === '/reservations' || path === '/reservations/lookup' || /\/cancel$/.test(path))) ||
+      (method === 'PATCH' && /\/modify$/.test(path)) ||
+      (method === 'GET' && path === '/waitlist' && url.searchParams.get('public') === '1');
+    if (!authorized(event) && !publicEndpoints) return json({ error: 'Unauthorized' }, 401);
   }
 
   if (path === '/guests' && !authorized(event)) return json({ error: 'Unauthorized' }, 401);
@@ -244,12 +389,13 @@ exports.handler = async (event) => {
       points_redeemed = rp;
     }
 
-    const reservation = { id: crypto.randomUUID(), name: String(name).trim(), email: String(email).trim(), phone: String(phone).trim(), date, time, guests: partySize, occasion: occasion || '', notes: String(notes || '').trim(), table: '', status: 'pending', points_awarded: 0, points_redeemed, discount, created_at: new Date().toISOString() };
+    const reservation = { id: crypto.randomUUID(), name: String(name).trim(), email: String(email).trim(), phone: String(phone).trim(), date, time, guests: partySize, occasion: occasion || '', notes: String(notes || '').trim(), table: '', status: 'pending', points_awarded: 0, points_redeemed, discount, reminder_24h: 0, reminder_2h: 0, created_at: new Date().toISOString() };
     const store = await reservationStore(event);
     await store.setJSON(`reservation/${reservation.id}`, reservation);
     if (points_redeemed) {
       await store.setJSON(`ledger/${guestId({ email, phone })}/${crypto.randomUUID()}`, { delta: -points_redeemed, reason: 'redeemed', ref_id: String(reservation.id), note: `Discount $${discount.toFixed(2)} on booking #${reservation.id}`, created_at: new Date().toISOString() });
     }
+    try { await sendBookingConfirmation(reservation); } catch { /* email is best-effort */ }
     return json({ ok: true, reservation }, 201);
   }
 
@@ -353,6 +499,164 @@ exports.handler = async (event) => {
     if (reply !== undefined) review.reply = String(reply).trim();
     await store.setJSON(key, review);
     return json({ ok: true, review });
+  }
+
+  if (method === 'POST' && path === '/reservations/lookup') {
+    const { id = '', contact = '' } = readBody(event);
+    if (!String(id).trim()) return json({ error: 'Booking reference is required.' }, 400);
+    if (!String(contact).trim()) return json({ error: 'Email or phone is required.' }, 400);
+    const store = await reservationStore(event);
+    const reservation = await store.get(`reservation/${String(id).trim()}`, { type: 'json' });
+    if (!reservation) return json({ error: 'No booking found with that reference.' }, 404);
+    if (!contactMatches(reservation, contact)) return json({ error: 'That contact does not match the booking.' }, 403);
+    return json({ ok: true, reservation });
+  }
+
+  const cancelMatch = path.match(/^\/reservations\/([^/]+)\/cancel$/);
+  if (cancelMatch && method === 'POST') {
+    const { contact = '' } = readBody(event);
+    const store = await reservationStore(event);
+    const key = `reservation/${cancelMatch[1]}`;
+    const reservation = await store.get(key, { type: 'json' });
+    if (!reservation) return json({ error: 'No booking found with that reference.' }, 404);
+    if (!contactMatches(reservation, contact)) return json({ error: 'That contact does not match the booking.' }, 403);
+    if (!['pending', 'confirmed'].includes(reservation.status)) return json({ error: 'This booking can no longer be cancelled.' }, 409);
+    reservation.status = 'cancelled';
+    await store.setJSON(key, reservation);
+    return json({ ok: true, reservation });
+  }
+
+  const modifyMatch = path.match(/^\/reservations\/([^/]+)\/modify$/);
+  if (modifyMatch && method === 'PATCH') {
+    const body = readBody(event);
+    const store = await reservationStore(event);
+    const key = `reservation/${modifyMatch[1]}`;
+    const reservation = await store.get(key, { type: 'json' });
+    if (!reservation) return json({ error: 'No booking found with that reference.' }, 404);
+    if (!contactMatches(reservation, body.contact)) return json({ error: 'That contact does not match the booking.' }, 403);
+    if (!['pending', 'confirmed'].includes(reservation.status)) return json({ error: 'This booking can no longer be modified.' }, 409);
+    const { date = '', time = '', guests = '' } = body;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date)) && !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(time))) return json({ error: 'Provide a new date and time.' }, 400);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(String(date)) && !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(time))) return json({ error: 'Provide both a new date and time.' }, 400);
+    const nextDate = String(date).trim() || reservation.date;
+    const nextTime = String(time).trim() || reservation.time;
+    if (new Date(`${nextDate} ${nextTime}:00Z`).getTime() <= Date.now() - 15 * 60 * 1000) return json({ error: 'Please pick a future date and time.' }, 400);
+    if (guests !== '') {
+      const partySize = Number(guests);
+      if (!Number.isInteger(partySize) || partySize < 1 || partySize > 20) return json({ error: 'Guests must be between 1 and 20.' }, 400);
+      reservation.guests = partySize;
+    }
+    reservation.date = nextDate;
+    reservation.time = nextTime;
+    await store.setJSON(key, reservation);
+    try { await sendBookingConfirmation(reservation); } catch { /* best-effort */ }
+    return json({ ok: true, reservation });
+  }
+
+  if (method === 'POST' && path === '/waitlist') {
+    const { name = '', phone = '', email = '', party_size = '', preferred_date = '', preferred_time = '', notes = '' } = readBody(event);
+    const invalid = [];
+    if (!String(name).trim()) invalid.push('name');
+    if (!String(phone).trim()) invalid.push('phone');
+    const partySize = Number(party_size);
+    if (!Number.isInteger(partySize) || partySize < 1 || partySize > 20) invalid.push('party_size');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(preferred_date))) invalid.push('preferred_date');
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(String(preferred_time))) invalid.push('preferred_time');
+    if (invalid.length) return json({ error: `Invalid fields: ${invalid.join(', ')}` }, 400);
+    const store = await reservationStore(event);
+    const entry = { id: await nextCounter(store, 'wait-counter'), name: String(name).trim(), phone: String(phone).trim(), email: String(email || '').trim(), party_size: partySize, preferred_date, preferred_time, notes: String(notes || '').trim(), status: 'waiting', created_at: new Date().toISOString() };
+    await store.setJSON(`wait/${entry.id}`, entry);
+    return json({ ok: true, entry }, 201);
+  }
+
+  if (method === 'GET' && path === '/waitlist') {
+    const store = await reservationStore(event);
+    const { blobs } = await store.list({ prefix: 'wait/' });
+    const values = await Promise.all(blobs.map(({ key }) => store.get(key, { type: 'json' })));
+    const date = url.searchParams.get('date');
+    return json(values.filter(Boolean).sort((a, b) => `${a.preferred_date} ${a.preferred_time}`.localeCompare(`${b.preferred_date} ${b.preferred_time}`)).filter((item) => !date || item.preferred_date === date));
+  }
+
+  const waitMatch = path.match(/^\/waitlist\/(\d+)$/);
+  if (waitMatch && (method === 'PATCH' || method === 'DELETE')) {
+    const store = await reservationStore(event);
+    const key = `wait/${Number(waitMatch[1])}`;
+    const entry = await store.get(key, { type: 'json' });
+    if (!entry) return json({ error: 'Waitlist entry not found' }, 404);
+    if (method === 'DELETE') { await store.delete(key); return json({ ok: true }); }
+    const { status } = readBody(event);
+    if (!['waiting', 'notified', 'seated', 'cancelled'].includes(status)) return json({ error: 'Invalid status' }, 400);
+    entry.status = status;
+    await store.setJSON(key, entry);
+    return json({ ok: true, entry });
+  }
+
+  if (method === 'POST' && path === '/reminders') {
+    const store = await reservationStore(event);
+    const items = await reservations(event);
+    const now = Date.now();
+    const sent = [];
+    for (const reservation of items) {
+      if (!['pending', 'confirmed'].includes(reservation.status)) continue;
+      const hours = (new Date(`${reservation.date} ${reservation.time}:00Z`).getTime() - now) / 3600000;
+      if (hours >= 20 && hours <= 26 && !reservation.reminder_24h) {
+        try { await sendReminder(reservation, 24); } catch { /* best-effort */ }
+        reservation.reminder_24h = 1;
+        await store.setJSON(`reservation/${reservation.id}`, reservation);
+        sent.push({ id: reservation.id, kind: '24h' });
+      } else if (hours >= 1 && hours <= 3 && !reservation.reminder_2h) {
+        try { await sendReminder(reservation, 2); } catch { /* best-effort */ }
+        reservation.reminder_2h = 1;
+        await store.setJSON(`reservation/${reservation.id}`, reservation);
+        sent.push({ id: reservation.id, kind: '2h' });
+      }
+    }
+    return json({ ok: true, count: sent.length, sent });
+  }
+
+  if (method === 'GET' && path === '/analytics') {
+    const items = await reservations(event);
+    const reviewsList = await reviews(event);
+    const published = reviewsList.filter((item) => item.status === 'published');
+
+    const now = new Date();
+    const trend = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const date = d.toISOString().slice(0, 10);
+      const day = items.filter((r) => r.date === date);
+      trend.push({ date, bookings: day.length, covers: day.reduce((sum, r) => sum + Number(r.guests), 0) });
+    }
+
+    const dowNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const byDay = dowNames.map((day, i) => ({ day, bookings: items.filter((r) => new Date(`${r.date}T12:00:00`).getDay() === i).length }));
+
+    const hourMap = {};
+    for (const r of items) hourMap[r.time] = (hourMap[r.time] || 0) + 1;
+    const byHour = Object.entries(hourMap).sort((a, b) => a[0].localeCompare(b[0])).map(([time, count]) => ({ time, count }));
+
+    const occasionMap = {};
+    for (const r of items) if (r.occasion) occasionMap[r.occasion] = (occasionMap[r.occasion] || 0) + 1;
+    const topOccasions = Object.entries(occasionMap).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([name, count]) => ({ name, count }));
+
+    const closed = items.filter((r) => ['cancelled', 'no-show'].includes(r.status));
+    const noShowRate = items.length ? Math.round((closed.length / items.length) * 100) : 0;
+
+    const { blobs } = await (await reservationStore(event)).list({ prefix: 'points/' });
+    const accounts = await Promise.all(blobs.map(({ key }) => storeGetJson(event, key)));
+    const pointsEarned = accounts.filter(Boolean).reduce((sum, a) => sum + Number(a.lifetime || 0), 0);
+    const pointsRedeemed = items.reduce((sum, r) => sum + Number(r.points_redeemed || 0), 0);
+    const discountTotal = items.reduce((sum, r) => sum + Number(r.discount || 0), 0);
+    const reviewAvg = published.length ? published.reduce((sum, r) => sum + reviewOverall(r), 0) / published.length : 0;
+
+    return json({
+      totals: { bookings: items.length, covers: items.reduce((sum, r) => sum + Number(r.guests), 0), arrivals: items.filter((r) => r.status === 'arrived').length, confirmed: items.filter((r) => r.status === 'confirmed').length, closed },
+      trend, byDay, byHour, topOccasions,
+      noShowRate,
+      points: { earned: pointsEarned, redeemed: pointsRedeemed, discount: discountTotal },
+      reviews: { count: published.length, avg: Math.round(reviewAvg * 10) / 10 }
+    });
   }
 
   const match = path.match(/^\/reservations\/([^/]+)$/);

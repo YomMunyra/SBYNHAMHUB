@@ -16,6 +16,7 @@ const LOGO = `
 function renderHeader(active) {
   const links = [
     ['/', 'Home'],
+    ['/discover', 'Discover'],
     ['/menu', 'Menu'],
     ['/reviews', 'Reviews'],
     ['/book', 'Reservations'],
@@ -27,6 +28,7 @@ function renderHeader(active) {
     ['/admin', 'Admin']
   ];
   const profileLinks = [
+    ['/discover', 'Discover & book'],
     ['/book', 'Book a table'],
     ['/manage', 'Manage my booking'],
     ['/pay', 'Pay your bill'],
@@ -115,6 +117,7 @@ function renderFooter() {
         <h4>Explore</h4>
         <ul>
           <li><a href="/">Home</a></li>
+          <li><a href="/discover">Discover</a></li>
           <li><a href="/menu">Menu</a></li>
           <li><a href="/reviews">Reviews</a></li>
           <li><a href="/points">Nyam Points</a></li>

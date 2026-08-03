@@ -8,6 +8,12 @@ const VALID_REVIEW_STATUS = ['pending', 'published', 'hidden'];
 const POINTS_PER_COVER = 100;
 const POINTS_UNIT = 100;
 const POINTS_RATE = 0.5;
+const SEAT_CAPACITY = 48;
+const TIME_SLOTS = [
+  '11:00', '11:30', '12:00', '12:30', '13:00',
+  '17:30', '18:00', '18:30', '19:00', '19:30',
+  '20:00', '20:30', '21:00'
+];
 
 module.exports = {
   VALID_STATUS,
@@ -16,5 +22,7 @@ module.exports = {
   VALID_REVIEW_STATUS,
   POINTS_PER_COVER,
   POINTS_UNIT,
-  POINTS_RATE
+  POINTS_RATE,
+  SEAT_CAPACITY,
+  TIME_SLOTS
 };

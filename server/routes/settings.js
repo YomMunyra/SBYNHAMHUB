@@ -8,14 +8,14 @@ const router = express.Router();
 
 router.get('/settings', (req, res) => {
   const row = db.prepare('SELECT * FROM settings WHERE id = 1').get();
-  if (!row) return res.json({ name: 'SbyNhamHub', phone: '', address: '', hours: [], avg_cover: 15, fee_rate: 0.0095, fee_flat: 0.5 });
+  if (!row) return res.json({ name: 'SbyNhamHub', phone: '', address: '', hours: [], avg_cover: 15, fee_rate: 0.0095, fee_flat: 0.5, capacity: 48 });
   let hours = [];
   try { hours = JSON.parse(row.hours); } catch { hours = []; }
-  res.json({ name: row.name, phone: row.phone, address: row.address, hours, avg_cover: row.avg_cover, fee_rate: row.fee_rate, fee_flat: row.fee_flat });
+  res.json({ name: row.name, phone: row.phone, address: row.address, hours, avg_cover: row.avg_cover, fee_rate: row.fee_rate, fee_flat: row.fee_flat, capacity: row.capacity });
 });
 
 router.patch('/settings', requireAuth, (req, res) => {
-  const { name, phone, address, hours, avg_cover, fee_rate, fee_flat } = req.body || {};
+  const { name, phone, address, hours, avg_cover, fee_rate, fee_flat, capacity } = req.body || {};
   const current = db.prepare('SELECT * FROM settings WHERE id = 1').get();
   if (!current) return res.status(404).json({ error: 'Settings not found' });
   let avgCover = current.avg_cover;
@@ -33,6 +33,11 @@ router.patch('/settings', requireAuth, (req, res) => {
     feeFlat = Number(fee_flat);
     if (!Number.isFinite(feeFlat) || feeFlat < 0) return res.status(400).json({ error: 'Flat fee must be 0 or more' });
   }
+  let seatCapacity = Number(current.capacity || 48);
+  if (capacity !== undefined) {
+    seatCapacity = Number(capacity);
+    if (!Number.isInteger(seatCapacity) || seatCapacity < 1 || seatCapacity > 1000) return res.status(400).json({ error: 'Seat capacity must be between 1 and 1000' });
+  }
   const next = {
     name: name !== undefined ? String(name).trim() : current.name,
     phone: phone !== undefined ? String(phone).trim() : current.phone,
@@ -40,13 +45,13 @@ router.patch('/settings', requireAuth, (req, res) => {
     hours: hours !== undefined ? JSON.stringify(hours) : current.hours
   };
   if (next.hours.length > 10000) return res.status(400).json({ error: 'Hours data is too long' });
-  db.prepare("UPDATE settings SET name = ?, phone = ?, address = ?, hours = ?, avg_cover = ?, fee_rate = ?, fee_flat = ?, updated_at = datetime('now') WHERE id = 1").run(
-    next.name, next.phone, next.address, next.hours, avgCover, feeRate, feeFlat
+  db.prepare("UPDATE settings SET name = ?, phone = ?, address = ?, hours = ?, avg_cover = ?, fee_rate = ?, fee_flat = ?, capacity = ?, updated_at = datetime('now') WHERE id = 1").run(
+    next.name, next.phone, next.address, next.hours, avgCover, feeRate, feeFlat, seatCapacity
   );
   const row = db.prepare('SELECT * FROM settings WHERE id = 1').get();
   let parsed = [];
   try { parsed = JSON.parse(row.hours); } catch { parsed = []; }
-  res.json({ ok: true, settings: { name: row.name, phone: row.phone, address: row.address, hours: parsed, avg_cover: row.avg_cover, fee_rate: row.fee_rate, fee_flat: row.fee_flat } });
+  res.json({ ok: true, settings: { name: row.name, phone: row.phone, address: row.address, hours: parsed, avg_cover: row.avg_cover, fee_rate: row.fee_rate, fee_flat: row.fee_flat, capacity: row.capacity } });
 });
 
 module.exports = router;

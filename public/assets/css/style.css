@@ -720,6 +720,39 @@ table.data tr:hover { background: var(--brand-soft); }
 .filter-chip:hover { border-color: var(--brand); color: var(--brand-mid); }
 .filter-chip.active { background: var(--brand); border-color: var(--brand); color: #fff; }
 
+/* ---------- Discover ---------- */
+
+.search-bar { padding: 26px; background: #fff; }
+.search-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+.filter-row { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.filter-row .filter-bar { margin-bottom: 0; }
+.filter-label { font-size: 12.5px; color: var(--sub); letter-spacing: 0.04em; font-weight: 600; }
+
+.restaurant-head { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+.restaurant-title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.restaurant-name { font-size: 30px; margin: 0; }
+.restaurant-meta { color: var(--sub); font-size: 14px; margin: 8px 0 0; }
+.restaurant-rating { text-align: right; }
+.restaurant-rating .stars { color: var(--gold); font-size: 18px; letter-spacing: 2px; }
+.restaurant-rating b { font-size: 22px; margin-left: 8px; }
+.restaurant-rating .muted { display: block; font-size: 12.5px; }
+.badge-verified { background: #E7F4E9; color: #16703A; }
+
+.slot-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+.slot-chip { display: flex; flex-direction: column; gap: 2px; align-items: center; justify-content: center; padding: 14px 6px; border-radius: var(--r-xl); border: 1.5px solid var(--hair); background: #fff; text-decoration: none; transition: all 0.15s ease; }
+.slot-chip .slot-time { font-weight: 700; font-size: 15.5px; color: var(--ink); }
+.slot-chip .slot-state { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; }
+.slot-open .slot-state { color: #16703A; }
+.slot-open:hover { border-color: var(--brand); box-shadow: 0 4px 14px rgba(255, 97, 31, 0.18); transform: translateY(-1px); }
+.slot-limited { background: var(--gold-tint); border-color: #E9D9B0; }
+.slot-limited .slot-state { color: #8a5d0e; }
+.slot-full { background: #F3EFEA; border-color: transparent; cursor: not-allowed; opacity: 0.7; }
+.slot-full .slot-time { color: var(--sub); }
+.slot-full .slot-state { color: var(--sub); }
+
+@media (max-width: 900px) { .search-grid { grid-template-columns: 1fr 1fr; } .slot-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 560px) { .search-grid { grid-template-columns: 1fr; } .slot-grid { grid-template-columns: repeat(2, 1fr); } }
+
 /* ---------- Admin ---------- */
 
 .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-bottom: 40px; }

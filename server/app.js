@@ -16,6 +16,7 @@ const manageRoutes = require('./routes/manage');
 const promoRoutes = require('./routes/promos');
 const adminRoutes = require('./routes/admin');
 const paymentRoutes = require('./routes/payments');
+const discoverRoutes = require('./routes/discover');
 
 function createApp() {
   const app = express();
@@ -44,12 +45,14 @@ function createApp() {
   app.use('/api', promoRoutes);
   app.use('/api', adminRoutes);
   app.use('/api', paymentRoutes);
+  app.use('/api', discoverRoutes);
 
   const publicDir = path.join(__dirname, '..', 'public');
   app.use(express.static(publicDir));
   app.get('/api/*', (req, res) => res.status(404).json({ error: 'Not found' }));
   const pages = {
     '/': ['customer', 'index.html'],
+    '/discover': ['customer', 'discover.html'],
     '/menu': ['customer', 'menu.html'],
     '/book': ['customer', 'book.html'],
     '/reviews': ['customer', 'reviews.html'],

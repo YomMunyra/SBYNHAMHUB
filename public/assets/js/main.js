@@ -25,6 +25,12 @@ function renderHeader(active) {
     ['/manager', 'Manager'],
     ['/admin', 'Admin']
   ];
+  const profileLinks = [
+    ['/book', 'Book a table'],
+    ['/manage', 'Manage my booking'],
+    ['/points', 'Nyam Points'],
+    ['/reviews', 'Leave a review']
+  ];
   const nav = document.getElementById('nav');
   if (!nav) return;
   nav.innerHTML = `
@@ -37,14 +43,31 @@ function renderHeader(active) {
       ${links.map(([href, label]) =>
         `<li><a href="${href}" class="${href === active ? 'active' : ''}">${label}</a></li>`
       ).join('')}
-      <li class="nav-portal">
-        ${portal.map(([href, label]) =>
-          `<a href="${href}" class="${href === active ? 'active' : ''}">${label}</a>`
-        ).join('')}
-      </li>
     </ul>
     <div class="nav-cta">
       <a class="btn btn-primary btn-sm" href="/book">Book a table</a>
+      <div class="nav-profile" id="profile">
+        <button class="profile-btn" id="profileBtn" aria-label="Open menu" aria-expanded="false">
+          <span class="profile-avatar">S</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="profile-menu" id="profileMenu">
+          <div class="profile-head">
+            <span class="profile-avatar">S</span>
+            <div><strong>Guest</strong><small>SbyNhamHub</small></div>
+          </div>
+          <p class="profile-label">Portals</p>
+          <div class="nav-portal">
+            ${portal.map(([href, label]) =>
+              `<a href="${href}" class="${href === active ? 'active' : ''}">${label}</a>`
+            ).join('')}
+          </div>
+          <p class="profile-label">Quick links</p>
+          ${profileLinks.map(([href, label]) =>
+            `<a class="profile-link" href="${href}">${label}</a>`
+          ).join('')}
+        </div>
+      </div>
     </div>
   </div>`;
   const burger = document.getElementById('burger');
@@ -52,6 +75,23 @@ function renderHeader(active) {
   burger.addEventListener('click', () => {
     navLinks.classList.toggle('open');
     burger.classList.toggle('open');
+  });
+  const profile = document.getElementById('profile');
+  const profileBtn = document.getElementById('profileBtn');
+  const profileMenu = document.getElementById('profileMenu');
+  function toggleProfile(open) {
+    profileMenu.classList.toggle('open', open);
+    profileBtn.setAttribute('aria-expanded', String(open));
+  }
+  profileBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleProfile(!profileMenu.classList.contains('open'));
+  });
+  document.addEventListener('click', (e) => {
+    if (!profile.contains(e.target)) toggleProfile(false);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') toggleProfile(false);
   });
 }
 

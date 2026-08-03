@@ -17,6 +17,7 @@ function renderHeader(active) {
   const links = [
     ['/', 'Home'],
     ['/menu', 'Menu'],
+    ['/reviews', 'Reviews'],
     ['/book', 'Reservations'],
     ['/admin', 'Admin']
   ];
@@ -64,6 +65,7 @@ function renderFooter() {
         <ul>
           <li><a href="/">Home</a></li>
           <li><a href="/menu">Menu</a></li>
+          <li><a href="/reviews">Reviews</a></li>
           <li><a href="/book">Book a table</a></li>
           <li><a href="/admin">Admin</a></li>
         </ul>

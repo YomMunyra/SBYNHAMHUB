@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reviews — SbyNhamHub</title>
+  <meta name="description" content="Verified reviews from real SbyNhamHub guests — food, service, ambience and value ratings.">
+  <link rel="icon" type="image/svg+xml" href="/img/logo.svg">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body data-page="/reviews">
+
+  <header class="nav" id="nav"></header>
+
+  <section class="page-hero">
+    <div class="container">
+      <p class="eyebrow">SbyNhamHub · Word of mouth</p>
+      <h1>Verified <span class="italic-accent">reviews.</span></h1>
+      <p class="lede">Every review here comes from a real booking that was honoured. No fake reviews — only tables we actually served.</p>
+    </div>
+  </section>
+
+  <!-- Summary -->
+  <section class="section" style="padding-bottom:0">
+    <div class="container">
+      <div class="review-summary">
+        <div class="review-summary-score">
+          <div class="review-big" id="reviewAvg">–</div>
+          <div class="review-stars" id="reviewStars">☆☆☆☆☆</div>
+          <p class="muted" id="reviewCount" style="font-size:13px;margin:6px 0 0">Loading reviews…</p>
+        </div>
+        <div class="review-summary-bars" id="reviewBars"></div>
+        <div class="review-summary-cta">
+          <span class="eyebrow">Been in lately?</span>
+          <h3 style="font-size:19px">Dined with us?</h3>
+          <p class="muted" style="font-size:13.5px">Earn SbyNham Points and shape the table for everyone who comes next.</p>
+          <a class="btn btn-primary btn-sm" href="#leave-review">Write a review</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Review cards -->
+  <section class="section">
+    <div class="container">
+      <div class="grid-3" id="reviewGrid">
+        <div class="card-tile" style="padding:60px;text-align:center;grid-column:1/-1">
+          <p class="muted">Loading reviews…</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Leave a review -->
+  <section class="section" id="leave-review" style="padding-top:0;background:#fff;border-top:1px solid var(--hair)">
+    <div class="container" style="max-width:820px">
+      <div class="section-head center">
+        <span class="eyebrow">Only after your visit</span>
+        <h2>Leave a review</h2>
+        <p class="lede">Had a meal with us? Tell us honestly about it. Your booking reference is shown in your confirmation.</p>
+      </div>
+      <div class="form-card">
+        <form id="reviewForm" novalidate>
+          <div class="form">
+            <div class="form-grid">
+              <div class="field">
+                <label for="rvRef">Booking reference <span class="req">*</span></label>
+                <input class="input" id="rvRef" name="reservation_id" placeholder="e.g. 42" required>
+              </div>
+              <div class="field">
+                <label for="rvContact">Email or phone used to book <span class="req">*</span></label>
+                <input class="input" id="rvContact" name="contact" placeholder="you@example.com or +855 12 345 678" required>
+              </div>
+            </div>
+
+            <div class="review-rating-row" data-key="food">
+              <label>Food</label>
+              <div class="rating-input" aria-label="Food rating"><span data-v="1">★</span><span data-v="2">★</span><span data-v="3">★</span><span data-v="4">★</span><span data-v="5">★</span></div>
+            </div>
+            <div class="review-rating-row" data-key="service">
+              <label>Service</label>
+              <div class="rating-input" aria-label="Service rating"><span data-v="1">★</span><span data-v="2">★</span><span data-v="3">★</span><span data-v="4">★</span><span data-v="5">★</span></div>
+            </div>
+            <div class="review-rating-row" data-key="ambience">
+              <label>Ambience</label>
+              <div class="rating-input" aria-label="Ambience rating"><span data-v="1">★</span><span data-v="2">★</span><span data-v="3">★</span><span data-v="4">★</span><span data-v="5">★</span></div>
+            </div>
+            <div class="review-rating-row" data-key="value">
+              <label>Value</label>
+              <div class="rating-input" aria-label="Value rating"><span data-v="1">★</span><span data-v="2">★</span><span data-v="3">★</span><span data-v="4">★</span><span data-v="5">★</span></div>
+            </div>
+
+            <div class="field">
+              <label for="rvComment">Your review <span class="req">*</span></label>
+              <textarea class="textarea" id="rvComment" name="comment" placeholder="How was the food, the service, the room? Anything we should know?" maxlength="2000" required></textarea>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-lg btn-block" id="rvSubmit">Submit review</button>
+            <p class="hint" style="text-align:center;margin:0">Reviews are verified against your booking, then checked by our team before going live.</p>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer" id="footer"></footer>
+
+  <script src="/js/main.js"></script>
+  <script>
+    (function () {
+      const barLabels = { 5: '5 stars', 4: '4 stars', 3: '3 stars', 2: '2 stars', 1: '1 star' };
+
+      function renderSummary(summary) {
+        const el = document.getElementById('reviewAvg');
+        const starsEl = document.getElementById('reviewStars');
+        const countEl = document.getElementById('reviewCount');
+        const barsEl = document.getElementById('reviewBars');
+        if (!summary.count) {
+          el.textContent = 'New';
+          starsEl.textContent = '☆☆☆☆☆';
+          countEl.textContent = 'Be the first to review us!';
+          barsEl.innerHTML = '';
+          return;
+        }
+        el.textContent = summary.avg.toFixed(1);
+        starsEl.textContent = stars(summary.avg);
+        countEl.textContent = `${summary.count} verified review${summary.count === 1 ? '' : 's'}`;
+        barsEl.innerHTML = [5, 4, 3, 2, 1].map((n) => {
+          const pct = Math.round((summary.distribution[n] / summary.count) * 100);
+          return `<div class="bar-row"><span>${barLabels[n]}</span><div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div><b>${summary.distribution[n]}</b></div>`;
+        }).join('');
+      }
+
+      function ratingChips(r) {
+        return `<div class="rating-chips"><span>Food ${r.food}</span><span>Service ${r.service}</span><span>Ambience ${r.ambience}</span><span>Value ${r.value}</span></div>`;
+      }
+
+      function renderReviews(items) {
+        const grid = document.getElementById('reviewGrid');
+        if (!items.length) {
+          grid.innerHTML = '<div class="card-tile" style="padding:60px;text-align:center;grid-column:1/-1"><p class="muted">No reviews yet — be the first!</p></div>';
+          return;
+        }
+        grid.innerHTML = items.map((r) => `
+          <article class="quote">
+            <div class="quote-stars">${stars(r.overall)}</div>
+            <p class="quote-text">"${escapeHTML(r.comment)}"</p>
+            ${r.reply ? `<div class="review-reply"><b>SbyNhamHub · Reply</b><p>"${escapeHTML(r.reply)}"</p></div>` : ''}
+            ${ratingChips(r.ratings)}
+            <div class="quote-who">
+              <div class="quote-avatar">${escapeHTML(r.name.charAt(0))}</div>
+              <div>
+                <div class="quote-name">${escapeHTML(r.name)}</div>
+                <div class="quote-role">Verified diner · ${new Date(r.created_at).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}</div>
+              </div>
+            </div>
+          </article>
+        `).join('');
+      }
+
+      Promise.all([fetch('/api/reviews/summary').then((r) => r.json()), fetch('/api/reviews').then((r) => r.json())])
+        .then(([summary, items]) => {
+          renderSummary(summary);
+          renderReviews(items);
+        })
+        .catch(() => {
+          document.getElementById('reviewGrid').innerHTML = '<div class="card-tile" style="padding:60px;text-align:center;grid-column:1/-1"><p class="muted">Reviews unavailable. Please try again later.</p></div>';
+        });
+
+      const ratings = {};
+      document.querySelectorAll('.review-rating-row').forEach((row) => {
+        row.addEventListener('click', (e) => {
+          const star = e.target.closest('.rating-input span');
+          if (!star) return;
+          const v = Number(star.dataset.v);
+          const key = row.dataset.key;
+          ratings[key] = v;
+          row.querySelectorAll('.rating-input span').forEach((s, i) => s.classList.toggle('active', i < v));
+        });
+      });
+
+      const form = document.getElementById('reviewForm');
+      const submitBtn = document.getElementById('rvSubmit');
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        for (const key of ['food', 'service', 'ambience', 'value']) {
+          if (!ratings[key]) { toast('Please rate every category.', 'error'); return; }
+        }
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting…';
+        try {
+          await api('/api/reviews', {
+            method: 'POST',
+            body: JSON.stringify({
+              reservation_id: form.reservation_id.value.trim(),
+              contact: form.contact.value.trim(),
+              food: ratings.food,
+              service: ratings.service,
+              ambience: ratings.ambience,
+              value: ratings.value,
+              comment: form.comment.value.trim()
+            })
+          });
+          toast('Review submitted! We\'ll review it and publish shortly.');
+          form.reset();
+          document.querySelectorAll('.rating-input span').forEach((s) => s.classList.remove('active'));
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Submit review';
+        } catch (err) {
+          toast(err.message, 'error');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Submit review';
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

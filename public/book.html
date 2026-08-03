@@ -119,7 +119,9 @@
       </div>
       <h3>Table reserved!</h3>
       <p id="modalText">We'll see you at the table.</p>
-      <button class="btn btn-primary btn-block mt-8" onclick="closeModal()">Done</button>
+      <div class="booking-ref" id="modalRef" style="display:none"></div>
+      <a class="btn btn-primary btn-block mt-8" id="modalReviewLink" href="/reviews" style="display:none">Leave a review</a>
+      <button class="btn btn-ghost btn-block mt-8" onclick="closeModal()">Done</button>
     </div>
   </div>
 
@@ -165,6 +167,11 @@
           });
           const r = data.reservation;
           modalText.textContent = `${r.name}, table for ${r.guests} on ${r.date} at ${r.time}. A confirmation is on its way — see you soon!`;
+          const ref = document.getElementById('modalRef');
+          ref.textContent = `Booking reference: ${r.id} — keep it to leave a verified review after your visit.`;
+          ref.style.display = 'block';
+          const reviewLink = document.getElementById('modalReviewLink');
+          reviewLink.style.display = 'inline-flex';
           modal.classList.add('open');
           form.reset();
           dateInput.value = iso;

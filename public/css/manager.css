@@ -1,0 +1,7 @@
+/* Manager workspace styles are separated here as the dashboard grows. */
+.manager-main { max-width: 1600px; }
+.manager-panel { transition: box-shadow .18s ease; }
+.manager-panel:hover { box-shadow: 0 10px 28px rgba(58, 22, 4, .05); }
+.manager-nav-link.active { box-shadow: inset 3px 0 0 var(--light-orange); }
+.manager-nav-badge { margin-left: auto; background: var(--brand); color: #fff; font-size: 11px; font-weight: 600; line-height: 1; padding: 4px 8px; border-radius: 999px; }
+.review-reply { resize: vertical; }

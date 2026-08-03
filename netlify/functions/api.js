@@ -88,6 +88,32 @@ function sortReservations(items) {
   return items.sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`) || String(b.created_at).localeCompare(String(a.created_at)));
 }
 
+async function reviews(event) {
+  const store = await reservationStore(event);
+  const { blobs } = await store.list({ prefix: 'review/' });
+  const values = await Promise.all(blobs.map(({ key }) => store.get(key, { type: 'json' })));
+  return values.filter(Boolean);
+}
+
+function reviewOverall(item) {
+  return Math.round((item.rating_food + item.rating_service + item.rating_ambience + item.rating_value) / 4);
+}
+
+function publicReview(item) {
+  const parts = String(item.name || '').trim().split(/\s+/);
+  const firstName = parts[0] || 'Guest';
+  const lastInitial = parts.length > 1 ? ' ' + parts[parts.length - 1].charAt(0).toUpperCase() + '.' : '';
+  return {
+    id: item.id,
+    name: firstName + lastInitial,
+    overall: reviewOverall(item),
+    ratings: { food: item.rating_food, service: item.rating_service, ambience: item.rating_ambience, value: item.rating_value },
+    comment: item.comment,
+    reply: item.reply || '',
+    created_at: item.created_at
+  };
+}
+
 function requestUrl(event) {
   if (event.rawUrl) return new URL(event.rawUrl);
   const host = event.headers?.host || 'localhost';
@@ -185,6 +211,88 @@ exports.handler = async (event) => {
     const todays = items.filter((item) => item.date === today);
     const by_status = VALID_STATUS.map((status) => ({ status, n: items.filter((item) => item.status === status).length })).filter((item) => item.n);
     return json({ total: items.length, today: todays.length, covers_today: todays.reduce((total, item) => total + Number(item.guests), 0), confirmed: items.filter((item) => item.status === 'confirmed').length, by_status });
+  }
+
+  if (method === 'GET' && path === '/reviews/summary') {
+    const items = await reviews(event);
+    const published = items.filter((item) => item.status === 'published');
+    const count = published.length;
+    const avg = count ? published.reduce((sum, item) => sum + reviewOverall(item), 0) / count : 0;
+    const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    for (const item of published) distribution[reviewOverall(item)] += 1;
+    return json({ count, avg: Math.round(avg * 10) / 10, distribution });
+  }
+
+  if (method === 'GET' && path === '/reviews') {
+    const all = url.searchParams.get('all') === '1';
+    if (all && !authorized(event)) return json({ error: 'Unauthorized' }, 401);
+    const items = (await reviews(event)).sort((a, b) => String(b.id).localeCompare(String(a.id)));
+    return json(all ? items : items.filter((item) => item.status === 'published').map(publicReview));
+  }
+
+  if (method === 'POST' && path === '/reviews') {
+    const body = readBody(event);
+    const { reservation_id = '', contact = '', food = '', service = '', ambience = '', value = '', comment = '' } = body;
+    const invalid = [];
+    if (!String(reservation_id).trim()) invalid.push('reservation_id');
+    if (!String(contact).trim()) invalid.push('contact');
+    const ratings = [food, service, ambience, value].map(Number);
+    for (const r of ratings) { if (!Number.isInteger(r) || r < 1 || r > 5) invalid.push('rating'); }
+    if (!String(comment).trim()) invalid.push('comment');
+    if (String(comment).trim().length > 2000) invalid.push('comment length');
+    if (invalid.length) return json({ error: `Invalid fields: ${invalid.join(', ')}` }, 400);
+
+    const store = await reservationStore(event);
+    const reservation = await store.get(`reservation/${reservation_id}`, { type: 'json' });
+    if (!reservation) return json({ error: 'No booking found with that reference.' }, 404);
+
+    if (new Date(`${reservation.date} ${reservation.time}:00Z`).getTime() >= Date.now()) {
+      return json({ error: 'Reviews are only possible after your visit.' }, 400);
+    }
+    if (!['arrived', 'confirmed', 'completed'].includes(reservation.status)) {
+      return json({ error: 'Only completed visits can be reviewed.' }, 400);
+    }
+
+    const c = String(contact).trim().toLowerCase();
+    const email = String(reservation.email || '').trim().toLowerCase();
+    const phone = String(reservation.phone || '').trim();
+    if (c !== email && c !== phone) {
+      return json({ error: 'That contact does not match the booking.' }, 403);
+    }
+
+    const existing = (await reviews(event)).find((item) => item.reservation_id === reservation_id);
+    if (existing) return json({ error: 'A review already exists for this booking.' }, 409);
+
+    const review = {
+      id: crypto.randomUUID(),
+      reservation_id,
+      name: String(reservation.name).trim(),
+      email: String(reservation.email || '').trim(),
+      phone: String(reservation.phone || '').trim(),
+      rating_food: ratings[0], rating_service: ratings[1], rating_ambience: ratings[2], rating_value: ratings[3],
+      comment: String(comment).trim(),
+      reply: '',
+      status: 'pending',
+      created_at: new Date().toISOString()
+    };
+    await store.setJSON(`review/${review.id}`, review);
+    return json({ ok: true, review: publicReview(review) }, 201);
+  }
+
+  const reviewMatch = path.match(/^\/reviews\/([^/]+)$/);
+  if (reviewMatch && method === 'PATCH') {
+    if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
+    const { status, reply } = readBody(event);
+    if (status !== undefined && !['pending', 'published', 'hidden'].includes(status)) return json({ error: 'Invalid status' }, 400);
+    if (reply !== undefined && String(reply).length > 1000) return json({ error: 'Reply is too long' }, 400);
+    const store = await reservationStore(event);
+    const key = `review/${reviewMatch[1]}`;
+    const review = await store.get(key, { type: 'json' });
+    if (!review) return json({ error: 'Review not found' }, 404);
+    if (status !== undefined) review.status = status;
+    if (reply !== undefined) review.reply = String(reply).trim();
+    await store.setJSON(key, review);
+    return json({ ok: true, review });
   }
 
   const match = path.match(/^\/reservations\/([^/]+)$/);

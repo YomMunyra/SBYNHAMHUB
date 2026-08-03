@@ -58,7 +58,7 @@
           </div>
           <div class="hero-stats">
             <div class="hero-stat"><div class="num">65,000+</div><div class="lbl">Happy Diners Served</div></div>
-            <div class="hero-stat"><div class="num">4.8★</div><div class="lbl">Average Rating</div></div>
+            <div class="hero-stat"><div class="num" id="heroRating">4.8★</div><div class="lbl">Average Rating</div></div>
             <div class="hero-stat"><div class="num">25+</div><div class="lbl">Signature Dishes</div></div>
             <div class="hero-stat"><div class="num">18+</div><div class="lbl">Years Of Hospitality</div></div>
           </div>
@@ -253,7 +253,7 @@
         <h2>Diners are telling us yes</h2>
         <p class="lede">Real people, real tables, real reviews.</p>
       </div>
-      <div class="grid-3">
+      <div class="grid-3" id="reviewsGrid">
         <div class="quote">
           <div class="quote-stars">★★★★★</div>
           <p class="quote-text">"SbyNhamHub cut our no-show rate from 22% to 5% in two months. We finally know who our customers are."</p>
@@ -409,6 +409,35 @@
       document.querySelectorAll('#hoursList .hours-row .day').forEach((el) => {
         if (el.textContent === todayLabel) el.closest('.hours-row').classList.add('today');
       });
+
+      fetch('/api/reviews/summary')
+        .then((r) => r.json())
+        .then((s) => {
+          const el = document.getElementById('heroRating');
+          if (s.count && el) el.textContent = s.avg.toFixed(1) + '★';
+        })
+        .catch(() => {});
+
+      fetch('/api/reviews')
+        .then((r) => r.json())
+        .then((items) => {
+          const grid = document.getElementById('reviewsGrid');
+          if (!grid || !items.length) return;
+          grid.innerHTML = items.slice(0, 3).map((r) => `
+            <div class="quote">
+              <div class="quote-stars">${stars(r.overall)}</div>
+              <p class="quote-text">"${escapeHTML(r.comment)}"</p>
+              <div class="quote-who">
+                <div class="quote-avatar">${escapeHTML(r.name.charAt(0))}</div>
+                <div>
+                  <div class="quote-name">${escapeHTML(r.name)}</div>
+                  <div class="quote-role">Verified diner · ${new Date(r.created_at).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}</div>
+                </div>
+              </div>
+            </div>
+          `).join('');
+        })
+        .catch(() => {});
     })();
   </script>
 </body>

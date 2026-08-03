@@ -46,6 +46,22 @@ CREATE TABLE IF NOT EXISTS reservations (
   status TEXT NOT NULL DEFAULT 'pending',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS reviews (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  reservation_id INTEGER REFERENCES reservations(id) ON DELETE SET NULL,
+  name TEXT NOT NULL,
+  email TEXT,
+  phone TEXT,
+  rating_food INTEGER NOT NULL,
+  rating_service INTEGER NOT NULL,
+  rating_ambience INTEGER NOT NULL,
+  rating_value INTEGER NOT NULL,
+  comment TEXT NOT NULL,
+  reply TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `;
 
 db.exec(SCHEMA);
@@ -114,6 +130,30 @@ function seed() {
   return true;
 }
 
+function seedReviews() {
+  const count = db.prepare('SELECT COUNT(*) AS n FROM reviews').get().n;
+  if (count > 0) return false;
+
+  const addReview = db.prepare(
+    `INSERT INTO reviews
+       (name, comment, rating_food, rating_service, rating_ambience, rating_value, status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'published', ?)`
+  );
+
+  const reviews = [
+    ['Channa Sok', 'Booked a table for two on the app, no phone call, no wait. They remembered our anniversary cake without being reminded. The whole night felt effortless.', 5, 5, 5, 4, '2026-07-18 21:10:00'],
+    ['Mei Lin', 'We booked a group of fourteen for a family gathering — one tap, confirmed instantly, and the team kept every name straight. The lok lak was exceptional.', 5, 4, 4, 5, '2026-07-12 20:45:00'],
+    ['Dara Kim', 'The reminder 2 hours before saved us after I double-booked myself. Called, they shifted our time with zero fuss. Service like this is why we keep coming back.', 5, 5, 4, 4, '2026-07-05 19:30:00'],
+    ['Sreypov Chan', 'Came in off the street without a booking at peak hour and they still found us a corner table in minutes. Points from our last visit paid for dessert.', 4, 5, 4, 5, '2026-06-28 20:15:00'],
+    ['Vannak Phoeun', 'Genuinely the easiest reservation I have ever made. Showed up, table was ready, name on the board. The sea bass was the best I have had in Phnom Penh.', 5, 4, 5, 4, '2026-06-21 19:00:00'],
+    ['Bopha Rath', 'Nice spot, good food, but the kitchen was a little slow on a Friday. The team comped our drinks while we waited — that is how you handle a wait.', 4, 4, 4, 3, '2026-06-14 20:00:00']
+  ];
+
+  for (const review of reviews) addReview.run(...review);
+  return true;
+}
+
 seed();
+seedReviews();
 
 module.exports = { db, DB_PATH, seed };

@@ -4,9 +4,12 @@ const express = require('express');
 const { db } = require('../../db');
 const { requireAuth } = require('../middleware/auth');
 const { VALID_STATUS } = require('../constants');
-const { sendBookingConfirmation, sendReminder } = require('../lib/mailer');
+const { sendBookingConfirmation } = require('../lib/mailer');
+const { processReminders } = require('../lib/scheduler');
 
 const router = express.Router();
+
+const CANCEL_WINDOW_MS = 60 * 60 * 1000;
 
 function contactMatches(reservation, contact) {
   const c = String(contact || '').trim().toLowerCase();
@@ -19,6 +22,11 @@ function findReservation(id) {
   const rid = Number(id);
   if (!Number.isInteger(rid) || rid <= 0) return null;
   return db.prepare('SELECT * FROM reservations WHERE id = ?').get(rid);
+}
+
+function insideWindow(reservation, now = Date.now()) {
+  const start = new Date(reservation.date + 'T' + reservation.time + ':00').getTime();
+  return now < start - CANCEL_WINDOW_MS;
 }
 
 router.post('/reservations/lookup', (req, res) => {
@@ -37,6 +45,9 @@ router.post('/reservations/:id/cancel', async (req, res) => {
   if (['cancelled', 'no-show'].includes(reservation.status)) {
     return res.status(409).json({ error: 'This booking is already closed.' });
   }
+  if (!insideWindow(reservation)) {
+    return res.status(400).json({ error: 'This table is under 1 hour away — bookings can only be cancelled up to 1 hour before. Call us and we will sort it.' });
+  }
   db.prepare("UPDATE reservations SET status = 'cancelled' WHERE id = ?").run(reservation.id);
   const updated = db.prepare('SELECT * FROM reservations WHERE id = ?').get(reservation.id);
   res.json({ ok: true, reservation: updated });
@@ -49,6 +60,9 @@ router.patch('/reservations/:id/modify', (req, res) => {
   if (!contactMatches(reservation, contact)) return res.status(403).json({ error: 'That contact does not match the booking.' });
   if (['cancelled', 'no-show'].includes(reservation.status)) {
     return res.status(409).json({ error: 'This booking is already closed.' });
+  }
+  if (!insideWindow(reservation)) {
+    return res.status(400).json({ error: 'This table is under 1 hour away — bookings can only be modified up to 1 hour before. Call us and we will sort it.' });
   }
   if (date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(String(date))) return res.status(400).json({ error: 'Invalid date' });
   if (time !== undefined && !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(time))) return res.status(400).json({ error: 'Invalid time' });
@@ -73,24 +87,7 @@ router.patch('/reservations/:id/modify', (req, res) => {
 });
 
 router.post('/reminders', requireAuth, async (req, res) => {
-  const now = Date.now();
-  const rows = db
-    .prepare("SELECT * FROM reservations WHERE status IN ('pending','confirmed') AND date >= date('now')")
-    .all();
-  const sent = [];
-  for (const row of rows) {
-    const msUntil = new Date(row.date + 'T' + row.time + ':00').getTime() - now;
-    const hours = msUntil / 3600000;
-    if (hours >= 20 && hours <= 26 && !Number(row.reminder_24h)) {
-      await sendReminder(row, 24);
-      db.prepare('UPDATE reservations SET reminder_24h = 1 WHERE id = ?').run(row.id);
-      sent.push({ id: row.id, kind: '24h' });
-    } else if (hours >= 1 && hours <= 3 && !Number(row.reminder_2h)) {
-      await sendReminder(row, 2);
-      db.prepare('UPDATE reservations SET reminder_2h = 1 WHERE id = ?').run(row.id);
-      sent.push({ id: row.id, kind: '2h' });
-    }
-  }
+  const sent = await processReminders();
   res.json({ ok: true, sent, count: sent.length });
 });
 

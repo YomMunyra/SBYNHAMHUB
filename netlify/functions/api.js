@@ -37,15 +37,19 @@ function createToken(role) {
 }
 
 function authorized(event) {
+  return roleOf(event) !== null;
+}
+
+function roleOf(event) {
   const token = (event.headers?.authorization || event.headers?.Authorization || '').replace(/^Bearer\s+/i, '');
   const [payload, signature] = token.split('.');
-  if (!payload || !signature) return false;
+  if (!payload || !signature) return null;
   let decoded;
-  try { decoded = JSON.parse(Buffer.from(payload, 'base64url').toString()); } catch { return false; }
-  if (!secret(decoded.role)) return false;
+  try { decoded = JSON.parse(Buffer.from(payload, 'base64url').toString()); } catch { return null; }
+  if (!['manager', 'admin'].includes(decoded.role) || !secret(decoded.role)) return null;
   const expected = sign(payload, decoded.role);
-  if (signature.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return false;
-  return decoded.exp > Date.now();
+  if (signature.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return null;
+  return decoded.exp > Date.now() ? decoded.role : null;
 }
 
 async function reservationStore(event) {
@@ -612,6 +616,15 @@ exports.handler = async (event) => {
     const todays = items.filter((item) => item.date === today);
     const by_status = VALID_STATUS.map((status) => ({ status, n: items.filter((item) => item.status === status).length })).filter((item) => item.n);
     return json({ total: items.length, today: todays.length, covers_today: todays.reduce((total, item) => total + Number(item.guests), 0), confirmed: items.filter((item) => item.status === 'confirmed').length, by_status });
+  }
+
+  if (method === 'GET' && path === '/admin/summary') {
+    if (roleOf(event) !== 'admin') return json({ error: 'Admin access required' }, 403);
+    const items = await reservations(event);
+    const today = new Date().toISOString().slice(0, 10);
+    const todays = items.filter((item) => item.date === today);
+    const recent = [...items].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, 6);
+    return json({ total: items.length, today: todays.length, covers_today: todays.reduce((total, item) => total + Number(item.guests), 0), confirmed: items.filter((item) => item.status === 'confirmed').length, recent });
   }
 
   if (method === 'GET' && path === '/points/lookup') {

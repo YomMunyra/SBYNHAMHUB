@@ -38,20 +38,33 @@ You can also deploy from a terminal after signing in: `npx netlify-cli deploy --
 | Home | http://localhost:3000/ |
 | Menu | http://localhost:3000/menu |
 | Book a table | http://localhost:3000/book |
+| Manager dashboard | http://localhost:3000/manager |
 | Admin dashboard | http://localhost:3000/admin |
 
-## Admin dashboard
+## Roles
 
-The dashboard is where staff manage incoming reservations (confirm, mark arrived,
-cancel, no-show, delete) and see daily stats.
+There are two staff roles with role-scoped login tokens:
 
-- Sign in with the password below (or set `ADMIN_PASSWORD` when starting the server).
+| Role | Sign-in | Default password | Access |
+|---|---|---|---|
+| Manager | `/manager` | `sbynham2026` | Restaurant workspace: bookings, floor plan, guests, waitlist, menu, promotions, reviews, analytics, settings |
+| Admin | `/admin` | `sbynham2026` | Everything a manager can do, plus the platform dashboard (`/api/admin/summary`) |
+
+Set separate secrets with environment variables (the manager falls back to the admin
+password when unset):
 
 ```bash
-ADMIN_PASSWORD=your-secret npm start
+ADMIN_PASSWORD=admin-secret MANAGER_PASSWORD=manager-secret npm start
 ```
 
-Default admin password: `sbynham2026`
+On Netlify, set `ADMIN_PASSWORD` (and optionally `MANAGER_PASSWORD`) in the project's
+environment variables. The default local passwords are deliberately not used on Netlify.
+
+## Admin & manager dashboard
+
+The dashboards are where staff manage incoming reservations (confirm, mark arrived,
+cancel, no-show, delete) and see daily stats. Signing in as admin also grants access
+to the manager workspace; a manager sign-in only opens the manager view.
 
 ## API
 

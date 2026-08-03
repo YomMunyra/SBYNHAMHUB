@@ -14,6 +14,7 @@ const settingsRoutes = require('./routes/settings');
 const waitlistRoutes = require('./routes/waitlist');
 const manageRoutes = require('./routes/manage');
 const promoRoutes = require('./routes/promos');
+const adminRoutes = require('./routes/admin');
 
 function createApp() {
   const app = express();
@@ -32,6 +33,7 @@ function createApp() {
   app.use('/api', waitlistRoutes);
   app.use('/api', manageRoutes);
   app.use('/api', promoRoutes);
+  app.use('/api', adminRoutes);
 
   const publicDir = path.join(__dirname, '..', 'public');
   app.use(express.static(publicDir));

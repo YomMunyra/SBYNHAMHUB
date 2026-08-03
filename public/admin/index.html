@@ -1,3 +1,101 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Platform Admin - SbyNhamHub</title><meta name="robots" content="noindex"><link rel="stylesheet" href="/assets/css/style.css"></head>
-<body class="manager-body" data-page="/admin"><section id="loginView"><header class="nav" id="nav"></header><div class="container"><div class="auth-box form-card"><span class="eyebrow">SbyNhamHub Platform</span><h3>Admin sign in</h3><p class="muted">Manage the restaurant platform and access support tools.</p><form id="loginForm" class="form mt-8"><div class="field"><label>Password</label><input class="input" id="pw" type="password" required></div><button class="btn btn-primary btn-block">Sign in as Admin</button></form></div></div></section>
-<section id="dashView" style="display:none" class="manager-app"><aside class="manager-sidebar"><a class="manager-brand" href="/"><img src="/assets/img/logo.svg" alt=""><span>SbyNham<strong>Hub</strong></span></a><p class="manager-label">Platform control</p><nav class="manager-nav"><button class="manager-nav-link active">Overview</button><a class="manager-nav-link" href="/manager"><span class="manager-icon">&#8646;</span>Switch to Manager</a></nav><div class="manager-user"><div class="manager-avatar">A</div><div><strong>Platform Admin</strong><small>Full access</small></div></div><button class="manager-signout" id="logoutBtn">Sign out</button></aside><main class="manager-main"><header class="manager-topbar"><div><p class="eyebrow">SbyNhamHub Platform</p><h1>Admin overview</h1></div><a class="btn btn-primary btn-sm" href="/manager">Open Manager view</a></header><div class="manager-date-row"><div><strong>Marketplace health</strong><span>Current activity across your restaurant workspace.</span></div></div><div class="stat-grid manager-stats" id="statGrid"></div><div class="manager-dashboard-grid"><section class="manager-panel"><p class="eyebrow">Recent activity</p><h2>Latest reservations</h2><div id="recent" class="booking-timeline"></div></section><section class="manager-panel manager-action-panel"><p class="eyebrow">Admin tools</p><h2>Restaurant operations</h2><p>Use Manager View to handle bookings, guests, floor plans, and future restaurant settings.</p><a class="btn btn-primary btn-block" href="/manager">Switch to Manager</a></section></div></main></section><script src="/assets/js/main.js"></script><script>(function(){const K='sbynham_token',t=()=>localStorage.getItem(K)||'',l=document.getElementById('loginView'),d=document.getElementById('dashView');async function load(){try{const h={Authorization:'Bearer '+t()},[s,r]=await Promise.all([api('/api/stats',{headers:h}),api('/api/reservations',{headers:h})]);document.getElementById('statGrid').innerHTML=`<div class="stat-card"><div class="val">${s.total}</div><div class="lbl">Total bookings</div></div><div class="stat-card"><div class="val">${s.today}</div><div class="lbl">Bookings today</div></div><div class="stat-card"><div class="val">${s.covers_today}</div><div class="lbl">Covers today</div></div><div class="stat-card"><div class="val">${s.confirmed}</div><div class="lbl">Confirmed bookings</div></div>`;document.getElementById('recent').innerHTML=r.slice(-6).reverse().map(x=>`<div class="timeline-booking"><strong>${escapeHTML(x.date)}</strong><div><b>${escapeHTML(x.name)}</b><span>${x.guests} guests at ${escapeHTML(x.time)}</span></div><span class="badge badge-brand">${escapeHTML(x.status)}</span></div>`).join('')||'<p class="muted">No reservations yet.</p>'}catch(e){toast(e.message,'error')}}function show(){l.style.display='none';d.style.display='flex';load()}document.getElementById('loginForm').addEventListener('submit',async e=>{e.preventDefault();try{const x=await api('/api/auth',{method:'POST',body:JSON.stringify({password:document.getElementById('pw').value,role:'admin'})});localStorage.setItem(K,x.token);show()}catch(x){toast(x.message,'error')}});document.getElementById('logoutBtn').onclick=()=>{localStorage.removeItem(K);location.reload()};if(t())show()})()</script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Platform Admin — SbyNhamHub</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="stylesheet" href="/assets/css/manager.css">
+</head>
+<body data-page="/admin" class="manager-body">
+
+  <section id="loginView">
+    <header class="nav" id="nav"></header>
+    <div class="container"><div class="auth-box form-card">
+      <span class="eyebrow">SbyNhamHub Platform</span>
+      <h3>Admin sign in</h3>
+      <p class="muted" style="font-size:14px">Manage the restaurant platform and access support tools.</p>
+      <form id="loginForm" class="form mt-8">
+        <div class="field"><label for="pw">Admin password</label><input class="input" id="pw" type="password" autocomplete="current-password" required></div>
+        <button class="btn btn-primary btn-block" type="submit">Sign in as Admin</button>
+      </form>
+    </div></div>
+    <footer class="footer" id="footer"></footer>
+  </section>
+
+  <section id="dashView" style="display:none" class="manager-app">
+    <aside class="manager-sidebar">
+      <a class="manager-brand" href="/" aria-label="SbyNhamHub home"><img src="/assets/img/logo.svg" alt=""><span>SbyNham<strong>Hub</strong></span></a>
+      <p class="manager-label">Platform control</p>
+      <nav class="manager-nav" aria-label="Admin navigation">
+        <button class="manager-nav-link active"><span class="manager-icon">&#9632;</span>Overview</button>
+        <a class="manager-nav-link" href="/manager"><span class="manager-icon">&#8646;</span>Switch to Manager</a>
+      </nav>
+      <div class="manager-user"><div class="manager-avatar">A</div><div><strong>Platform Admin</strong><small>Full access</small></div></div>
+      <button class="manager-signout" id="logoutBtn">Sign out</button>
+    </aside>
+
+    <main class="manager-main">
+      <header class="manager-topbar"><div><p class="eyebrow">SbyNhamHub Platform</p><h1>Admin overview</h1></div><a class="btn btn-primary btn-sm" href="/manager">Open Manager view</a></header>
+
+      <div class="manager-date-row"><div><strong>Marketplace health</strong><span>Current activity across your restaurant workspace.</span></div><button class="btn btn-ghost btn-sm" id="refreshBtn">Refresh data</button></div>
+      <div class="stat-grid manager-stats" id="statGrid"><div class="stat-card"><div class="val">-</div><div class="lbl">Total bookings</div></div><div class="stat-card"><div class="val">-</div><div class="lbl">Bookings today</div></div><div class="stat-card"><div class="val">-</div><div class="lbl">Covers today</div></div><div class="stat-card"><div class="val">-</div><div class="lbl">Confirmed bookings</div></div></div>
+      <div class="manager-dashboard-grid">
+        <section class="manager-panel"><div class="manager-panel-head"><div><p class="eyebrow">Recent activity</p><h2>Latest reservations</h2></div></div><div id="recent" class="booking-timeline"><p class="muted">Loading bookings...</p></div></section>
+        <section class="manager-panel manager-action-panel"><p class="eyebrow">Admin tools</p><h2>Restaurant operations</h2><p>Use Manager View to handle bookings, guests, floor plans, promotions and restaurant settings. Admin has full access to both.</p><a class="btn btn-primary btn-block" href="/manager">Switch to Manager</a></section>
+      </div>
+    </main>
+  </section>
+
+  <script src="/assets/js/main.js"></script>
+  <script>
+    (function () {
+      const ADMIN_KEY = 'sbynham_admin_token';
+      const MANAGER_KEY = 'sbynham_token';
+      const loginView = document.getElementById('loginView'), dashView = document.getElementById('dashView');
+      const adminToken = () => localStorage.getItem(ADMIN_KEY) || '';
+
+      function showDash() { loginView.style.display = 'none'; dashView.style.display = 'flex'; load(); }
+
+      async function load() {
+        try {
+          const s = await api('/api/admin/summary', { headers: { Authorization: 'Bearer ' + adminToken() } });
+          document.getElementById('statGrid').innerHTML = `
+            <div class="stat-card"><div class="val">${s.total}</div><div class="lbl">Total bookings</div></div>
+            <div class="stat-card"><div class="val">${s.today}</div><div class="lbl">Bookings today</div></div>
+            <div class="stat-card"><div class="val">${s.covers_today}</div><div class="lbl">Covers today</div></div>
+            <div class="stat-card"><div class="val">${s.confirmed}</div><div class="lbl">Confirmed bookings</div></div>`;
+          document.getElementById('recent').innerHTML = s.recent.length
+            ? s.recent.map((x) => `<div class="timeline-booking"><strong>${escapeHTML(x.date)}</strong><div><b>${escapeHTML(x.name)}</b><span>${x.guests} guest${x.guests === 1 ? '' : 's'} at ${escapeHTML(x.time)}</span></div><span class="badge badge-brand">${escapeHTML(x.status)}</span></div>`).join('')
+            : '<p class="muted">No reservations yet.</p>';
+        } catch (err) {
+          toast(err.message, 'error');
+          if (err.message === 'Unauthorized' || err.message === 'Admin access required') { localStorage.removeItem(ADMIN_KEY); localStorage.removeItem(MANAGER_KEY); loginView.style.display = 'block'; dashView.style.display = 'none'; }
+        }
+      }
+
+      document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try {
+          const data = await api('/api/auth', { method: 'POST', body: JSON.stringify({ password: document.getElementById('pw').value, role: 'admin' }) });
+          localStorage.setItem(ADMIN_KEY, data.token);
+          localStorage.setItem(MANAGER_KEY, data.token);
+          document.getElementById('pw').value = '';
+          showDash();
+        } catch (err) { toast(err.message, 'error'); }
+      });
+
+      document.getElementById('logoutBtn').addEventListener('click', () => {
+        localStorage.removeItem(ADMIN_KEY);
+        localStorage.removeItem(MANAGER_KEY);
+        loginView.style.display = 'block'; dashView.style.display = 'none';
+      });
+      document.getElementById('refreshBtn').addEventListener('click', load);
+
+      if (adminToken()) showDash(); else loginView.style.display = 'block';
+    })();
+  </script>
+</body>
+</html>

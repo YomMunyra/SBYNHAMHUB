@@ -228,7 +228,7 @@
           const pending = todayItems.filter((r) => r.status === 'pending').length, confirmed = todayItems.filter((r) => r.status === 'confirmed').length, arrived = todayItems.filter((r) => r.status === 'arrived').length;
           document.getElementById('statusSummary').innerHTML = `<div><b>${pending}</b><span>Pending</span></div><div><b>${confirmed}</b><span>Confirmed</span></div><div><b>${arrived}</b><span>Arrived</span></div>`;
           renderTable(tableItems);
-        } catch (err) { if (err.message === 'Unauthorized') { localStorage.removeItem(TOKEN_KEY); loginView.style.display = 'block'; dashView.style.display = 'none'; } toast(err.message, 'error'); }
+        } catch (err) { if (err.message === 'Unauthorized') { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem('sbynham_admin_token'); loginView.style.display = 'block'; dashView.style.display = 'none'; } toast(err.message, 'error'); }
       }
       let editingDishId = '';
       function openDishForm(item) {
@@ -471,8 +471,8 @@
         try { await api('/api/promos/' + box.dataset.id, { method: 'PATCH', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify({ [box.dataset.field]: box.checked }) }); toast('Promotion updated'); load(); } catch (err) { toast(err.message, 'error'); }
       });
 
-      document.getElementById('loginForm').addEventListener('submit', async (e) => { e.preventDefault(); try { const data = await api('/api/auth', { method:'POST', body:JSON.stringify({ password: document.getElementById('pw').value, role:'manager' }) }); localStorage.setItem(TOKEN_KEY, data.token); document.getElementById('pw').value = ''; showDash(); } catch (err) { toast(err.message, 'error'); } });
-      document.getElementById('logoutBtn').addEventListener('click', () => { localStorage.removeItem(TOKEN_KEY); loginView.style.display = 'block'; dashView.style.display = 'none'; });
+      document.getElementById('loginForm').addEventListener('submit', async (e) => { e.preventDefault(); try { const data = await api('/api/auth', { method:'POST', body: JSON.stringify({ password: document.getElementById('pw').value, role:'manager' }) }); localStorage.setItem(TOKEN_KEY, data.token); localStorage.removeItem('sbynham_admin_token'); document.getElementById('pw').value = ''; showDash(); } catch (err) { toast(err.message, 'error'); } });
+      document.getElementById('logoutBtn').addEventListener('click', () => { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem('sbynham_admin_token'); loginView.style.display = 'block'; dashView.style.display = 'none'; });
       document.querySelectorAll('[data-view]').forEach((button) => button.addEventListener('click', () => showView(button.dataset.view)));
       document.getElementById('refreshBtn').addEventListener('click', load); filterDate.addEventListener('change', load); document.getElementById('clearFilter').addEventListener('click', () => { filterDate.value = ''; load(); });
       resBody.addEventListener('change', async (e) => { const sel = e.target.closest('.status-select'); if (!sel) return; try { await api('/api/reservations/' + sel.dataset.id, { method:'PATCH', headers:{ Authorization:'Bearer ' + token() }, body:JSON.stringify({ status:sel.value }) }); toast('Booking updated'); load(); } catch (err) { toast(err.message, 'error'); } });

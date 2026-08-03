@@ -130,6 +130,26 @@ CREATE TABLE IF NOT EXISTS promos (
   active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS payments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  payment_ref TEXT NOT NULL UNIQUE,
+  reservation_id INTEGER REFERENCES reservations(id) ON DELETE SET NULL,
+  name TEXT NOT NULL,
+  email TEXT,
+  amount REAL NOT NULL,
+  tip_pct REAL NOT NULL DEFAULT 0,
+  tip_amount REAL NOT NULL DEFAULT 0,
+  fee_rate REAL NOT NULL DEFAULT 0.0095,
+  fee_flat REAL NOT NULL DEFAULT 0.5,
+  fee_total REAL NOT NULL DEFAULT 0,
+  total REAL NOT NULL,
+  split_across INTEGER NOT NULL DEFAULT 1,
+  split_index INTEGER NOT NULL DEFAULT 1,
+  card_last4 TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'paid',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `;
 
 db.exec(SCHEMA);
@@ -146,6 +166,8 @@ try { db.exec("ALTER TABLE reservations ADD COLUMN promo_id INTEGER NOT NULL DEF
 try { db.exec("ALTER TABLE reservations ADD COLUMN promo_name TEXT NOT NULL DEFAULT ''"); } catch { /* Existing local databases already have this column. */ }
 try { db.exec("ALTER TABLE reservations ADD COLUMN promo_discount REAL NOT NULL DEFAULT 0"); } catch { /* Existing local databases already have this column. */ }
 try { db.exec("ALTER TABLE settings ADD COLUMN avg_cover REAL NOT NULL DEFAULT 15"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE settings ADD COLUMN fee_rate REAL NOT NULL DEFAULT 0.0095"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE settings ADD COLUMN fee_flat REAL NOT NULL DEFAULT 0.50"); } catch { /* Existing local databases already have this column. */ }
 
 function seedSettings() {
   const existing = db.prepare('SELECT id FROM settings WHERE id = 1').get();

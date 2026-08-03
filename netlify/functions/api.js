@@ -2,7 +2,7 @@
 
 const crypto = require('node:crypto');
 const { categories, menu } = require('./menu-data');
-const { sendBookingConfirmation, sendReminder } = require('../../server/lib/mailer');
+const { sendBookingConfirmation, sendReminder, sendPaymentReceipt } = require('../../server/lib/mailer');
 
 const VALID_STATUS = ['pending', 'confirmed', 'arrived', 'cancelled', 'no-show'];
 const VALID_OCCASIONS = ['', 'Birthday', 'Anniversary', 'Date Night', 'Business', 'Family Gathering', 'Other'];
@@ -11,6 +11,51 @@ const TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
 const POINTS_PER_COVER = 100;
 const POINTS_UNIT = 100;
 const POINTS_RATE = 0.5;
+const PAY_FEE_RATE = 0.0095;
+const PAY_FEE_FLAT = 0.5;
+
+function round2(n) {
+  return Math.round(Number(n) * 100) / 100;
+}
+
+function paymentRef() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let out = 'NYM-';
+  for (let i = 0; i < 8; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  return out;
+}
+
+function computeTip(amount, tipPct) {
+  return Math.round(Math.round(Number(amount) * 100) * Number(tipPct) / 100) / 100;
+}
+
+function computeFee(amount, feeRate, feeFlat) {
+  const cents = Math.round(Number(amount) * 100);
+  const bps = Math.round(Number(feeRate) * 10000);
+  const feeCents = Math.round(cents * bps / 10000) + Math.round(Number(feeFlat) * 100);
+  return feeCents / 100;
+}
+
+function cardDigits(number) {
+  return String(number || '').replace(/[\s-]/g, '');
+}
+
+function mockProcessCard(card) {
+  const number = cardDigits(card && card.number);
+  if (!/^\d{13,19}$/.test(number)) return { error: 'Card number must be 13–19 digits.' };
+  const last4 = number.slice(-4);
+  if (last4 === '1111') return { error: 'Card declined by issuer. Please try another card.' };
+  const expiry = String(card && card.expiry || '').trim();
+  const m = expiry.match(/^(0[1-9]|1[0-2])\/(\d{2})$/);
+  if (!m) return { error: 'Expiry must be in MM/YY format.' };
+  const month = Number(m[1]);
+  const year = 2000 + Number(m[2]);
+  const now = new Date();
+  if (year < now.getFullYear() || (year === now.getFullYear() && month < now.getMonth() + 1)) return { error: 'This card has expired.' };
+  const cvc = String(card && card.cvc || '').trim();
+  if (!/^\d{3,4}$/.test(cvc)) return { error: 'CVC must be 3–4 digits.' };
+  return { ok: true, last4 };
+}
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -103,6 +148,13 @@ async function guests(event) {
 
 function sortReservations(items) {
   return items.sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`) || String(b.created_at).localeCompare(String(a.created_at)));
+}
+
+async function payments(event) {
+  const store = await reservationStore(event);
+  const { blobs } = await store.list({ prefix: 'payment/' });
+  const values = await Promise.all(blobs.map(({ key }) => store.get(key, { type: 'json' })));
+  return values.filter(Boolean).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
 }
 
 async function reviews(event) {
@@ -518,7 +570,7 @@ exports.handler = async (event) => {
     const store = await reservationStore(event);
     if (method === 'GET') {
       const saved = (await store.get('settings/restaurant', { type: 'json' })) || {};
-      return json({ name: saved.name || 'SbyNhamHub', phone: saved.phone || '+855 12 345 678', address: saved.address || '123 Riverside Walk, Phnom Penh', hours: saved.hours || DEFAULT_HOURS, avg_cover: saved.avg_cover || 15 });
+      return json({ name: saved.name || 'SbyNhamHub', phone: saved.phone || '+855 12 345 678', address: saved.address || '123 Riverside Walk, Phnom Penh', hours: saved.hours || DEFAULT_HOURS, avg_cover: saved.avg_cover || 15, fee_rate: saved.fee_rate || 0.0095, fee_flat: saved.fee_flat || 0.5 });
     }
     if (method === 'PATCH') {
       if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
@@ -636,6 +688,77 @@ exports.handler = async (event) => {
     const todays = items.filter((item) => item.date === today);
     const recent = [...items].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, 6);
     return json({ total: items.length, today: todays.length, covers_today: todays.reduce((total, item) => total + Number(item.guests), 0), confirmed: items.filter((item) => item.status === 'confirmed').length, recent });
+  }
+
+  if (method === 'POST' && path === '/payments/pay') {
+    const body = readBody(event);
+    const { name = '', email = '', amount = '', tip_pct = 0, split_across = 1, split_index = 1, reservation_id = '', card = {} } = body;
+    const invalid = [];
+    if (!String(name).trim()) invalid.push('name');
+    if (!String(email).trim()) invalid.push('email');
+    const amt = Number(amount);
+    if (!Number.isFinite(amt) || amt <= 0 || amt > 100000) invalid.push('amount');
+    const tipPct = Number(tip_pct);
+    if (!Number.isFinite(tipPct) || tipPct < 0 || tipPct > 25) invalid.push('tip');
+    const splitAcross = Number(split_across);
+    const splitIndex = Number(split_index);
+    if (!Number.isInteger(splitAcross) || splitAcross < 1 || splitAcross > 12) invalid.push('split_across');
+    if (!Number.isInteger(splitIndex) || splitIndex < 1 || splitIndex > splitAcross) invalid.push('split_index');
+    if (invalid.length) return json({ error: `Invalid fields: ${invalid.join(', ')}` }, 400);
+
+    const processed = mockProcessCard(card);
+    if (processed.error) return json({ error: processed.error }, 400);
+
+    const store = await reservationStore(event);
+    const settings = (await store.get('settings/restaurant', { type: 'json' })) || {};
+    const feeRate = Number(settings.fee_rate) || PAY_FEE_RATE;
+    const feeFlat = Number(settings.fee_flat) || PAY_FEE_FLAT;
+    const tipAmount = computeTip(amt, tipPct);
+    const feeTotal = computeFee(amt, feeRate, feeFlat);
+    const total = round2(amt + tipAmount + feeTotal);
+
+    let rid = 0;
+    if (String(reservation_id).trim()) {
+      const target = await store.get(`reservation/${String(reservation_id).trim()}`, { type: 'json' });
+      if (!target) return json({ error: 'No booking found with that reference.' }, 404);
+      target.status = 'paid';
+      await store.setJSON(`reservation/${target.id}`, target);
+      rid = target.id;
+    }
+
+    const ref = paymentRef();
+    const payment = { id: ref, payment_ref: ref, reservation_id: rid, name: String(name).trim(), email: String(email).trim(), amount: amt, tip_pct: tipPct, tip_amount: tipAmount, fee_rate: feeRate, fee_flat: feeFlat, fee_total: feeTotal, total, split_across: splitAcross, split_index: splitIndex, card_last4: processed.last4, status: 'paid', created_at: new Date().toISOString() };
+    await store.setJSON(`payment/${ref}`, payment);
+    try { await sendPaymentReceipt(payment, rid ? await store.get(`reservation/${rid}`, { type: 'json' }) : null); } catch { /* email is best-effort */ }
+    return json({ ok: true, payment }, 201);
+  }
+
+  if (method === 'GET' && /^\/payments\/receipt\/[^/]+$/.test(path)) {
+    const ref = String(path.split('/').pop()).toUpperCase();
+    if (!/^NYM-[A-Z0-9]{8}$/.test(ref)) return json({ error: 'Invalid receipt reference.' }, 400);
+    const store = await reservationStore(event);
+    const payment = await store.get(`payment/${ref}`, { type: 'json' });
+    if (!payment) return json({ error: 'No payment found with that reference.' }, 404);
+    const reservation = payment.reservation_id ? await store.get(`reservation/${payment.reservation_id}`, { type: 'json' }) : null;
+    return json({ payment, reservation });
+  }
+
+  if (method === 'GET' && path === '/payments') {
+    if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
+    const rows = await payments(event);
+    const summary = { count: rows.length, gross: round2(rows.reduce((sum, p) => sum + p.total, 0)), fees: round2(rows.reduce((sum, p) => sum + p.fee_total, 0)), tips: round2(rows.reduce((sum, p) => sum + p.tip_amount, 0)), net: round2(rows.reduce((sum, p) => sum + p.total - p.fee_total, 0)) };
+    return json({ summary, payments: rows });
+  }
+
+  if (method === 'POST' && /^\/payments\/[^/]+\/refund$/.test(path)) {
+    if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
+    const ref = path.split('/')[2];
+    const store = await reservationStore(event);
+    const payment = await store.get(`payment/${ref}`, { type: 'json' });
+    if (!payment) return json({ error: 'Payment not found' }, 404);
+    payment.status = 'refunded';
+    await store.setJSON(`payment/${ref}`, payment);
+    return json({ ok: true, payment });
   }
 
   if (method === 'GET' && path === '/points/lookup') {
@@ -886,13 +1009,27 @@ exports.handler = async (event) => {
     const topPromos = Object.values(promoMap).sort((a, b) => b.uses - a.uses).slice(0, 5);
     const reviewAvg = published.length ? published.reduce((sum, r) => sum + reviewOverall(r), 0) / published.length : 0;
 
+    const payRows = (await payments(event)).filter((p) => p.status === 'paid');
+    const payRevenue = payRows.reduce((sum, p) => sum + p.total, 0);
+    const payFees = payRows.reduce((sum, p) => sum + p.fee_total, 0);
+    const payTips = payRows.reduce((sum, p) => sum + p.tip_amount, 0);
+    const payByDay = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const date = d.toISOString().slice(0, 10);
+      const day = payRows.filter((p) => String(p.created_at).slice(0, 10) === date);
+      payByDay.push({ date, revenue: Math.round(day.reduce((sum, p) => sum + p.total, 0) * 100) / 100 });
+    }
+
     return json({
       totals: { bookings: items.length, covers: items.reduce((sum, r) => sum + Number(r.guests), 0), arrivals: items.filter((r) => r.status === 'arrived').length, confirmed: items.filter((r) => r.status === 'confirmed').length, closed },
       trend, byDay, byHour, topOccasions,
       noShowRate,
       points: { earned: pointsEarned, redeemed: pointsRedeemed, discount: Math.round((discountTotal - promoDiscount) * 100) / 100 },
       promos: { uses: promoUses, discount: Math.round(promoDiscount * 100) / 100, top: topPromos },
-      reviews: { count: published.length, avg: Math.round(reviewAvg * 10) / 10 }
+      reviews: { count: published.length, avg: Math.round(reviewAvg * 10) / 10 },
+      payments: { count: payRows.length, gross: Math.round(payRevenue * 100) / 100, fees: Math.round(payFees * 100) / 100, tips: Math.round(payTips * 100) / 100, net: Math.round((payRevenue - payFees) * 100) / 100, byDay: payByDay }
     });
   }
 

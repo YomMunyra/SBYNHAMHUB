@@ -83,6 +83,7 @@
             </div>
             <div class="flex" style="gap:10px;flex-wrap:wrap">
               <button class="btn btn-primary" id="mModify">Save changes</button>
+              <button class="btn btn-secondary" id="mPay" style="display:none">Pay your bill with NyamPay</button>
               <button class="btn btn-danger" id="mCancel">Cancel this booking</button>
             </div>
           </div>
@@ -145,6 +146,9 @@
             return;
           }
           document.getElementById('mActions').style.display = 'block';
+          const payBtn = document.getElementById('mPay');
+          payBtn.style.display = ['arrived', 'confirmed'].includes(current.status) ? 'inline-block' : 'none';
+          payBtn.onclick = () => { window.location.href = '/pay?ref=' + current.id; };
           document.getElementById('mDate').value = current.date;
           document.getElementById('mDate').min = today;
           document.getElementById('mTime').value = current.time;

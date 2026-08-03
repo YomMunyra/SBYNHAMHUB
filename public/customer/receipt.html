@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Receipt — SbyNhamHub</title>
+  <meta name="description" content="View your NyamPay receipt from SbyNhamHub.">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <style>
+    @media print {
+      .nav, .page-hero, .no-print, .footer { display: none !important; }
+      body { background: #fff; }
+      .receipt-card { box-shadow: none !important; border: 1px solid #ddd; }
+    }
+  </style>
+</head>
+<body data-page="/receipt">
+
+  <header class="nav" id="nav"></header>
+
+  <section class="page-hero">
+    <div class="container">
+      <p class="eyebrow">SbyNhamHub · NyamPay</p>
+      <h1>Your <span class="italic-accent">receipt.</span></h1>
+      <p class="lede">Every NyamPay transaction gets its own reference. Enter it below to pull up the receipt anytime.</p>
+    </div>
+  </section>
+
+  <section class="section" style="padding-top:0">
+    <div class="container" style="max-width:680px">
+      <div class="form-card no-print" style="padding:20px">
+        <div class="flex" style="gap:10px">
+          <input class="input" id="recRef" placeholder="NYM-XXXXXXXX" style="text-transform:uppercase">
+          <button class="btn btn-primary" id="recLookup">View receipt</button>
+        </div>
+      </div>
+
+      <div id="receiptWrap" style="display:none"></div>
+    </div>
+  </section>
+
+  <footer class="footer" id="footer"></footer>
+
+  <script src="/assets/js/main.js"></script>
+  <script>
+    (function () {
+      const ref = document.getElementById('recRef');
+      const wrap = document.getElementById('receiptWrap');
+
+      function row(label, value, strong) {
+        return `<div class="bill-row${strong ? ' total' : ''}"><span>${label}</span><b>${value}</b></div>`;
+      }
+
+      async function lookup() {
+        const r = ref.value.trim().toUpperCase();
+        if (!/^NYM-[A-Z0-9]{8}$/.test(r)) { toast('Enter a valid receipt reference (NYM-XXXXXXXX).', 'error'); return; }
+        try {
+          const data = await api('/api/payments/receipt/' + encodeURIComponent(r));
+          const p = data.payment;
+          const res = data.reservation;
+          wrap.style.display = 'block';
+          wrap.innerHTML = `
+            <div class="card-tile receipt-card" style="background:#fff;padding:32px;margin-top:16px">
+              <div class="flex-between">
+                <div>
+                  <span class="eyebrow">NyamPay receipt</span>
+                  <h3 style="margin:4px 0 0">SbyNhamHub</h3>
+                </div>
+                <div style="text-align:right">
+                  <div class="booking-ref" style="margin:0">${escapeHTML(p.payment_ref)}</div>
+                </div>
+              </div>
+              <hr class="divider" style="margin:22px 0">
+              ${row('Paid by', escapeHTML(p.name))}
+              ${res ? row('Booking', `<a href="/manage">#${res.id}</a> — ${escapeHTML(res.name)}, ${res.guests} guests, ${res.date} at ${res.time}`) : ''}
+              ${p.split_across > 1 ? row('Split', `Share ${p.split_index} of ${p.split_across}`) : ''}
+              ${row('Card', '•••• ' + escapeHTML(p.card_last4))}
+              ${row('Date', new Date(p.created_at).toLocaleString())}
+              <hr class="divider" style="margin:22px 0">
+              ${row('Bill', money(p.amount))}
+              ${p.tip_amount ? row(`Tip (${p.tip_pct}%)`, money(p.tip_amount)) : ''}
+              ${row('NyamPay fee', money(p.fee_total))}
+              ${row('Total', money(p.total), true)}
+              <p class="hint" style="margin-top:16px">${p.status === 'refunded' ? '<strong>This payment has been refunded.</strong>' : 'Thanks for dining with us — Taste · Book · Enjoy.'}</p>
+              <button class="btn btn-secondary no-print" style="margin-top:12px" onclick="window.print()">Print receipt</button>
+            </div>`;
+        } catch (err) {
+          wrap.style.display = 'none';
+          toast(err.message, 'error');
+        }
+      }
+
+      document.getElementById('recLookup').addEventListener('click', lookup);
+      ref.addEventListener('keydown', (e) => { if (e.key === 'Enter') lookup(); });
+      const q = new URLSearchParams(window.location.search).get('ref');
+      if (q) { ref.value = q; lookup(); }
+    })();
+  </script>
+</body>
+</html>

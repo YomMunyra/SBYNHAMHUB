@@ -15,6 +15,7 @@ const waitlistRoutes = require('./routes/waitlist');
 const manageRoutes = require('./routes/manage');
 const promoRoutes = require('./routes/promos');
 const adminRoutes = require('./routes/admin');
+const paymentRoutes = require('./routes/payments');
 
 function createApp() {
   const app = express();
@@ -42,6 +43,7 @@ function createApp() {
   app.use('/api', manageRoutes);
   app.use('/api', promoRoutes);
   app.use('/api', adminRoutes);
+  app.use('/api', paymentRoutes);
 
   const publicDir = path.join(__dirname, '..', 'public');
   app.use(express.static(publicDir));
@@ -53,6 +55,8 @@ function createApp() {
     '/reviews': ['customer', 'reviews.html'],
     '/points': ['customer', 'points.html'],
     '/manage': ['customer', 'manage.html'],
+    '/pay': ['customer', 'pay.html'],
+    '/receipt': ['customer', 'receipt.html'],
     '/manager': ['manager', 'index.html'],
     '/admin': ['admin', 'index.html']
   };

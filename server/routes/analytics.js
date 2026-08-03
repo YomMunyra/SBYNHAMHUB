@@ -57,6 +57,19 @@ router.get('/analytics', requireAuth, (req, res) => {
   const published = db.prepare("SELECT * FROM reviews WHERE status = 'published'").all();
   const reviewAvg = published.length ? published.reduce((sum, r) => sum + reviewOverall(r), 0) / published.length : 0;
 
+  const payRows = db.prepare("SELECT * FROM payments WHERE status = 'paid'").all();
+  const payRevenue = payRows.reduce((sum, p) => sum + p.total, 0);
+  const payFees = payRows.reduce((sum, p) => sum + p.fee_total, 0);
+  const payTips = payRows.reduce((sum, p) => sum + p.tip_amount, 0);
+  const payByDay = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const date = d.toISOString().slice(0, 10);
+    const day = payRows.filter((p) => String(p.created_at).slice(0, 10) === date);
+    payByDay.push({ date, revenue: Math.round(day.reduce((sum, p) => sum + p.total, 0) * 100) / 100 });
+  }
+
   res.json({
     totals: {
       bookings: all.length,
@@ -72,7 +85,15 @@ router.get('/analytics', requireAuth, (req, res) => {
     noShowRate,
     points: { earned: pointsEarned, redeemed: pointsRedeemed, discount: discountTotal - promoDiscount },
     promos: { uses: promoUses, discount: Math.round(promoDiscount * 100) / 100, top: topPromos },
-    reviews: { count: published.length, avg: Math.round(reviewAvg * 10) / 10 }
+    reviews: { count: published.length, avg: Math.round(reviewAvg * 10) / 10 },
+    payments: {
+      count: payRows.length,
+      gross: Math.round(payRevenue * 100) / 100,
+      fees: Math.round(payFees * 100) / 100,
+      tips: Math.round(payTips * 100) / 100,
+      net: Math.round((payRevenue - payFees) * 100) / 100,
+      byDay: payByDay
+    }
   });
 });
 

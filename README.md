@@ -93,6 +93,24 @@ pages):
 The manager dashboard (→ **Embed & share**) generates a ready-to-paste snippet with
 live preview and one-click copy.
 
+## NyamPay
+
+Guest checkout for a reservation bill — from `/pay`, customers enter their booking
+reference (or are pre-linked from the booking manager), pick a tip, optionally split
+the bill 2–12 ways with per-guest emails, and pay by mock card. Receipts are emailed
+instantly and printable from `/receipt`.
+
+- **Fees**: 0.95% + $0.50 per transaction (configurable by manager under
+  **Settings → Payments**, `GET/PATCH /api/settings`). Fees and tips are computed in
+  cents so totals always round correctly.
+- **Payment reference**: `NYM-XXXXXXXX` (e.g. `NYM-KNWSG2K4`).
+- **Demo cards**: any 13–19 digit number works; cards ending in `1111` are declined
+  so you can see the error path.
+- **Refunds**: manager → **Payments** view can refund a payment (excluded from
+  analytics once refunded).
+- **Booking attach**: passing `reservation_id` marks the reservation `paid`, which
+  unlocks the "Pay your bill with NyamPay" button in the guest booking manager.
+
 ## API
 
 | Method | Endpoint | Auth | Description |
@@ -105,6 +123,12 @@ live preview and one-click copy.
 | DELETE | `/api/reservations/:id` | Bearer token | Delete a reservation |
 | GET | `/api/stats` | Bearer token | Booking stats |
 | POST | `/api/auth` | — | Exchange password for token |
+| POST | `/api/payments/pay` | — | Charge a bill (tip, split, mock card) |
+| GET | `/api/payments/receipt/:ref` | — | Look up a payment receipt |
+| GET | `/api/payments` | Bearer token | Payment summary + history |
+| POST | `/api/payments/:id/refund` | Bearer token | Refund a payment |
+| GET | `/api/settings` | — | Payment fees & site settings |
+| PATCH | `/api/settings` | Bearer token | Update settings |
 
 ## Data
 

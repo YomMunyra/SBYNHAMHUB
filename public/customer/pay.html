@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pay with NyamPay — SbyNhamHub</title>
+  <meta name="description" content="Split the bill, tip between 0–25%, and get a receipt emailed instantly with NyamPay.">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body data-page="/pay">
+
+  <header class="nav" id="nav"></header>
+
+  <section class="page-hero">
+    <div class="container">
+      <p class="eyebrow">SbyNhamHub · NyamPay</p>
+      <h1>Pay your bill, <span class="italic-accent">your way.</span></h1>
+      <p class="lede">Split the bill between the party, tip your server between 0–25%, and get a receipt emailed instantly. Integrated checkout at 0.95% + $0.50 per transaction.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container" style="max-width:980px">
+      <div class="pay-layout">
+        <div class="form-card" style="padding:26px">
+          <div class="field">
+            <label for="payRef">Booking reference <span class="muted">(optional — attach this payment to your table)</span></label>
+            <div class="flex" style="gap:10px">
+              <input class="input" id="payRef" placeholder="#123 or 123" style="flex:1">
+              <button class="btn btn-secondary" id="payRefLookup" type="button">Use booking</button>
+            </div>
+            <p class="hint" id="payRefStatus" style="margin-top:8px"></p>
+          </div>
+
+          <div class="field">
+            <label for="payAmount">Bill amount <span class="req">*</span></label>
+            <input class="input" id="payAmount" type="number" min="0" step="0.01" placeholder="45.00" inputmode="decimal">
+          </div>
+
+          <div class="field">
+            <label>Tip your server</label>
+            <div class="tip-chips" id="tipChips">
+              <button type="button" data-tip="0">0%</button>
+              <button type="button" data-tip="5">5%</button>
+              <button type="button" data-tip="10">10%</button>
+              <button type="button" data-tip="15" class="on">15%</button>
+              <button type="button" data-tip="20">20%</button>
+              <button type="button" data-tip="25">25%</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="check" style="font-size:14px"><input type="checkbox" id="paySplit"> Split the bill between the party</label>
+          </div>
+
+          <div id="splitBox" style="display:none">
+            <div class="field">
+              <label>Split between</label>
+              <div class="stepper">
+                <button type="button" id="splitMinus" aria-label="Fewer people">&minus;</button>
+                <span id="splitCount">2</span>
+                <button type="button" id="splitPlus" aria-label="More people">+</button>
+              </div>
+            </div>
+            <div id="splitRows"></div>
+          </div>
+
+          <div class="pay-divider"></div>
+
+          <div class="field">
+            <label for="payCard">Card number <span class="req">*</span></label>
+            <input class="input" id="payCard" inputmode="numeric" placeholder="4242 4242 4242 4242" maxlength="23" autocomplete="cc-number">
+          </div>
+          <div class="form-grid">
+            <div class="field">
+              <label for="payExp">Expiry</label>
+              <input class="input" id="payExp" placeholder="MM/YY" maxlength="5" autocomplete="cc-exp">
+            </div>
+            <div class="field">
+              <label for="payCvc">CVC</label>
+              <input class="input" id="payCvc" inputmode="numeric" placeholder="123" maxlength="4" autocomplete="cc-csc">
+            </div>
+          </div>
+
+          <button class="btn btn-primary btn-lg btn-block" id="payBtn" type="button">Pay $0.00</button>
+          <p class="hint" style="text-align:center;margin-top:10px">Demo checkout — no real charge is made. Card numbers ending <b>1111</b> are declined for testing.</p>
+        </div>
+
+        <div>
+          <div class="card-tile" style="background:#fff;padding:26px" id="recapCard">
+            <span class="eyebrow">Your bill</span>
+            <div class="bill-row"><span>Bill</span><b id="rBill">$0.00</b></div>
+            <div class="bill-row"><span>Tip <em id="rTipPct">(15%)</em></span><b id="rTip">$0.00</b></div>
+            <div class="bill-row"><span>NyamPay fee <em>(0.95% + $0.50)</em></span><b id="rFee">$0.00</b></div>
+            <div class="bill-row total"><span>Total</span><b id="rTotal">$0.00</b></div>
+            <div id="rSplit" class="split-note" style="display:none"></div>
+          </div>
+          <div class="callout blue mt-8">
+            <strong>NyamPay:</strong> payment is processed instantly and the receipt is emailed right
+            away. Tips go 100% to your server.
+          </div>
+          <p class="muted" style="font-size:13px;margin-top:14px">Charges are split automatically across the group — each share gets its own receipt reference and email.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="modal-backdrop" id="payModal">
+    <div class="modal">
+      <div class="icon-big">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      </div>
+      <h3>Payment complete!</h3>
+      <p id="paySuccessText">Your bill is settled. Receipts are on their way.</p>
+      <div id="payReceipts"></div>
+      <a class="btn btn-primary btn-block mt-8" href="/book">Book your next table</a>
+      <button class="btn btn-ghost btn-block mt-8" id="payModalClose" type="button">Done</button>
+    </div>
+  </div>
+
+  <footer class="footer" id="footer"></footer>
+
+  <script src="/assets/js/main.js"></script>
+  <script>
+    (function () {
+      const FEE_RATE = 0.0095, FEE_FLAT = 0.5;
+      const round2 = (n) => Math.round(n * 100) / 100;
+
+      const amount = document.getElementById('payAmount');
+      const tipChips = document.getElementById('tipChips');
+      const splitBox = document.getElementById('splitBox');
+      const paySplit = document.getElementById('paySplit');
+      const splitRows = document.getElementById('splitRows');
+      const splitCountEl = document.getElementById('splitCount');
+      const payBtn = document.getElementById('payBtn');
+      const payRef = document.getElementById('payRef');
+      const payRefStatus = document.getElementById('payRefStatus');
+      const payCard = document.getElementById('payCard');
+      const payExp = document.getElementById('payExp');
+      const payCvc = document.getElementById('payCvc');
+      const modal = document.getElementById('payModal');
+
+      let tip = 15, splitCount = 2, bookingId = 0;
+
+      function currentTip() { return tip; }
+      function currentAmount() { return Math.max(0, Number(amount.value) || 0); }
+      function share() { return round2(currentAmount() / splitCount); }
+
+      function renderSplitRows() {
+        splitRows.innerHTML = '';
+        for (let i = 1; i <= splitCount; i++) {
+          const row = document.createElement('div');
+          row.className = 'split-row';
+          row.innerHTML = `
+            <span class="split-tag">${i}</span>
+            <input class="input split-name" placeholder="Guest ${i}" value="Guest ${i}">
+            <input class="input split-email" type="email" placeholder="guest${i}@email.com">
+          `;
+          splitRows.appendChild(row);
+        }
+      }
+
+      function recap() {
+        const a = currentAmount();
+        const t = Math.round(Math.round(a * 100) * tip / 100) / 100;
+        const cents = Math.round(a * 100);
+        const bps = Math.round(FEE_RATE * 10000);
+        const f = (Math.round(cents * bps / 10000) + Math.round(FEE_FLAT * 100)) / 100;
+        const total = round2(a + t + f);
+        document.getElementById('rBill').textContent = money(a);
+        document.getElementById('rTip').textContent = money(t);
+        document.getElementById('rTipPct').textContent = `(${tip}%)`;
+        document.getElementById('rFee').textContent = money(f);
+        document.getElementById('rTotal').textContent = money(total);
+        const rSplit = document.getElementById('rSplit');
+        if (paySplit.checked && splitCount > 1) {
+          const s = share();
+          const st = Math.round(Math.round(s * 100) * tip / 100) / 100;
+          const sc = Math.round(s * 100);
+          const sf = (Math.round(sc * bps / 10000) + Math.round(FEE_FLAT * 100)) / 100;
+          const sTotal = round2(s + st + sf);
+          rSplit.style.display = 'block';
+          rSplit.innerHTML = `Split across <b>${splitCount}</b>: each share is <b>${money(s)}</b> + ${tip}% tip + fee = <b>${money(sTotal)}</b> each.`;
+          payBtn.textContent = `Pay ${money(round2(sTotal * splitCount))} for ${splitCount} shares`;
+        } else {
+          rSplit.style.display = 'none';
+          payBtn.textContent = `Pay ${money(total)}`;
+        }
+      }
+
+      function shares() {
+        const a = currentAmount();
+        const rows = splitRows.querySelectorAll('.split-row');
+        const list = [];
+        if (paySplit.checked && splitCount > 1) {
+          const s = share();
+          rows.forEach((row, i) => {
+            list.push({ name: row.querySelector('.split-name').value.trim() || `Guest ${i + 1}`, email: row.querySelector('.split-email').value.trim(), amount: s, split_across: splitCount, split_index: i + 1 });
+          });
+        } else {
+          list.push({ name: document.getElementById('payName') ? document.getElementById('payName').value.trim() : '', email: '', amount: a, split_across: 1, split_index: 1 });
+        }
+        return list;
+      }
+
+      tipChips.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-tip]');
+        if (!btn) return;
+        tip = Number(btn.dataset.tip);
+        tipChips.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b === btn));
+        recap();
+      });
+
+      paySplit.addEventListener('change', () => {
+        splitBox.style.display = paySplit.checked ? 'block' : 'none';
+        renderSplitRows();
+        recap();
+      });
+      document.getElementById('splitMinus').addEventListener('click', () => { if (splitCount > 2) { splitCount--; splitCountEl.textContent = splitCount; renderSplitRows(); recap(); } });
+      document.getElementById('splitPlus').addEventListener('click', () => { if (splitCount < 12) { splitCount++; splitCountEl.textContent = splitCount; renderSplitRows(); recap(); } });
+
+      amount.addEventListener('input', recap);
+
+      payCard.addEventListener('input', () => {
+        payCard.value = payCard.value.replace(/[^\d]/g, '').replace(/(\d{4})(?=\d)/g, '$1 ').slice(0, 19);
+      });
+      payExp.addEventListener('input', () => {
+        let v = payExp.value.replace(/[^\d]/g, '').slice(0, 4);
+        if (v.length > 2) v = v.slice(0, 2) + '/' + v.slice(2);
+        payExp.value = v;
+      });
+
+      payRefLookup.addEventListener('click', async () => {
+        const ref = payRef.value.replace(/[^0-9]/g, '');
+        if (!ref) { toast('Enter your booking reference first.', 'error'); return; }
+        bookingId = Number(ref);
+        try {
+          const data = await api('/api/reservations/lookup', { method: 'POST', body: JSON.stringify({ id: ref }) });
+          payRefStatus.innerHTML = `Attached to booking <b>#${data.reservation.id}</b> — ${escapeHTML(data.reservation.name)}, ${data.reservation.guests} guests on ${data.reservation.date} at ${data.reservation.time}.`;
+          payRefStatus.className = 'hint';
+        } catch (err) {
+          payRefStatus.textContent = 'Booking attached — add your name below.';
+          payRefStatus.className = 'hint';
+        }
+      });
+      payRef.addEventListener('input', () => { const ref = payRef.value.replace(/[^0-9]/g, ''); bookingId = ref ? Number(ref) : 0; if (!ref) payRefStatus.textContent = ''; });
+
+      payBtn.addEventListener('click', async () => {
+        const a = currentAmount();
+        if (a <= 0) { toast('Enter a bill amount.', 'error'); return; }
+        const digits = payCard.value.replace(/[^\d]/g, '');
+        if (digits.length < 13) { toast('Enter a valid card number.', 'error'); return; }
+        if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(payExp.value)) { toast('Enter expiry as MM/YY.', 'error'); return; }
+        if (!/^\d{3,4}$/.test(payCvc.value)) { toast('Enter a valid CVC.', 'error'); return; }
+
+        const list = shares();
+        if (list.length > 1 && list.some((s) => !s.email)) { toast('Add an email to every share so receipts can be sent.', 'error'); return; }
+
+        payBtn.disabled = true;
+        payBtn.textContent = 'Processing…';
+        const receipts = [];
+        try {
+          for (const s of list) {
+            const data = await api('/api/payments/pay', {
+              method: 'POST',
+              body: JSON.stringify({
+                name: s.name, email: s.email, amount: s.amount, tip_pct: tip,
+                split_across: s.split_across, split_index: s.split_index,
+                reservation_id: bookingId || '',
+                card: { number: digits, expiry: payExp.value, cvc: payCvc.value }
+              })
+            });
+            receipts.push(data.payment);
+          }
+          document.getElementById('paySuccessText').textContent = list.length > 1
+            ? `The bill was split across ${list.length} shares. Receipts are on their way.`
+            : 'Your bill is settled. The receipt is on its way.';
+          document.getElementById('payReceipts').innerHTML = receipts.map((p) => `
+            <a class="booking-ref" href="/receipt?ref=${encodeURIComponent(p.payment_ref)}">${p.payment_ref} — ${money(p.total)} <span style="float:right">View &#8594;</span></a>
+          `).join('');
+          modal.classList.add('open');
+          amount.value = ''; payCard.value = ''; payExp.value = ''; payCvc.value = ''; payRef.value = ''; bookingId = 0; payRefStatus.textContent = '';
+          paySplit.checked = false; splitBox.style.display = 'none';
+        } catch (err) {
+          toast(err.message, 'error');
+          if (receipts.length) toast('Some shares were charged before the error — check the receipt page.', 'error');
+        }
+        payBtn.disabled = false;
+        recap();
+      });
+
+      document.getElementById('payModalClose').addEventListener('click', () => modal.classList.remove('open'));
+      modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('open'); });
+
+      const urlRef = new URLSearchParams(window.location.search).get('ref');
+      if (urlRef) { payRef.value = urlRef; payRefLookup.click(); }
+
+      renderSplitRows();
+      recap();
+    })();
+  </script>
+</body>
+</html>

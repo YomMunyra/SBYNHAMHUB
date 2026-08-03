@@ -94,4 +94,45 @@ async function sendReminder(reservation, hoursBefore) {
   });
 }
 
-module.exports = { sendBookingConfirmation, sendReminder, sendEmail };
+async function sendPaymentReceipt(payment, reservation) {
+  if (!payment || !payment.email) return { sent: false, dev: true, reason: 'no-email' };
+  const lines = (p, label) => `<tr><td style="padding:6px 0;color:#888">${label}</td><td style="text-align:right"><b>${p}</b></td></tr>`;
+  return sendEmail({
+    to: payment.email,
+    subject: `Your NyamPay receipt ${payment.payment_ref}`,
+    text: [
+      `Hi ${payment.name},`,
+      `Thanks for dining with us — here is your receipt from SbyNhamHub.`,
+      ``,
+      `Receipt reference: ${payment.payment_ref}`,
+      payment.reservation_id ? `Booking reference: #${payment.reservation_id}` : null,
+      `Bill: $${payment.amount.toFixed(2)}`,
+      payment.tip_amount ? `Tip (${payment.tip_pct}%): $${payment.tip_amount.toFixed(2)}` : null,
+      `NyamPay fee: $${payment.fee_total.toFixed(2)}`,
+      `Total: $${payment.total.toFixed(2)}`,
+      `Paid by card ending ${payment.card_last4} · ${payment.created_at}`,
+      ``,
+      `Find this receipt anytime on the SbyNhamHub receipt page.`,
+      `Taste · Book · Enjoy.`
+    ].filter(Boolean).join('\n'),
+    html: [
+      `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto">`,
+      `<h2 style="color:#FF611F">Your receipt is ready</h2>`,
+      `<p>Hi <b>${payment.name}</b>, thanks for dining with us.</p>`,
+      `<table style="width:100%;border-collapse:collapse;margin:16px 0">`,
+      lines(payment.payment_ref, 'Receipt reference'),
+      payment.reservation_id ? lines(`#${payment.reservation_id}`, 'Booking reference') : '',
+      lines(`$${payment.amount.toFixed(2)}`, 'Bill'),
+      payment.tip_amount ? lines(`$${payment.tip_amount.toFixed(2)} (${payment.tip_pct}%)`, 'Tip') : '',
+      lines(`$${payment.fee_total.toFixed(2)}`, 'NyamPay fee'),
+      lines(`$${payment.total.toFixed(2)}`, 'Total'),
+      lines(`Card ending ${payment.card_last4}`, 'Paid by'),
+      lines(String(payment.created_at), 'Date'),
+      `</table>`,
+      `<p style="color:#888;font-size:13px">Taste · Book · Enjoy — SbyNhamHub</p>`,
+      `</div>`
+    ].join('')
+  });
+}
+
+module.exports = { sendBookingConfirmation, sendReminder, sendEmail, sendPaymentReceipt };

@@ -19,6 +19,7 @@ function renderHeader(active) {
     ['/menu', 'Menu'],
     ['/reviews', 'Reviews'],
     ['/book', 'Reservations'],
+    ['/pay', 'Pay'],
     ['/points', 'Nyam Points']
   ];
   const portal = [
@@ -28,6 +29,7 @@ function renderHeader(active) {
   const profileLinks = [
     ['/book', 'Book a table'],
     ['/manage', 'Manage my booking'],
+    ['/pay', 'Pay your bill'],
     ['/points', 'Nyam Points'],
     ['/reviews', 'Leave a review']
   ];
@@ -117,6 +119,7 @@ function renderFooter() {
           <li><a href="/reviews">Reviews</a></li>
           <li><a href="/points">Nyam Points</a></li>
           <li><a href="/book">Book a table</a></li>
+          <li><a href="/pay">Pay your bill</a></li>
           <li><a href="/manage">Manage booking</a></li>
           <li><a href="/admin">Admin</a></li>
         </ul>

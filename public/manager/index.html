@@ -37,6 +37,7 @@
         <button class="manager-nav-link" data-view="waitlist"><span class="manager-icon">&#9775;</span>Waitlist <span class="manager-nav-badge" id="waitlistBadge" style="display:none">0</span></button>
         <button class="manager-nav-link" data-view="menu"><span class="manager-icon">&#9776;</span>Menu</button>
         <button class="manager-nav-link" data-view="promotions"><span class="manager-icon">&#37;</span>Promotions</button>
+        <button class="manager-nav-link" data-view="embed"><span class="manager-icon">&lt;/&gt;</span>Embed &amp; share</button>
         <button class="manager-nav-link" data-view="reviews"><span class="manager-icon">&#9734;</span>Reviews <span class="manager-nav-badge" id="reviewBadge" style="display:none">0</span></button>
         <button class="manager-nav-link" data-view="settings"><span class="manager-icon">&#9881;</span>Restaurant settings</button>
       </nav>
@@ -154,6 +155,31 @@
           <div class="table-wrap"><table class="data"><thead><tr><th>Promotion</th><th>Code</th><th>Discount</th><th>Window</th><th>Limits</th><th>Usage</th><th>Flags</th><th></th></tr></thead><tbody id="promoBody"><tr><td colspan="8" style="text-align:center;color:#888780">Loading promotions...</td></tr></tbody></table></div>
         </section>
       </div>
+      <div id="embedView" style="display:none">
+        <div class="manager-date-row"><div><p class="eyebrow">Booking widget</p><h2>Embed &amp; share</h2><span>Drop the SbyNhamHub booking widget on any website with one line of code. Customise it, watch it live, then copy the snippet.</span></div></div>
+        <div class="embed-layout">
+          <section class="manager-panel">
+            <div class="manager-panel-head"><div><p class="eyebrow">Widget settings</p><h2>Customise</h2></div></div>
+            <div class="form">
+              <div class="form-grid">
+                <div class="field"><label>Heading</label><input class="input" id="embedTitle" value="Book a table at SbyNhamHub"></div>
+                <div class="field"><label>Brand colour</label><input class="input" id="embedBrand" type="color" value="#FF611F" style="height:44px;padding:4px"></div>
+              </div>
+              <div class="field flex">
+                <label class="check"><input type="checkbox" id="embedPromo" checked> Show promo-code field</label>
+                <label class="check"><input type="checkbox" id="embedPoints"> Show Nyam Points redeemer</label>
+              </div>
+              <p class="muted" style="margin:0;font-size:13px">The widget posts bookings straight to your reservation system, applies valid promo codes, and even lets guests redeem Nyam Points. Your theme colours are used automatically.</p>
+            </div>
+            <div class="manager-panel-head" style="margin-top:20px"><div><p class="eyebrow">Copy &amp; paste</p><h2>Embed code</h2></div><button class="btn btn-secondary btn-sm" id="copyEmbedBtn">Copy code</button></div>
+            <pre class="embed-code" id="embedCode"></pre>
+          </section>
+          <section class="manager-panel embed-preview-panel">
+            <div class="manager-panel-head"><div><p class="eyebrow">Live preview</p><h2>How it looks</h2></div></div>
+            <div id="embedPreview" style="background:#f3ede4;border-radius:14px;padding:26px 18px"></div>
+          </section>
+        </div>
+      </div>
       <div id="reviewsView" style="display:none"><div class="manager-date-row"><div><p class="eyebrow">Guest feedback</p><h2>Reviews & moderation</h2><span>Check what guests are saying, reply on behalf of the restaurant, and publish what goes live.</span></div><a class="btn btn-primary btn-sm" href="/reviews">View public page</a></div><section class="manager-panel manager-table-panel"><div class="table-wrap"><table class="data"><thead><tr><th>Guest</th><th>Booking</th><th>Rating</th><th>Review</th><th>Status</th><th>Reply</th><th></th></tr></thead><tbody id="reviewBody"><tr><td colspan="7" style="text-align:center;color:#888780">Loading...</td></tr></tbody></table></div></section></div>
       <div id="settingsView" style="display:none"><div class="manager-date-row"><div><p class="eyebrow">Restaurant setup</p><h2>Restaurant profile</h2><span>Saved settings appear on the public site.</span></div></div><section class="manager-panel"><div class="form"><div class="form-grid"><div class="field"><label>Restaurant name</label><input class="input" id="setName"></div><div class="field"><label>Phone</label><input class="input" id="setPhone"></div></div><div class="field"><label>Address</label><input class="input" id="setAddress"></div><div class="field"><label>Opening hours <span class="muted">(one per line: Label | 11:00 - 22:00)</span></label><textarea class="textarea" id="setHours" rows="5"></textarea></div><button class="btn btn-primary" id="saveSettings">Save settings</button></div></section></div>
     </main>
@@ -161,6 +187,7 @@
 
   <script src="/assets/js/main.js"></script>
   <script src="/assets/js/manager.js"></script>
+  <script src="/widget.js" defer></script>
   <script>
     (function () {
       const TOKEN_KEY = 'sbynham_token';
@@ -172,7 +199,7 @@
 
       function statusBadge(status) { const map = { pending:'badge-gold', confirmed:'badge-brand', arrived:'badge-green', cancelled:'badge-neutral', 'no-show':'badge-red' }; return `<span class="badge ${map[status] || 'badge-neutral'}">${escapeHTML(status)}</span>`; }
       let floorBookings = [], selectedBookingId = '', guestItems = [], selectedGuestId = '', reviewItems = [], menuItems = [], categories = [], waitlistItems = [], analyticsData = null, promoItems = [], editingPromoId = '';
-      function showView(view) { ['overview','analytics','bookings','floor','guests','waitlist','menu','promotions','reviews','settings'].forEach((name) => document.getElementById(name + 'View').style.display = view === name ? 'block' : 'none'); document.getElementById('viewTitle').textContent = view === 'settings' ? 'Restaurant settings' : view === 'bookings' ? 'Reservation desk' : view === 'floor' ? 'Floor plan' : view === 'guests' ? 'Guest profiles' : view === 'waitlist' ? 'Waitlist' : view === 'menu' ? 'Menu management' : view === 'promotions' ? 'Promotions' : view === 'reviews' ? 'Reviews & moderation' : view === 'analytics' ? 'Analytics' : 'Good day, manager'; document.querySelectorAll('[data-view]').forEach((el) => el.classList.toggle('active', el.dataset.view === view && el.classList.contains('manager-nav-link'))); }
+      function showView(view) { ['overview','analytics','bookings','floor','guests','waitlist','menu','promotions','embed','reviews','settings'].forEach((name) => document.getElementById(name + 'View').style.display = view === name ? 'block' : 'none'); document.getElementById('viewTitle').textContent = view === 'settings' ? 'Restaurant settings' : view === 'bookings' ? 'Reservation desk' : view === 'floor' ? 'Floor plan' : view === 'guests' ? 'Guest profiles' : view === 'waitlist' ? 'Waitlist' : view === 'menu' ? 'Menu management' : view === 'promotions' ? 'Promotions' : view === 'embed' ? 'Embed & share' : view === 'reviews' ? 'Reviews & moderation' : view === 'analytics' ? 'Analytics' : 'Good day, manager'; document.querySelectorAll('[data-view]').forEach((el) => el.classList.toggle('active', el.dataset.view === view && el.classList.contains('manager-nav-link'))); if (view === 'embed') renderEmbed(); }
       function renderReviews() {
         const rows = document.getElementById('reviewBody');
         if (!reviewItems.length) { rows.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888780">No reviews yet. Guest reviews will appear here once submitted.</td></tr>'; return; }
@@ -476,6 +503,35 @@
         const box = e.target.closest('input[data-field]');
         if (!box) return;
         try { await api('/api/promos/' + box.dataset.id, { method: 'PATCH', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify({ [box.dataset.field]: box.checked }) }); toast('Promotion updated'); load(); } catch (err) { toast(err.message, 'error'); }
+      });
+
+      function embedConfig() {
+        return {
+          title: document.getElementById('embedTitle').value.trim() || 'Book a table at SbyNhamHub',
+          brand: document.getElementById('embedBrand').value,
+          promo: document.getElementById('embedPromo').checked,
+          points: document.getElementById('embedPoints').checked
+        };
+      }
+      function embedSnippet() {
+        const c = embedConfig();
+        const attrs = ['target="#sby-widget"', 'title="' + c.title.replace(/"/g, '&quot;') + '"', 'brand="' + c.brand + '"', 'promo="' + c.promo + '"', 'points="' + c.points + '"'];
+        return '<div id="sby-widget"></div>\n<script src="' + window.location.origin + '/widget.js" ' + attrs.join(' ') + ' defer><\/script>';
+      }
+      function renderEmbed() {
+        if (!window.SbyWidget) return;
+        const c = embedConfig();
+        document.getElementById('embedPreview').innerHTML = '<div id="sbyWidgetPreview"></div>';
+        window.SbyWidget.render(c, document.getElementById('sbyWidgetPreview'));
+        document.getElementById('embedCode').textContent = embedSnippet();
+      }
+      document.getElementById('embedTitle').addEventListener('input', renderEmbed);
+      document.getElementById('embedBrand').addEventListener('input', renderEmbed);
+      document.getElementById('embedPromo').addEventListener('change', renderEmbed);
+      document.getElementById('embedPoints').addEventListener('change', renderEmbed);
+      document.getElementById('copyEmbedBtn').addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(embedSnippet()); toast('Embed code copied to clipboard'); }
+        catch (e) { const ta = document.createElement('textarea'); ta.value = embedSnippet(); document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('Embed code copied to clipboard'); }
       });
 
       document.getElementById('loginForm').addEventListener('submit', async (e) => { e.preventDefault(); try { const data = await api('/api/auth', { method:'POST', body: JSON.stringify({ password: document.getElementById('pw').value, role:'manager' }) }); localStorage.setItem(TOKEN_KEY, data.token); localStorage.removeItem('sbynham_admin_token'); document.getElementById('pw').value = ''; showDash(); } catch (err) { toast(err.message, 'error'); } });

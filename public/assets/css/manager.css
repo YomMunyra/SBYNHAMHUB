@@ -24,3 +24,9 @@
 .dish-off td:first-child strong { color: var(--muted); text-decoration: line-through; }
 .check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; cursor: pointer; }
 .usage-cell { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+
+.embed-layout { display: grid; grid-template-columns: 1.1fr 1fr; gap: 16px; align-items: start; }
+@media (max-width: 1100px) { .embed-layout { grid-template-columns: 1fr; } }
+.embed-code { margin: 0; padding: 14px 16px; background: #231607; color: #FFD9C2; border-radius: 12px; font-family: "JetBrains Mono", Consolas, monospace; font-size: 12.5px; line-height: 1.7; white-space: pre-wrap; word-break: break-all; }
+.embed-preview-panel { position: sticky; top: 16px; }
+@media (max-width: 1100px) { .embed-preview-panel { position: static; } }

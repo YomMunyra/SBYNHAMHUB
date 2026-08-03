@@ -12,12 +12,19 @@ const POINTS_PER_COVER = 100;
 const POINTS_UNIT = 100;
 const POINTS_RATE = 0.5;
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+};
+
 function json(body, statusCode = 200) {
   return {
     statusCode,
     headers: {
       'Cache-Control': 'no-store',
-      'Content-Type': 'application/json; charset=utf-8'
+      'Content-Type': 'application/json; charset=utf-8',
+      ...CORS_HEADERS
     },
     body: JSON.stringify(body)
   };
@@ -289,6 +296,10 @@ exports.handler = async (event) => {
   const path = requestPath(event);
   const method = event.httpMethod;
   const url = requestUrl(event);
+
+  if (method === 'OPTIONS') {
+    return { statusCode: 204, headers: CORS_HEADERS, body: '' };
+  }
 
   if (method === 'GET' && path === '/categories') {
     const store = await reservationStore(event);

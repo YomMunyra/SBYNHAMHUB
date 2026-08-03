@@ -66,6 +66,33 @@ The dashboards are where staff manage incoming reservations (confirm, mark arriv
 cancel, no-show, delete) and see daily stats. Signing in as admin also grants access
 to the manager workspace; a manager sign-in only opens the manager view.
 
+## Embed widget
+
+Any external site can accept bookings with one line of code. The widget is served
+from `/widget.js`, is fully self-contained (no other scripts or styles needed), and
+posts straight to the reservation API with CORS enabled for all origins.
+
+```html
+<div id="sby-widget"></div>
+<script src="https://your-domain/widget.js" data-target="#sby-widget" data-title="Book a table at SbyNhamHub" data-brand="#FF611F" data-promo="true" data-points="false" defer></script>
+```
+
+Options are read from `data-*` attributes (or `SbyWidget.render({...})` for dynamic
+pages):
+
+| Attribute | Default | Description |
+|---|---|---|
+| `data-target` | `#sby-widget` | Container selector to render the widget into |
+| `data-title` | `Book a table at SbyNhamHub` | Widget heading |
+| `data-subtitle` | Reserve in seconds… | Sub-heading |
+| `data-brand` | `#FF611F` | Brand accent colour |
+| `data-promo` | `true` | Show the promo-code field |
+| `data-points` | `false` | Show the Nyam Points redeemer |
+| `data-api` | script origin | Override the API base URL |
+
+The manager dashboard (→ **Embed & share**) generates a ready-to-paste snippet with
+live preview and one-click copy.
+
 ## API
 
 | Method | Endpoint | Auth | Description |

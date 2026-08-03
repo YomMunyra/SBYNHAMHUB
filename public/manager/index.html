@@ -36,6 +36,7 @@
         <button class="manager-nav-link" data-view="guests"><span class="manager-icon">&#9786;</span>Guests</button>
         <button class="manager-nav-link" data-view="waitlist"><span class="manager-icon">&#9775;</span>Waitlist <span class="manager-nav-badge" id="waitlistBadge" style="display:none">0</span></button>
         <button class="manager-nav-link" data-view="menu"><span class="manager-icon">&#9776;</span>Menu</button>
+        <button class="manager-nav-link" data-view="promotions"><span class="manager-icon">&#37;</span>Promotions</button>
         <button class="manager-nav-link" data-view="reviews"><span class="manager-icon">&#9734;</span>Reviews <span class="manager-nav-badge" id="reviewBadge" style="display:none">0</span></button>
         <button class="manager-nav-link" data-view="settings"><span class="manager-icon">&#9881;</span>Restaurant settings</button>
       </nav>
@@ -110,6 +111,42 @@
           <div class="table-wrap"><table class="data"><thead><tr><th>Dish</th><th>Category</th><th>Price</th><th>Tag</th><th>Flags</th><th></th></tr></thead><tbody id="managerMenu"><tr><td colspan="6" style="text-align:center;color:#888780">Loading menu...</td></tr></tbody></table></div>
         </section>
       </div>
+      <div id="promotionsView" style="display:none">
+        <div class="manager-date-row"><div><p class="eyebrow">Offers &amp; discounts</p><h2>Promotions</h2><span>Create seasonal offers and promo codes. Guests see active offers and can redeem codes at booking.</span></div><button class="btn btn-secondary btn-sm" id="newPromoBtn">+ New promotion</button></div>
+        <section class="manager-panel manager-table-panel">
+          <div class="form-card" id="promoForm" style="display:none;margin:0 0 16px;border:1px dashed var(--brand)">
+            <span class="eyebrow" id="promoFormLabel">New promotion</span>
+            <div class="form">
+              <div class="form-grid">
+                <div class="field"><label>Name <span class="req">*</span></label><input class="input" id="pName" placeholder="e.g. Lunch Special"></div>
+                <div class="field"><label>Promo code</label><input class="input" id="pCode" placeholder="LUNCH20" style="text-transform:uppercase"></div>
+              </div>
+              <div class="form-grid">
+                <div class="field"><label>Discount type</label><select class="select" id="pType"><option value="percent">Percent off</option><option value="flat">Fixed amount off</option></select></div>
+                <div class="field"><label>Value <span class="req">*</span></label><input class="input" id="pValue" type="number" step="1" min="1" placeholder="20"></div>
+              </div>
+              <div class="form-grid">
+                <div class="field"><label>Start date</label><input class="input" id="pStartDate" type="date"></div>
+                <div class="field"><label>End date</label><input class="input" id="pEndDate" type="date"></div>
+              </div>
+              <div class="field"><label>Days of the week <span class="muted">(leave all off for every day)</span></label><div class="form-grid" id="pDays" style="grid-template-columns:repeat(7,1fr)"><label class="check"><input type="checkbox" data-day="0"> Sun</label><label class="check"><input type="checkbox" data-day="1"> Mon</label><label class="check"><input type="checkbox" data-day="2"> Tue</label><label class="check"><input type="checkbox" data-day="3"> Wed</label><label class="check"><input type="checkbox" data-day="4"> Thu</label><label class="check"><input type="checkbox" data-day="5"> Fri</label><label class="check"><input type="checkbox" data-day="6"> Sat</label></div></div>
+              <div class="form-grid">
+                <div class="field"><label>Window start time</label><input class="input" id="pStartTime" type="time"></div>
+                <div class="field"><label>Window end time</label><input class="input" id="pEndTime" type="time"></div>
+              </div>
+              <div class="form-grid">
+                <div class="field"><label>Minimum covers</label><input class="input" id="pMinCovers" type="number" min="0" placeholder="0 = any party"></div>
+                <div class="field"><label>Usage limit</label><input class="input" id="pMaxUses" type="number" min="0" placeholder="0 = unlimited"></div>
+              </div>
+              <div class="form-grid">
+                <div class="field flex"><label class="check"><input type="checkbox" id="pFeatured" checked> Feature on home page</label><label class="check"><input type="checkbox" id="pActive" checked> Active</label></div>
+              </div>
+              <div class="flex" style="gap:10px"><button class="btn btn-primary" id="savePromoBtn">Save promotion</button><button class="btn btn-ghost" id="cancelPromoBtn">Cancel</button></div>
+            </div>
+          </div>
+          <div class="table-wrap"><table class="data"><thead><tr><th>Promotion</th><th>Code</th><th>Discount</th><th>Window</th><th>Limits</th><th>Usage</th><th>Flags</th><th></th></tr></thead><tbody id="promoBody"><tr><td colspan="8" style="text-align:center;color:#888780">Loading promotions...</td></tr></tbody></table></div>
+        </section>
+      </div>
       <div id="reviewsView" style="display:none"><div class="manager-date-row"><div><p class="eyebrow">Guest feedback</p><h2>Reviews & moderation</h2><span>Check what guests are saying, reply on behalf of the restaurant, and publish what goes live.</span></div><a class="btn btn-primary btn-sm" href="/reviews">View public page</a></div><section class="manager-panel manager-table-panel"><div class="table-wrap"><table class="data"><thead><tr><th>Guest</th><th>Booking</th><th>Rating</th><th>Review</th><th>Status</th><th>Reply</th><th></th></tr></thead><tbody id="reviewBody"><tr><td colspan="7" style="text-align:center;color:#888780">Loading...</td></tr></tbody></table></div></section></div>
       <div id="settingsView" style="display:none"><div class="manager-date-row"><div><p class="eyebrow">Restaurant setup</p><h2>Restaurant profile</h2><span>Saved settings appear on the public site.</span></div></div><section class="manager-panel"><div class="form"><div class="form-grid"><div class="field"><label>Restaurant name</label><input class="input" id="setName"></div><div class="field"><label>Phone</label><input class="input" id="setPhone"></div></div><div class="field"><label>Address</label><input class="input" id="setAddress"></div><div class="field"><label>Opening hours <span class="muted">(one per line: Label | 11:00 - 22:00)</span></label><textarea class="textarea" id="setHours" rows="5"></textarea></div><button class="btn btn-primary" id="saveSettings">Save settings</button></div></section></div>
     </main>
@@ -127,8 +164,8 @@
       document.getElementById('todayLabel').textContent = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date(today + 'T12:00:00'));
 
       function statusBadge(status) { const map = { pending:'badge-gold', confirmed:'badge-brand', arrived:'badge-green', cancelled:'badge-neutral', 'no-show':'badge-red' }; return `<span class="badge ${map[status] || 'badge-neutral'}">${escapeHTML(status)}</span>`; }
-      let floorBookings = [], selectedBookingId = '', guestItems = [], selectedGuestId = '', reviewItems = [], menuItems = [], categories = [], waitlistItems = [], analyticsData = null;
-      function showView(view) { ['overview','analytics','bookings','floor','guests','waitlist','menu','reviews','settings'].forEach((name) => document.getElementById(name + 'View').style.display = view === name ? 'block' : 'none'); document.getElementById('viewTitle').textContent = view === 'settings' ? 'Restaurant settings' : view === 'bookings' ? 'Reservation desk' : view === 'floor' ? 'Floor plan' : view === 'guests' ? 'Guest profiles' : view === 'waitlist' ? 'Waitlist' : view === 'menu' ? 'Menu management' : view === 'reviews' ? 'Reviews & moderation' : view === 'analytics' ? 'Analytics' : 'Good day, manager'; document.querySelectorAll('[data-view]').forEach((el) => el.classList.toggle('active', el.dataset.view === view && el.classList.contains('manager-nav-link'))); }
+      let floorBookings = [], selectedBookingId = '', guestItems = [], selectedGuestId = '', reviewItems = [], menuItems = [], categories = [], waitlistItems = [], analyticsData = null, promoItems = [], editingPromoId = '';
+      function showView(view) { ['overview','analytics','bookings','floor','guests','waitlist','menu','promotions','reviews','settings'].forEach((name) => document.getElementById(name + 'View').style.display = view === name ? 'block' : 'none'); document.getElementById('viewTitle').textContent = view === 'settings' ? 'Restaurant settings' : view === 'bookings' ? 'Reservation desk' : view === 'floor' ? 'Floor plan' : view === 'guests' ? 'Guest profiles' : view === 'waitlist' ? 'Waitlist' : view === 'menu' ? 'Menu management' : view === 'promotions' ? 'Promotions' : view === 'reviews' ? 'Reviews & moderation' : view === 'analytics' ? 'Analytics' : 'Good day, manager'; document.querySelectorAll('[data-view]').forEach((el) => el.classList.toggle('active', el.dataset.view === view && el.classList.contains('manager-nav-link'))); }
       function renderReviews() {
         const rows = document.getElementById('reviewBody');
         if (!reviewItems.length) { rows.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888780">No reviews yet. Guest reviews will appear here once submitted.</td></tr>'; return; }
@@ -184,7 +221,7 @@
           analyticsData = await api('/api/analytics', { headers }); renderAnalytics();
           await loadSettings();
           reviewItems = await api('/api/reviews?all=1', { headers }); renderReviews();
-          const pendingCount = reviewItems.filter((r) => r.status === 'pending').length;
+          promoItems = await api('/api/promos?all=1', { headers }); renderPromos();          const pendingCount = reviewItems.filter((r) => r.status === 'pending').length;
           const badge = document.getElementById('reviewBadge');
           if (pendingCount) { badge.textContent = pendingCount; badge.style.display = 'inline-flex'; } else { badge.style.display = 'none'; }
           document.getElementById('todayBookings').innerHTML = active.length ? active.map((r) => `<div class="timeline-booking"><strong>${escapeHTML(r.time)}</strong><div><b>${escapeHTML(r.name)}</b><span>${r.guests} guest${r.guests === 1 ? '' : 's'}${r.occasion ? ' - ' + escapeHTML(r.occasion) : ''}</span></div>${statusBadge(r.status)}</div>`).join('') : '<div class="empty-service"><strong>No bookings yet</strong><span>New reservations will appear here.</span></div>';
@@ -226,6 +263,69 @@
       function renderCategories() {
         document.getElementById('dCategory').innerHTML = categories.map((c) => `<option value="${c.id}">${escapeHTML(c.name)}</option>`).join('');
         document.getElementById('catList').innerHTML = categories.map((c) => `<span class="chip">${escapeHTML(c.name)}<button class="chip-x" data-delcat="${c.id}" title="Delete if empty">×</button></span>`).join('');
+      }
+      function promoWindow(p) {
+        const days = (p.days || []).slice().sort();
+        const parts = [];
+        if (p.start_date) parts.push(`${p.start_date}${p.end_date ? ' to ' + p.end_date : ' onward'}`);
+        if (p.start_time) parts.push(`${p.start_time}${p.end_time ? ' - ' + p.end_time : ''}`);
+        if (days.length) { const names = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']; parts.push(days.map((d) => names[d]).join(', ')); }
+        return parts.length ? parts.join('<br>') : '<span class="muted">Always on</span>';
+      }
+      function renderPromos() {
+        const body = document.getElementById('promoBody');
+        if (!promoItems.length) { body.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888780">No promotions yet — create your first offer.</td></tr>'; return; }
+        body.innerHTML = promoItems.map((p) => `
+          <tr data-id="${p.id}">
+            <td><strong>${escapeHTML(p.name)}</strong></td>
+            <td>${p.code ? `<span class="badge badge-brand" style="letter-spacing:1px">${escapeHTML(p.code)}</span>` : '<span class="muted">-</span>'}</td>
+            <td><b>${escapeHTML(p.discount_label)}</b></td>
+            <td style="font-size:13px">${promoWindow(p)}</td>
+            <td style="font-size:13px">${p.min_covers ? `Min ${p.min_covers} cover${p.min_covers === 1 ? '' : 's'}` : 'Any party'}${p.max_uses ? `<br>${p.max_uses} use${p.max_uses === 1 ? '' : 's'} max` : '<br>Unlimited'}</td>
+            <td><div class="usage-cell"><b>${p.used}</b>${p.max_uses ? ` / ${p.max_uses}` : ''}${p.max_uses && p.used >= p.max_uses ? ' <span class="badge badge-red">used up</span>' : ''}</div></td>
+            <td class="flex" style="gap:8px">
+              <label class="check"><input type="checkbox" data-id="${p.id}" data-field="active" ${p.active ? 'checked' : ''}> On</label>
+              <label class="check"><input type="checkbox" data-id="${p.id}" data-field="featured" ${p.featured ? 'checked' : ''}> Featured</label>
+            </td>
+            <td class="flex" style="gap:6px"><button class="btn btn-sm btn-ghost edit" data-id="${p.id}">Edit</button><button class="btn btn-sm btn-ghost del" data-id="${p.id}">Delete</button></td>
+          </tr>`).join('');
+      }
+      function openPromoForm(p) {
+        editingPromoId = p ? p.id : '';
+        document.getElementById('promoFormLabel').textContent = p ? 'Edit promotion' : 'New promotion';
+        document.getElementById('pName').value = p ? p.name : '';
+        document.getElementById('pCode').value = p ? (p.code || '') : '';
+        document.getElementById('pType').value = p ? p.type : 'percent';
+        document.getElementById('pValue').value = p ? p.value : '';
+        document.getElementById('pStartDate').value = p ? (p.start_date || '') : '';
+        document.getElementById('pEndDate').value = p ? (p.end_date || '') : '';
+        document.getElementById('pStartTime').value = p ? (p.start_time || '') : '';
+        document.getElementById('pEndTime').value = p ? (p.end_time || '') : '';
+        document.getElementById('pMinCovers').value = p ? p.min_covers : 0;
+        document.getElementById('pMaxUses').value = p ? p.max_uses : 0;
+        document.getElementById('pFeatured').checked = p ? !!p.featured : true;
+        document.getElementById('pActive').checked = p ? !!p.active : true;
+        document.querySelectorAll('#pDays input[data-day]').forEach((box) => { box.checked = p ? (p.days || []).includes(Number(box.dataset.day)) : false; });
+        const form = document.getElementById('promoForm');
+        form.style.display = 'block';
+        form.scrollIntoView({ block: 'nearest' });
+      }
+      function collectPromoForm() {
+        return {
+          name: document.getElementById('pName').value.trim(),
+          code: document.getElementById('pCode').value.trim(),
+          type: document.getElementById('pType').value,
+          value: Number(document.getElementById('pValue').value),
+          start_date: document.getElementById('pStartDate').value,
+          end_date: document.getElementById('pEndDate').value,
+          start_time: document.getElementById('pStartTime').value,
+          end_time: document.getElementById('pEndTime').value,
+          min_covers: Number(document.getElementById('pMinCovers').value) || 0,
+          max_uses: Number(document.getElementById('pMaxUses').value) || 0,
+          days: Array.from(document.querySelectorAll('#pDays input[data-day]:checked')).map((box) => Number(box.dataset.day)),
+          featured: document.getElementById('pFeatured').checked,
+          active: document.getElementById('pActive').checked
+        };
       }
       function barRow(label, value, max, color) {
         const pct = max ? Math.round((value / max) * 100) : 0;
@@ -346,6 +446,30 @@
       });
       document.getElementById('waitlistDate').addEventListener('change', renderWaitlist);
       document.getElementById('clearWaitlist').addEventListener('click', () => { document.getElementById('waitlistDate').value = ''; renderWaitlist(); });
+      document.getElementById('newPromoBtn').addEventListener('click', () => openPromoForm(null));
+      document.getElementById('cancelPromoBtn').addEventListener('click', () => { document.getElementById('promoForm').style.display = 'none'; editingPromoId = ''; });
+      document.getElementById('savePromoBtn').addEventListener('click', async () => {
+        const payload = collectPromoForm();
+        if (!payload.name || !payload.value) { toast('Name and discount value are required', 'error'); return; }
+        try {
+          if (editingPromoId) await api('/api/promos/' + editingPromoId, { method: 'PATCH', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify(payload) });
+          else await api('/api/promos', { method: 'POST', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify(payload) });
+          toast('Promotion saved'); document.getElementById('promoForm').style.display = 'none'; editingPromoId = ''; load();
+        } catch (err) { toast(err.message, 'error'); }
+      });
+      document.getElementById('promoBody').addEventListener('click', async (e) => {
+        const btn = e.target.closest('.edit, .del');
+        if (!btn) return;
+        const id = btn.dataset.id;
+        if (btn.classList.contains('edit')) { openPromoForm(promoItems.find((p) => p.id === id)); return; }
+        if (!confirm('Delete this promotion?')) return;
+        try { await api('/api/promos/' + id, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token() } }); toast('Promotion deleted'); load(); } catch (err) { toast(err.message, 'error'); }
+      });
+      document.getElementById('promoBody').addEventListener('change', async (e) => {
+        const box = e.target.closest('input[data-field]');
+        if (!box) return;
+        try { await api('/api/promos/' + box.dataset.id, { method: 'PATCH', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify({ [box.dataset.field]: box.checked }) }); toast('Promotion updated'); load(); } catch (err) { toast(err.message, 'error'); }
+      });
 
       document.getElementById('loginForm').addEventListener('submit', async (e) => { e.preventDefault(); try { const data = await api('/api/auth', { method:'POST', body:JSON.stringify({ password: document.getElementById('pw').value, role:'manager' }) }); localStorage.setItem(TOKEN_KEY, data.token); document.getElementById('pw').value = ''; showDash(); } catch (err) { toast(err.message, 'error'); } });
       document.getElementById('logoutBtn').addEventListener('click', () => { localStorage.removeItem(TOKEN_KEY); loginView.style.display = 'block'; dashView.style.display = 'none'; });

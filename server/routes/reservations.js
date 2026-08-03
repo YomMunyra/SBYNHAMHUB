@@ -13,6 +13,7 @@ const {
 } = require('../constants');
 const { guestId } = require('../format');
 const { sendBookingConfirmation } = require('../lib/mailer');
+const { resolvePromo, redeemPromo } = require('../lib/promos');
 
 const router = express.Router();
 
@@ -64,7 +65,8 @@ router.post('/reservations', (req, res) => {
     guests = '',
     occasion = '',
     notes = '',
-    redeem_points = ''
+    redeem_points = '',
+    promo_code = ''
   } = req.body;
 
   const errs = [];
@@ -103,10 +105,23 @@ router.post('/reservations', (req, res) => {
     points_redeemed = rp;
   }
 
+  const avgCover = db.prepare('SELECT avg_cover FROM settings WHERE id = 1').get()?.avg_cover || 15;
+  let promo_id = 0;
+  let promo_name = '';
+  let promo_discount = 0;
+  if (String(promo_code).trim()) {
+    const resolved = resolvePromo({ code: promo_code, date, time, guests: n, avgCover });
+    if (resolved.error) return res.status(400).json({ error: resolved.error });
+    promo_id = resolved.promo.id;
+    promo_name = resolved.promo.name;
+    promo_discount = resolved.discount;
+    discount += promo_discount;
+  }
+
   const result = db
     .prepare(
-      `INSERT INTO reservations (name, email, phone, date, time, guests, occasion, notes, points_redeemed, discount)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO reservations (name, email, phone, date, time, guests, occasion, notes, points_redeemed, discount, promo_id, promo_name, promo_discount)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       String(name).trim(),
@@ -118,10 +133,19 @@ router.post('/reservations', (req, res) => {
       occasion || '',
       String(notes || '').trim(),
       points_redeemed,
-      discount
+      discount,
+      promo_id,
+      promo_name,
+      promo_discount
     );
 
   const id = Number(result.lastInsertRowid);
+  if (promo_id) {
+    if (!redeemPromo(promo_id)) {
+      db.prepare('DELETE FROM reservations WHERE id = ?').run(id);
+      return res.status(400).json({ error: 'That promo just reached its usage limit.' });
+    }
+  }
   if (points_redeemed) {
     db.prepare('UPDATE points_accounts SET balance = balance - ? WHERE guest_key = ?').run(points_redeemed, redeemKey);
     db.prepare(

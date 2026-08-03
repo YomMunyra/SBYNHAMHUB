@@ -22,6 +22,19 @@
 
   <section class="section">
     <div class="container" style="max-width:860px">
+      <div class="offers-panel" id="offersPanel" style="display:none">
+        <div class="points-card-head">
+          <div class="icon-chip">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF611F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41 12 22l-8.59-8.59a2 2 0 0 1 0-2.83L12 2l8.59 8.59a2 2 0 0 1 0 2.83Z"/><path d="M15 9h.01"/></svg>
+          </div>
+          <div>
+            <strong>Offers for your visit</strong>
+            <p class="muted" style="margin:0;font-size:13.5px">These apply automatically when you add their promo code.</p>
+          </div>
+        </div>
+        <div id="offersList"></div>
+      </div>
+
       <div class="form-card">
         <span class="eyebrow">Reservation details</span>
         <h3 style="margin-bottom:24px">Reserve a table for two, tonight at seven?</h3>
@@ -100,6 +113,28 @@
             <div class="field">
               <label for="bNotes">Special requests</label>
               <textarea class="textarea" id="bNotes" name="notes" placeholder="Window seat, allergies, a cake on the table…"></textarea>
+            </div>
+            <div class="promo-box">
+              <div class="points-card-head">
+                <div class="icon-chip">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF611F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M12 5v14"/><path d="M7.5 9.5h.01M7.5 14.5h.01M16.5 9.5h.01M16.5 14.5h.01"/></svg>
+                </div>
+                <div>
+                  <strong>Promo code</strong>
+                  <p class="muted" style="margin:0;font-size:13.5px">Have an offer code? Enter it here before you confirm.</p>
+                </div>
+              </div>
+              <div class="form-grid">
+                <div class="field">
+                  <label for="bPromo">Code</label>
+                  <input class="input" id="bPromo" placeholder="e.g. LUNCH20" style="text-transform:uppercase" autocomplete="off">
+                </div>
+                <div class="field">
+                  <label for="bPromoApply">&nbsp;</label>
+                  <button type="button" class="btn btn-secondary btn-block" id="bPromoApply">Apply code</button>
+                </div>
+              </div>
+              <div class="points-status muted" id="promoStatus" style="display:none"></div>
             </div>
             <div class="points-card" id="pointsCard">
               <div class="points-card-head">
@@ -224,6 +259,52 @@
       if (qs.get('time')) document.getElementById('bTime').value = qs.get('time');
       if (qs.get('guests')) document.getElementById('bGuests').value = qs.get('guests');
 
+      const offersPanel = document.getElementById('offersPanel');
+      const offersList = document.getElementById('offersList');
+      let loadedOffers = [];
+      async function loadOffers() {
+        try {
+          const date = form.date.value, time = form.time.value, guests = form.guests.value;
+          loadedOffers = await api(`/api/promos/offers?date=${encodeURIComponent(date)}&time=${encodeURIComponent(time)}&guests=${encodeURIComponent(guests)}`);
+          if (!loadedOffers.length) { offersPanel.style.display = 'none'; offersList.innerHTML = ''; return; }
+          offersList.innerHTML = loadedOffers.map((o) => `
+            <div class="offer-row">
+              <div><strong>${escapeHTML(o.name)}</strong><div class="muted" style="font-size:12.5px">${escapeHTML(o.discount_label)}${o.min_covers ? ` · for parties of ${o.min_covers}+` : ''}</div></div>
+              ${o.code ? `<span class="offer-code" data-code="${escapeHTML(o.code)}">${escapeHTML(o.code)}</span>` : ''}
+            </div>`).join('');
+          offersPanel.style.display = 'block';
+        } catch { loadedOffers = []; }
+      }
+      ['bDate', 'bTime', 'bGuests'].forEach((id) => document.getElementById(id).addEventListener('change', () => { loadOffers(); clearPromo(); }));
+      offersList.addEventListener('click', (e) => {
+        const chip = e.target.closest('.offer-code');
+        if (!chip) return;
+        document.getElementById('bPromo').value = chip.dataset.code;
+        applyPromo();
+      });
+      const promoStatus = document.getElementById('promoStatus');
+      function clearPromo() {
+        document.getElementById('bPromo').value = '';
+        promoStatus.style.display = 'none';
+        promoStatus.className = 'points-status muted';
+      }
+      function applyPromo() {
+        const code = document.getElementById('bPromo').value.trim().toUpperCase();
+        if (!code) { promoStatus.style.display = 'none'; return; }
+        const offer = loadedOffers.find((o) => (o.code || '').toUpperCase() === code);
+        if (offer) {
+          promoStatus.className = 'points-status';
+          promoStatus.innerHTML = `Code <strong>${escapeHTML(offer.code)}</strong> applies — <strong>${escapeHTML(offer.discount_label)}</strong> will be taken off your bill.`;
+        } else {
+          promoStatus.className = 'points-status muted';
+          promoStatus.innerHTML = 'This code doesn\'t apply to your date, time or party size. It will be skipped at booking.';
+        }
+        promoStatus.style.display = 'block';
+      }
+      document.getElementById('bPromoApply').addEventListener('click', applyPromo);
+      document.getElementById('bPromo').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); applyPromo(); } });
+      loadOffers();
+
       const pointsStatus = document.getElementById('pointsStatus');
       const redeemRow = document.getElementById('redeemRow');
       const pRedeem = document.getElementById('pRedeem');
@@ -270,6 +351,7 @@
         submitBtn.disabled = true;
         submitBtn.textContent = 'Reserving…';
 
+        const promoCode = document.getElementById('bPromo').value.trim().toUpperCase();
         const payload = {
           name: form.name.value.trim(),
           email: form.email.value.trim(),
@@ -281,6 +363,7 @@
           notes: form.notes.value.trim(),
           redeem_points: Number(pRedeem.value || 0)
         };
+        if (promoCode && loadedOffers.some((o) => (o.code || '').toUpperCase() === promoCode)) payload.promo_code = promoCode;
 
         try {
           const data = await api('/api/reservations', {
@@ -292,9 +375,12 @@
           const ref = document.getElementById('modalRef');
           ref.textContent = `Booking reference: ${r.id} — keep it to leave a verified review after your visit.`;
           ref.style.display = 'block';
-          if (r.discount > 0) {
+          const savings = [];
+          if (r.promo_discount > 0) savings.push(`Promo ${escapeHTML(r.promo_name || 'applied')} — $${r.promo_discount.toFixed(2)} off`);
+          if (r.points_redeemed > 0) savings.push(`${r.points_redeemed} Nyam Points — $${r.points_redeemed * 0.005} off`);
+          if (savings.length) {
             const discount = document.getElementById('modalDiscount');
-            discount.textContent = `Nyam Points applied: ${r.points_redeemed} pts — $${r.discount.toFixed(2)} off your bill.`;
+            discount.textContent = savings.join(' · ') + '.';
             discount.style.display = 'block';
           }
           const reviewLink = document.getElementById('modalReviewLink');
@@ -307,6 +393,8 @@
           pRedeem.innerHTML = '';
           pDiscount.value = '$0.00';
           document.getElementById('pEmail').value = '';
+          clearPromo();
+          loadOffers();
           submitBtn.disabled = false;
           submitBtn.textContent = 'Confirm reservation';
         } catch (err) {

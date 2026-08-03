@@ -108,9 +108,31 @@ CREATE TABLE IF NOT EXISTS settings (
   phone TEXT NOT NULL DEFAULT '+855 12 345 678',
   address TEXT NOT NULL DEFAULT '123 Riverside Walk, Phnom Penh',
   hours TEXT NOT NULL DEFAULT '{}',
+  avg_cover REAL NOT NULL DEFAULT 15,
   updated_at TEXT
 );
+
+CREATE TABLE IF NOT EXISTS promos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  code TEXT UNIQUE,
+  type TEXT NOT NULL DEFAULT 'percent',
+  value REAL NOT NULL DEFAULT 0,
+  start_date TEXT,
+  end_date TEXT,
+  days TEXT NOT NULL DEFAULT '[]',
+  start_time TEXT,
+  end_time TEXT,
+  min_covers INTEGER NOT NULL DEFAULT 0,
+  max_uses INTEGER NOT NULL DEFAULT 0,
+  used INTEGER NOT NULL DEFAULT 0,
+  featured INTEGER NOT NULL DEFAULT 0,
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `;
+
+db.exec(SCHEMA);
 
 db.exec(SCHEMA);
 try { db.exec("ALTER TABLE reservations ADD COLUMN table_name TEXT NOT NULL DEFAULT ''"); } catch { /* Existing local databases already have this column. */ }
@@ -120,13 +142,17 @@ try { db.exec("ALTER TABLE reservations ADD COLUMN discount REAL NOT NULL DEFAUL
 try { db.exec("ALTER TABLE menu_items ADD COLUMN available INTEGER NOT NULL DEFAULT 1"); } catch { /* Existing local databases already have this column. */ }
 try { db.exec("ALTER TABLE reservations ADD COLUMN reminder_24h INTEGER NOT NULL DEFAULT 0"); } catch { /* Existing local databases already have this column. */ }
 try { db.exec("ALTER TABLE reservations ADD COLUMN reminder_2h INTEGER NOT NULL DEFAULT 0"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE reservations ADD COLUMN promo_id INTEGER NOT NULL DEFAULT 0"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE reservations ADD COLUMN promo_name TEXT NOT NULL DEFAULT ''"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE reservations ADD COLUMN promo_discount REAL NOT NULL DEFAULT 0"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE settings ADD COLUMN avg_cover REAL NOT NULL DEFAULT 15"); } catch { /* Existing local databases already have this column. */ }
 
 function seedSettings() {
   const existing = db.prepare('SELECT id FROM settings WHERE id = 1').get();
   if (existing) return;
   db.prepare(
-    `INSERT INTO settings (id, name, phone, address, hours)
-     VALUES (1, 'SbyNhamHub', '+855 12 345 678', '123 Riverside Walk, Phnom Penh', ?)`
+    `INSERT INTO settings (id, name, phone, address, hours, avg_cover)
+     VALUES (1, 'SbyNhamHub', '+855 12 345 678', '123 Riverside Walk, Phnom Penh', ?, 15)`
   ).run(
     JSON.stringify([
       { day: 'Monday – Thursday', hours: '11:00 – 22:00' },

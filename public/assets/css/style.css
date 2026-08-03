@@ -551,6 +551,20 @@ p { margin: 0 0 1em; }
 .points-history-row span { color: #3A3A37; }
 .points-history-row i { font-style: normal; color: var(--muted); font-size: 12.5px; }
 
+/* ---------- Offers & promo codes ---------- */
+
+.offers-panel { border: 1px solid var(--hair); background: #FFFAF5; border-radius: var(--r-lg); padding: 20px; margin-bottom: 20px; }
+.offer-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px dashed var(--hair); font-size: 14.5px; }
+.offer-row:last-child { border-bottom: 0; }
+.offer-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; font-weight: 700; letter-spacing: 1px; color: var(--brand); background: var(--brand-soft); border: 1px dashed var(--brand); border-radius: 999px; padding: 6px 14px; cursor: pointer; white-space: nowrap; }
+.offer-code:hover { background: var(--brand); color: #fff; }
+.promo-box { border: 1px dashed var(--hair); background: #FFFAF5; border-radius: var(--r-lg); padding: 20px; margin-bottom: 20px; }
+
+.offer-card { background: #fff; border: 1px solid var(--hair); border-radius: var(--r-lg); padding: 26px; display: flex; flex-direction: column; gap: 12px; }
+.offer-card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.offer-name { margin: 0; font-size: 18px; }
+.offer-desc { margin: 0; }
+
 /* ---------- Gallery ---------- */
 
 .gallery { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }

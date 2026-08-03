@@ -245,6 +245,20 @@
     </div>
   </section>
 
+  <!-- Today's offers -->
+  <section class="section" id="homeOffersSection" style="padding-top:0;display:none">
+    <div class="container">
+      <div class="flex-between" style="margin-bottom:36px">
+        <div>
+          <span class="eyebrow">Today's offers</span>
+          <h2 style="margin:0">A little something on the house</h2>
+        </div>
+        <a class="btn btn-secondary" href="/book">Book &amp; use a code</a>
+      </div>
+      <div class="grid-3" id="homeOffers"></div>
+    </div>
+  </section>
+
   <!-- Testimonials -->
   <section class="section" style="background:#fff;border-top:1px solid var(--hair);border-bottom:1px solid var(--hair)">
     <div class="container">
@@ -417,6 +431,29 @@
           list.innerHTML = s.hours.map((h) => `<div class="hours-row"><span class="day">${escapeHTML(h.day)}</span><span>${escapeHTML(h.hours)}</span></div>`).join('');
           document.querySelectorAll('#hoursList .hours-row .day').forEach((el) => {
             if (el.textContent === todayLabel) el.closest('.hours-row').classList.add('today');
+          });
+        })
+        .catch(() => {});
+
+      fetch('/api/promos')
+        .then((r) => r.json())
+        .then((items) => {
+          const section = document.getElementById('homeOffersSection');
+          if (!section || !items.length) return;
+          document.getElementById('homeOffers').innerHTML = items.map((o) => `
+            <div class="offer-card">
+              <div class="offer-card-top">
+                <span class="badge badge-gold">${escapeHTML(o.discount_label)}</span>
+                ${o.code ? `<span class="offer-code" data-code="${escapeHTML(o.code)}">${escapeHTML(o.code)}</span>` : ''}
+              </div>
+              <h3 class="offer-name">${escapeHTML(o.name)}</h3>
+              <p class="muted offer-desc" style="font-size:14px">${o.min_covers ? `Valid for parties of ${o.min_covers}+.` : 'Valid for any party size.'} Use the code when you book.</p>
+              <a class="btn btn-primary btn-sm" href="/book">Book now</a>
+            </div>`).join('');
+          section.style.display = 'block';
+          document.getElementById('homeOffers').addEventListener('click', (e) => {
+            const chip = e.target.closest('.offer-code');
+            if (chip) chip.style.outline = '2px solid var(--gold)';
           });
         })
         .catch(() => {});

@@ -23,3 +23,4 @@
 .chip-x:hover { opacity: 1; }
 .dish-off td:first-child strong { color: var(--muted); text-decoration: line-through; }
 .check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; cursor: pointer; }
+.usage-cell { display: flex; align-items: center; gap: 6px; white-space: nowrap; }

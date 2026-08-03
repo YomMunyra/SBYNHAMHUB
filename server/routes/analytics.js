@@ -44,7 +44,15 @@ router.get('/analytics', requireAuth, (req, res) => {
 
   const pointsEarned = db.prepare('SELECT COALESCE(SUM(lifetime), 0) AS n FROM points_accounts').get().n;
   const pointsRedeemed = db.prepare("SELECT COALESCE(SUM(-delta), 0) AS n FROM points_ledger WHERE reason = 'redeemed'").get().n;
+  const promoDiscount = db.prepare('SELECT COALESCE(SUM(promo_discount), 0) AS n FROM reservations').get().n;
   const discountTotal = db.prepare('SELECT COALESCE(SUM(discount), 0) AS n FROM reservations').get().n;
+  const promoUses = db.prepare('SELECT COUNT(*) AS n FROM reservations WHERE promo_id != 0').get().n;
+  const topPromos = db
+    .prepare(
+      `SELECT promo_name AS name, COUNT(*) AS uses, SUM(promo_discount) AS discount
+       FROM reservations WHERE promo_id != 0 GROUP BY promo_id ORDER BY uses DESC LIMIT 5`
+    )
+    .all();
 
   const published = db.prepare("SELECT * FROM reviews WHERE status = 'published'").all();
   const reviewAvg = published.length ? published.reduce((sum, r) => sum + reviewOverall(r), 0) / published.length : 0;
@@ -62,7 +70,8 @@ router.get('/analytics', requireAuth, (req, res) => {
     byHour,
     topOccasions,
     noShowRate,
-    points: { earned: pointsEarned, redeemed: pointsRedeemed, discount: discountTotal },
+    points: { earned: pointsEarned, redeemed: pointsRedeemed, discount: discountTotal - promoDiscount },
+    promos: { uses: promoUses, discount: Math.round(promoDiscount * 100) / 100, top: topPromos },
     reviews: { count: published.length, avg: Math.round(reviewAvg * 10) / 10 }
   });
 });

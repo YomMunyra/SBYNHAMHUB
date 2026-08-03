@@ -135,7 +135,8 @@
                 <div><span class="muted">Date</span><br><b>${escapeHTML(current.date)}</b></div>
                 <div><span class="muted">Time</span><br><b>${escapeHTML(current.time)}</b></div>
                 <div><span class="muted">Party</span><br><b>${current.guests} guest${current.guests === 1 ? '' : 's'}</b></div>
-                ${current.discount ? `<div><span class="muted">Nyam Points</span><br><b>${current.points_redeemed} pts · $${Number(current.discount).toFixed(2)} off</b></div>` : ''}
+                ${current.promo_name ? `<div><span class="muted">Promo</span><br><b>${escapeHTML(current.promo_name)} · $${Number(current.promo_discount).toFixed(2)} off</b></div>` : ''}
+                ${current.points_redeemed ? `<div><span class="muted">Nyam Points</span><br><b>${current.points_redeemed} pts · $${Number(current.points_redeemed * 0.005).toFixed(2)} off</b></div>` : ''}
               </div>
             </div>`;
           if (closed) {

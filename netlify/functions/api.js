@@ -195,6 +195,69 @@ async function storeGetJson(event, key) {
   return store.get(key, { type: 'json' });
 }
 
+function promoParseDays(promo) {
+  const d = promo.days;
+  if (Array.isArray(d)) return d.map(Number);
+  try {
+    const arr = JSON.parse(d);
+    return Array.isArray(arr) ? arr.map(Number) : [];
+  } catch {
+    return [];
+  }
+}
+
+function promoPublic(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    code: row.code || '',
+    type: row.type,
+    value: row.value,
+    discount_label: row.type === 'percent' ? `${Number(row.value)}% off` : `$${Number(row.value).toFixed(2)} off`,
+    min_covers: row.min_covers,
+    days: promoParseDays(row),
+    start_time: row.start_time || '',
+    end_time: row.end_time || '',
+    used: row.used,
+    max_uses: row.max_uses
+  };
+}
+
+function promoApplicable(row, { date = '', time = '', guests = 1 } = {}) {
+  if (!Number(row.active)) return false;
+  if (row.max_uses > 0 && Number(row.used) >= Number(row.max_uses)) return false;
+  if (row.start_date && String(row.start_date) > String(date)) return false;
+  if (row.end_date && String(row.end_date) < String(date)) return false;
+  if (row.min_covers > 0 && Number(guests) < Number(row.min_covers)) return false;
+  const days = promoParseDays(row);
+  if (days.length && date) {
+    const dow = new Date(String(date) + 'T12:00:00').getDay();
+    if (!days.includes(dow)) return false;
+  }
+  if (row.start_time && String(time) < String(row.start_time)) return false;
+  if (row.end_time && String(time) > String(row.end_time)) return false;
+  return true;
+}
+
+function promoDiscount(row, guests, avgCover) {
+  if (row.type === 'flat') return Number(row.value);
+  return Math.round(Number(guests) * Number(avgCover) * (Number(row.value) / 100) * 100) / 100;
+}
+
+async function loadPromos(store) {
+  const { blobs } = await store.list({ prefix: 'promo/' });
+  if (!blobs.length) return [];
+  const values = await Promise.all(blobs.map(({ key }) => store.get(key, { type: 'json' })));
+  return values.filter(Boolean).sort((a, b) => b.id - a.id);
+}
+
+async function findPromoByCode(store, code) {
+  const clean = String(code || '').trim().toUpperCase();
+  if (!clean) return null;
+  const promos = await loadPromos(store);
+  return promos.find((p) => p.code === clean) || null;
+}
+
 function requestUrl(event) {
   if (event.rawUrl) return new URL(event.rawUrl);
   const host = event.headers?.host || 'localhost';
@@ -318,11 +381,129 @@ exports.handler = async (event) => {
     return json({ ok: true });
   }
 
+  if (method === 'GET' && path === '/promos/offers') {
+    const store = await reservationStore(event);
+    const promos = await loadPromos(store);
+    return json(promos.filter((p) => promoApplicable(p, { date: url.searchParams.get('date') || '', time: url.searchParams.get('time') || '', guests: Number(url.searchParams.get('guests')) || 1 })).map(promoPublic));
+  }
+
+  if (method === 'GET' && path === '/promos') {
+    const store = await reservationStore(event);
+    const promos = await loadPromos(store);
+    if (url.searchParams.get('all') === '1') {
+      if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
+      return json(promos);
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    return json(promos.filter((p) => Number(p.active) && Number(p.featured) && (!p.max_uses || Number(p.used) < Number(p.max_uses)) && (!p.start_date || p.start_date <= today) && (!p.end_date || p.end_date >= today)).map(promoPublic));
+  }
+
+  if (method === 'POST' && path === '/promos') {
+    if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
+    const body = readBody(event);
+    const { name = '', code = '', type = 'percent', value = '', start_date = '', end_date = '', days = [], start_time = '', end_time = '', min_covers = 0, max_uses = 0, featured = 0, active = 1 } = body;
+    if (!String(name).trim()) return json({ error: 'Promotion name is required' }, 400);
+    if (!['percent', 'flat'].includes(String(type))) return json({ error: 'Discount type must be percent or flat' }, 400);
+    const valueNum = Number(value);
+    if (!Number.isFinite(valueNum) || valueNum <= 0) return json({ error: 'Discount value must be a positive number' }, 400);
+    if (type === 'percent' && valueNum > 50) return json({ error: 'Percent discounts are capped at 50%' }, 400);
+    let cleanCode = '';
+    if (String(code).trim()) {
+      cleanCode = String(code).trim().toUpperCase();
+      if (!/^[A-Z0-9_-]{2,20}$/.test(cleanCode)) return json({ error: 'Promo code must be 2-20 characters (letters, numbers, _ or -)' }, 400);
+      const store = await reservationStore(event);
+      if (await findPromoByCode(store, cleanCode)) return json({ error: 'That promo code is already in use' }, 400);
+    }
+    if (start_date && !/^\d{4}-\d{2}-\d{2}$/.test(String(start_date))) return json({ error: 'Invalid start date' }, 400);
+    if (end_date && !/^\d{4}-\d{2}-\d{2}$/.test(String(end_date))) return json({ error: 'Invalid end date' }, 400);
+    if (start_date && end_date && String(start_date) > String(end_date)) return json({ error: 'Start date must be before end date' }, 400);
+    const dayList = Array.isArray(days) ? days.map(Number) : [];
+    if (dayList.some((d) => !Number.isInteger(d) || d < 0 || d > 6)) return json({ error: 'Invalid days selected' }, 400);
+    if (start_time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(start_time))) return json({ error: 'Invalid start time' }, 400);
+    if (end_time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(end_time))) return json({ error: 'Invalid end time' }, 400);
+    if (start_time && end_time && String(start_time) > String(end_time)) return json({ error: 'Start time must be before end time' }, 400);
+    const covers = Number(min_covers);
+    const uses = Number(max_uses);
+    if (!Number.isInteger(covers) || covers < 0) return json({ error: 'Minimum covers must be 0 or more' }, 400);
+    if (!Number.isInteger(uses) || uses < 0) return json({ error: 'Usage limit must be 0 (unlimited) or more' }, 400);
+    const store = await reservationStore(event);
+    const promo = { id: await nextCounter(store, 'promo-counter'), name: String(name).trim(), code: cleanCode || null, type: String(type), value: valueNum, start_date: start_date || null, end_date: end_date || null, days: dayList, start_time: start_time || null, end_time: end_time || null, min_covers: covers, max_uses: uses, used: 0, featured: featured ? 1 : 0, active: active ? 1 : 0, created_at: new Date().toISOString() };
+    await store.setJSON(`promo/${promo.id}`, promo);
+    return json({ ok: true, promo }, 201);
+  }
+
+  const promoMatch = path.match(/^\/promos\/(\d+)$/);
+  if (promoMatch && (method === 'PATCH' || method === 'DELETE')) {
+    if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
+    const store = await reservationStore(event);
+    const key = `promo/${Number(promoMatch[1])}`;
+    const promo = await store.get(key, { type: 'json' });
+    if (!promo) return json({ error: 'Promotion not found' }, 404);
+    if (method === 'DELETE') { await store.delete(key); return json({ ok: true }); }
+    const body = readBody(event);
+    if (body.name !== undefined) {
+      if (!String(body.name).trim()) return json({ error: 'Promotion name is required' }, 400);
+      promo.name = String(body.name).trim();
+    }
+    if (body.type !== undefined) {
+      if (!['percent', 'flat'].includes(String(body.type))) return json({ error: 'Discount type must be percent or flat' }, 400);
+      promo.type = String(body.type);
+    }
+    if (body.value !== undefined) {
+      const valueNum = Number(body.value);
+      if (!Number.isFinite(valueNum) || valueNum <= 0) return json({ error: 'Discount value must be a positive number' }, 400);
+      if (promo.type === 'percent' && valueNum > 50) return json({ error: 'Percent discounts are capped at 50%' }, 400);
+      promo.value = valueNum;
+    }
+    if (body.code !== undefined) {
+      const cleanCode = String(body.code).trim().toUpperCase();
+      if (cleanCode && !/^[A-Z0-9_-]{2,20}$/.test(cleanCode)) return json({ error: 'Promo code must be 2-20 characters (letters, numbers, _ or -)' }, 400);
+      const clash = cleanCode ? (await loadPromos(store)).find((p) => p.code === cleanCode && p.id !== promo.id) : null;
+      if (clash) return json({ error: 'That promo code is already in use' }, 400);
+      promo.code = cleanCode || null;
+    }
+    if (body.start_date !== undefined) {
+      if (body.start_date && !/^\d{4}-\d{2}-\d{2}$/.test(String(body.start_date))) return json({ error: 'Invalid start date' }, 400);
+      promo.start_date = body.start_date || null;
+    }
+    if (body.end_date !== undefined) {
+      if (body.end_date && !/^\d{4}-\d{2}-\d{2}$/.test(String(body.end_date))) return json({ error: 'Invalid end date' }, 400);
+      promo.end_date = body.end_date || null;
+    }
+    if (body.days !== undefined) {
+      const dayList = Array.isArray(body.days) ? body.days.map(Number) : [];
+      if (dayList.some((d) => !Number.isInteger(d) || d < 0 || d > 6)) return json({ error: 'Invalid days selected' }, 400);
+      promo.days = dayList;
+    }
+    if (body.start_time !== undefined) {
+      if (body.start_time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(body.start_time))) return json({ error: 'Invalid start time' }, 400);
+      promo.start_time = body.start_time || null;
+    }
+    if (body.end_time !== undefined) {
+      if (body.end_time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(body.end_time))) return json({ error: 'Invalid end time' }, 400);
+      promo.end_time = body.end_time || null;
+    }
+    if (body.min_covers !== undefined) {
+      const covers = Number(body.min_covers);
+      if (!Number.isInteger(covers) || covers < 0) return json({ error: 'Minimum covers must be 0 or more' }, 400);
+      promo.min_covers = covers;
+    }
+    if (body.max_uses !== undefined) {
+      const uses = Number(body.max_uses);
+      if (!Number.isInteger(uses) || uses < 0) return json({ error: 'Usage limit must be 0 (unlimited) or more' }, 400);
+      promo.max_uses = uses;
+    }
+    if (body.featured !== undefined) promo.featured = body.featured ? 1 : 0;
+    if (body.active !== undefined) promo.active = body.active ? 1 : 0;
+    await store.setJSON(key, promo);
+    return json({ ok: true, promo });
+  }
+
   if (path === '/settings') {
     const store = await reservationStore(event);
     if (method === 'GET') {
       const saved = (await store.get('settings/restaurant', { type: 'json' })) || {};
-      return json({ name: saved.name || 'SbyNhamHub', phone: saved.phone || '+855 12 345 678', address: saved.address || '123 Riverside Walk, Phnom Penh', hours: saved.hours || DEFAULT_HOURS });
+      return json({ name: saved.name || 'SbyNhamHub', phone: saved.phone || '+855 12 345 678', address: saved.address || '123 Riverside Walk, Phnom Penh', hours: saved.hours || DEFAULT_HOURS, avg_cover: saved.avg_cover || 15 });
     }
     if (method === 'PATCH') {
       if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
@@ -361,7 +542,7 @@ exports.handler = async (event) => {
 
   if (method === 'POST' && path === '/reservations') {
     const body = readBody(event);
-    const { name = '', email = '', phone = '', date = '', time = '', guests = '', occasion = '', notes = '', redeem_points = '' } = body;
+    const { name = '', email = '', phone = '', date = '', time = '', guests = '', occasion = '', notes = '', redeem_points = '', promo_code = '' } = body;
     const invalid = [];
     if (!String(name).trim()) invalid.push('name');
     if (!String(phone).trim()) invalid.push('phone');
@@ -389,8 +570,28 @@ exports.handler = async (event) => {
       points_redeemed = rp;
     }
 
-    const reservation = { id: crypto.randomUUID(), name: String(name).trim(), email: String(email).trim(), phone: String(phone).trim(), date, time, guests: partySize, occasion: occasion || '', notes: String(notes || '').trim(), table: '', status: 'pending', points_awarded: 0, points_redeemed, discount, reminder_24h: 0, reminder_2h: 0, created_at: new Date().toISOString() };
+    let promo_id = 0;
+    let promo_name = '';
+    let promo_discount = 0;
     const store = await reservationStore(event);
+    const settings = (await store.get('settings/restaurant', { type: 'json' })) || {};
+    const avgCover = Number(settings.avg_cover) || 15;
+    if (String(promo_code).trim()) {
+      const promo = await findPromoByCode(store, promo_code);
+      if (!promo) return json({ error: 'That promo code is not valid.' }, 400);
+      if (!promoApplicable(promo, { date, time, guests: partySize })) {
+        if (promo.max_uses > 0 && Number(promo.used) >= Number(promo.max_uses)) return json({ error: 'That promo has reached its usage limit.' }, 400);
+        return json({ error: 'That promo does not apply to your date, time or party size.' }, 400);
+      }
+      promo.used += 1;
+      await store.setJSON(`promo/${promo.id}`, promo);
+      promo_id = promo.id;
+      promo_name = promo.name;
+      promo_discount = promoDiscount(promo, partySize, avgCover);
+      discount += promo_discount;
+    }
+
+    const reservation = { id: crypto.randomUUID(), name: String(name).trim(), email: String(email).trim(), phone: String(phone).trim(), date, time, guests: partySize, occasion: occasion || '', notes: String(notes || '').trim(), table: '', status: 'pending', points_awarded: 0, points_redeemed, discount, promo_id, promo_name, promo_discount, reminder_24h: 0, reminder_2h: 0, created_at: new Date().toISOString() };
     await store.setJSON(`reservation/${reservation.id}`, reservation);
     if (points_redeemed) {
       await store.setJSON(`ledger/${guestId({ email, phone })}/${crypto.randomUUID()}`, { delta: -points_redeemed, reason: 'redeemed', ref_id: String(reservation.id), note: `Discount $${discount.toFixed(2)} on booking #${reservation.id}`, created_at: new Date().toISOString() });
@@ -647,14 +848,26 @@ exports.handler = async (event) => {
     const accounts = await Promise.all(blobs.map(({ key }) => storeGetJson(event, key)));
     const pointsEarned = accounts.filter(Boolean).reduce((sum, a) => sum + Number(a.lifetime || 0), 0);
     const pointsRedeemed = items.reduce((sum, r) => sum + Number(r.points_redeemed || 0), 0);
+    const promoDiscount = items.reduce((sum, r) => sum + Number(r.promo_discount || 0), 0);
     const discountTotal = items.reduce((sum, r) => sum + Number(r.discount || 0), 0);
+    const promoUses = items.filter((r) => Number(r.promo_id)).length;
+    const promoMap = {};
+    for (const r of items) {
+      if (!Number(r.promo_id)) continue;
+      const name = r.promo_name || 'Promotion';
+      promoMap[name] = promoMap[name] || { name, uses: 0, discount: 0 };
+      promoMap[name].uses += 1;
+      promoMap[name].discount += Number(r.promo_discount || 0);
+    }
+    const topPromos = Object.values(promoMap).sort((a, b) => b.uses - a.uses).slice(0, 5);
     const reviewAvg = published.length ? published.reduce((sum, r) => sum + reviewOverall(r), 0) / published.length : 0;
 
     return json({
       totals: { bookings: items.length, covers: items.reduce((sum, r) => sum + Number(r.guests), 0), arrivals: items.filter((r) => r.status === 'arrived').length, confirmed: items.filter((r) => r.status === 'confirmed').length, closed },
       trend, byDay, byHour, topOccasions,
       noShowRate,
-      points: { earned: pointsEarned, redeemed: pointsRedeemed, discount: discountTotal },
+      points: { earned: pointsEarned, redeemed: pointsRedeemed, discount: Math.round((discountTotal - promoDiscount) * 100) / 100 },
+      promos: { uses: promoUses, discount: Math.round(promoDiscount * 100) / 100, top: topPromos },
       reviews: { count: published.length, avg: Math.round(reviewAvg * 10) / 10 }
     });
   }

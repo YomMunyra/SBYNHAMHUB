@@ -374,7 +374,8 @@ function promoPublic(row) {
     start_time: row.start_time || '',
     end_time: row.end_time || '',
     used: row.used,
-    max_uses: row.max_uses
+    max_uses: row.max_uses,
+    auto_end: Number(row.auto_end || 0)
   };
 }
 
@@ -411,6 +412,18 @@ async function findPromoByCode(store, code) {
   if (!clean) return null;
   const promos = await loadPromos(store);
   return promos.find((p) => p.code === clean) || null;
+}
+
+async function slotIsFullAt(store, date, time) {
+  if (!date || !time) return false;
+  const { blobs } = await store.list({ prefix: 'reservation/' });
+  const items = (await Promise.all(blobs.map(({ key }) => store.get(key, { type: 'json' })))).filter(Boolean);
+  const seats = items
+    .filter((r) => r.date === String(date) && r.time === String(time) && ['pending', 'confirmed', 'arrived'].includes(r.status))
+    .reduce((sum, r) => sum + Number(r.guests || 0), 0);
+  const settings = (await store.get('settings/restaurant', { type: 'json' })) || {};
+  const capacity = Number(settings.capacity) || 48;
+  return seats >= capacity;
 }
 
 function requestUrl(event) {
@@ -543,7 +556,16 @@ exports.handler = async (event) => {
   if (method === 'GET' && path === '/promos/offers') {
     const store = await reservationStore(event);
     const promos = await loadPromos(store);
-    return json(promos.filter((p) => promoApplicable(p, { date: url.searchParams.get('date') || '', time: url.searchParams.get('time') || '', guests: Number(url.searchParams.get('guests')) || 1 })).map(promoPublic));
+    const date = url.searchParams.get('date') || '';
+    const time = url.searchParams.get('time') || '';
+    const guests = Number(url.searchParams.get('guests')) || 1;
+    const shown = [];
+    for (const p of promos) {
+      if (!promoApplicable(p, { date, time, guests })) continue;
+      if (Number(p.auto_end) && await slotIsFullAt(store, date, time)) continue;
+      shown.push(promoPublic(p));
+    }
+    return json(shown);
   }
 
   if (method === 'GET' && path === '/promos') {
@@ -560,7 +582,7 @@ exports.handler = async (event) => {
   if (method === 'POST' && path === '/promos') {
     if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
     const body = readBody(event);
-    const { name = '', code = '', type = 'percent', value = '', start_date = '', end_date = '', days = [], start_time = '', end_time = '', min_covers = 0, max_uses = 0, featured = 0, active = 1 } = body;
+    const { name = '', code = '', type = 'percent', value = '', start_date = '', end_date = '', days = [], start_time = '', end_time = '', min_covers = 0, max_uses = 0, featured = 0, active = 1, auto_end = 0 } = body;
     if (!String(name).trim()) return json({ error: 'Promotion name is required' }, 400);
     if (!['percent', 'flat'].includes(String(type))) return json({ error: 'Discount type must be percent or flat' }, 400);
     const valueNum = Number(value);
@@ -586,7 +608,7 @@ exports.handler = async (event) => {
     if (!Number.isInteger(covers) || covers < 0) return json({ error: 'Minimum covers must be 0 or more' }, 400);
     if (!Number.isInteger(uses) || uses < 0) return json({ error: 'Usage limit must be 0 (unlimited) or more' }, 400);
     const store = await reservationStore(event);
-    const promo = { id: await nextCounter(store, 'promo-counter'), name: String(name).trim(), code: cleanCode || null, type: String(type), value: valueNum, start_date: start_date || null, end_date: end_date || null, days: dayList, start_time: start_time || null, end_time: end_time || null, min_covers: covers, max_uses: uses, used: 0, featured: featured ? 1 : 0, active: active ? 1 : 0, created_at: new Date().toISOString() };
+    const promo = { id: await nextCounter(store, 'promo-counter'), name: String(name).trim(), code: cleanCode || null, type: String(type), value: valueNum, start_date: start_date || null, end_date: end_date || null, days: dayList, start_time: start_time || null, end_time: end_time || null, min_covers: covers, max_uses: uses, used: 0, featured: featured ? 1 : 0, active: active ? 1 : 0, auto_end: auto_end ? 1 : 0, created_at: new Date().toISOString() };
     await store.setJSON(`promo/${promo.id}`, promo);
     return json({ ok: true, promo }, 201);
   }
@@ -654,6 +676,7 @@ exports.handler = async (event) => {
     }
     if (body.featured !== undefined) promo.featured = body.featured ? 1 : 0;
     if (body.active !== undefined) promo.active = body.active ? 1 : 0;
+    if (body.auto_end !== undefined) promo.auto_end = body.auto_end ? 1 : 0;
     await store.setJSON(key, promo);
     return json({ ok: true, promo });
   }
@@ -739,6 +762,7 @@ exports.handler = async (event) => {
     if (String(promo_code).trim()) {
       const promo = await findPromoByCode(store, promo_code);
       if (!promo) return json({ error: 'That promo code is not valid.' }, 400);
+      if (Number(promo.auto_end) && await slotIsFullAt(store, date, time)) return json({ error: 'That promo has ended — the restaurant is at capacity for this slot.' }, 400);
       if (!promoApplicable(promo, { date, time, guests: partySize })) {
         if (promo.max_uses > 0 && Number(promo.used) >= Number(promo.max_uses)) return json({ error: 'That promo has reached its usage limit.' }, 400);
         return json({ error: 'That promo does not apply to your date, time or party size.' }, 400);

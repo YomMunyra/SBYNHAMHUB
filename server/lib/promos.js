@@ -1,6 +1,7 @@
 'use strict';
 
 const { db } = require('../../db');
+const { SEAT_CAPACITY } = require('../constants');
 
 function parseDays(promo) {
   try {
@@ -9,6 +10,20 @@ function parseDays(promo) {
   } catch {
     return [];
   }
+}
+
+function slotOccupancy(date, time) {
+  if (!date || !time) return null;
+  const seats = db
+    .prepare("SELECT COALESCE(SUM(guests), 0) AS n FROM reservations WHERE date = ? AND time = ? AND status IN ('pending','confirmed','arrived')")
+    .get(String(date), String(time)).n;
+  const capacity = Number(db.prepare('SELECT capacity FROM settings WHERE id = 1').get()?.capacity || SEAT_CAPACITY);
+  return { seats: Number(seats), capacity };
+}
+
+function slotIsFull(date, time) {
+  const occ = slotOccupancy(date, time);
+  return !!occ && occ.seats >= occ.capacity;
 }
 
 function discountLabel(promo) {
@@ -30,7 +45,8 @@ function publicPromo(row) {
     start_time: row.start_time || '',
     end_time: row.end_time || '',
     used: row.used,
-    max_uses: row.max_uses
+    max_uses: row.max_uses,
+    auto_end: Number(row.auto_end || 0)
   };
 }
 
@@ -47,6 +63,7 @@ function promoApplicable(row, { date = '', time = '', guests = 1 } = {}) {
   }
   if (row.start_time && String(time) < String(row.start_time)) return false;
   if (row.end_time && String(time) > String(row.end_time)) return false;
+  if (Number(row.auto_end) && slotIsFull(date, time)) return false;
   return true;
 }
 
@@ -74,6 +91,9 @@ function resolvePromo({ code = '', date = '', time = '', guests = 1, avgCover = 
   if (!clean) return { promo: null, discount: 0 };
   const promo = findPromoByCode(clean);
   if (!promo) return { error: 'That promo code is not valid.' };
+  if (Number(promo.auto_end) && slotIsFull(date, time)) {
+    return { error: 'That promo has ended — the restaurant is at capacity for this slot.' };
+  }
   if (!promoApplicable(promo, { date, time, guests })) {
     if (promo.max_uses > 0 && Number(promo.used) >= Number(promo.max_uses)) {
       return { error: 'That promo has reached its usage limit.' };
@@ -83,4 +103,4 @@ function resolvePromo({ code = '', date = '', time = '', guests = 1, avgCover = 
   return { promo, discount: discountFor(promo, { guests, avgCover }), code: clean };
 }
 
-module.exports = { parseDays, discountLabel, publicPromo, promoApplicable, discountFor, findPromoByCode, redeemPromo, resolvePromo };
+module.exports = { parseDays, discountLabel, publicPromo, promoApplicable, discountFor, findPromoByCode, redeemPromo, resolvePromo, slotOccupancy, slotIsFull };

@@ -130,6 +130,7 @@ CREATE TABLE IF NOT EXISTS promos (
   used INTEGER NOT NULL DEFAULT 0,
   featured INTEGER NOT NULL DEFAULT 0,
   active INTEGER NOT NULL DEFAULT 1,
+  auto_end INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -176,6 +177,7 @@ try { db.exec("ALTER TABLE reviews ADD COLUMN spam INTEGER NOT NULL DEFAULT 0");
 try { db.exec("ALTER TABLE reviews ADD COLUMN spam_reason TEXT NOT NULL DEFAULT ''"); } catch { /* Existing local databases already have this column. */ }
 try { db.exec("ALTER TABLE points_ledger ADD COLUMN expires_at TEXT"); } catch { /* Existing local databases already have this column. */ }
 try { db.exec("ALTER TABLE points_ledger ADD COLUMN remaining INTEGER"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE promos ADD COLUMN auto_end INTEGER NOT NULL DEFAULT 0"); } catch { /* Existing local databases already have this column. */ }
 db.exec("UPDATE points_ledger SET remaining = delta, expires_at = datetime(created_at, '+18 months') WHERE reason = 'earned' AND remaining IS NULL");
 
 function seedSettings() {

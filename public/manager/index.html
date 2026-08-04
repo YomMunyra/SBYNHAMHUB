@@ -185,7 +185,7 @@
                 <div class="field"><label>Usage limit</label><input class="input" id="pMaxUses" type="number" min="0" placeholder="0 = unlimited"></div>
               </div>
               <div class="form-grid">
-                <div class="field flex"><label class="check"><input type="checkbox" id="pFeatured" checked> Feature on home page</label><label class="check"><input type="checkbox" id="pActive" checked> Active</label></div>
+                <div class="field flex"><label class="check"><input type="checkbox" id="pFeatured" checked> Feature on home page</label><label class="check"><input type="checkbox" id="pActive" checked> Active</label><label class="check"><input type="checkbox" id="pAutoEnd"> Auto-end when at capacity</label></div>
               </div>
               <div class="flex" style="gap:10px"><button class="btn btn-primary" id="savePromoBtn">Save promotion</button><button class="btn btn-ghost" id="cancelPromoBtn">Cancel</button></div>
             </div>
@@ -431,6 +431,7 @@
             <td class="flex" style="gap:8px">
               <label class="check"><input type="checkbox" data-id="${p.id}" data-field="active" ${p.active ? 'checked' : ''}> On</label>
               <label class="check"><input type="checkbox" data-id="${p.id}" data-field="featured" ${p.featured ? 'checked' : ''}> Featured</label>
+              ${p.auto_end ? '<span class="badge badge-gold">Auto-end</span>' : ''}
             </td>
             <td class="flex" style="gap:6px"><button class="btn btn-sm btn-ghost edit" data-id="${p.id}">Edit</button><button class="btn btn-sm btn-ghost del" data-id="${p.id}">Delete</button></td>
           </tr>`).join('');
@@ -450,6 +451,7 @@
         document.getElementById('pMaxUses').value = p ? p.max_uses : 0;
         document.getElementById('pFeatured').checked = p ? !!p.featured : true;
         document.getElementById('pActive').checked = p ? !!p.active : true;
+        document.getElementById('pAutoEnd').checked = p ? !!p.auto_end : false;
         document.querySelectorAll('#pDays input[data-day]').forEach((box) => { box.checked = p ? (p.days || []).includes(Number(box.dataset.day)) : false; });
         const form = document.getElementById('promoForm');
         form.style.display = 'block';
@@ -469,7 +471,8 @@
           max_uses: Number(document.getElementById('pMaxUses').value) || 0,
           days: Array.from(document.querySelectorAll('#pDays input[data-day]:checked')).map((box) => Number(box.dataset.day)),
           featured: document.getElementById('pFeatured').checked,
-          active: document.getElementById('pActive').checked
+          active: document.getElementById('pActive').checked,
+          auto_end: document.getElementById('pAutoEnd').checked
         };
       }
       function barRow(label, value, max, color) {

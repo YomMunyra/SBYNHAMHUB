@@ -25,7 +25,8 @@ function validatePromo(body) {
     min_covers = 0,
     max_uses = 0,
     featured = 0,
-    active = 1
+    active = 1,
+    auto_end = 0
   } = body;
 
   if (!String(name).trim()) return { error: 'Promotion name is required' };
@@ -71,7 +72,8 @@ function validatePromo(body) {
       min_covers: covers,
       max_uses: uses,
       featured: featured ? 1 : 0,
-      active: active ? 1 : 0
+      active: active ? 1 : 0,
+      auto_end: auto_end ? 1 : 0
     }
   };
 }
@@ -94,6 +96,7 @@ function toRow(row) {
     used: row.used,
     featured: Number(row.featured),
     active: Number(row.active),
+    auto_end: Number(row.auto_end),
     created_at: row.created_at
   };
 }
@@ -134,9 +137,9 @@ router.post('/promos', requireAuth, (req, res) => {
   if (error) return res.status(400).json({ error });
   const id = Number(
     db.prepare(
-      `INSERT INTO promos (name, code, type, value, start_date, end_date, days, start_time, end_time, min_covers, max_uses, featured, active)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(data.name, data.code, data.type, data.value, data.start_date, data.end_date, data.days, data.start_time, data.end_time, data.min_covers, data.max_uses, data.featured, data.active).lastInsertRowid
+      `INSERT INTO promos (name, code, type, value, start_date, end_date, days, start_time, end_time, min_covers, max_uses, featured, active, auto_end)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(data.name, data.code, data.type, data.value, data.start_date, data.end_date, data.days, data.start_time, data.end_time, data.min_covers, data.max_uses, data.featured, data.active, data.auto_end).lastInsertRowid
   );
   res.status(201).json({ ok: true, promo: toRow(db.prepare('SELECT * FROM promos WHERE id = ?').get(id)) });
 });
@@ -210,6 +213,7 @@ router.patch('/promos/:id', requireAuth, (req, res) => {
   }
   if (body.featured !== undefined) patch.featured = body.featured ? 1 : 0;
   if (body.active !== undefined) patch.active = body.active ? 1 : 0;
+  if (body.auto_end !== undefined) patch.auto_end = body.auto_end ? 1 : 0;
 
   const sets = Object.keys(patch).map((key) => `${key} = ?`);
   if (sets.length) db.prepare(`UPDATE promos SET ${sets.join(', ')} WHERE id = ?`).run(...Object.values(patch), id);

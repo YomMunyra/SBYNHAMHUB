@@ -5,9 +5,15 @@ A full-stack restaurant website built from the **NyamHub** Figma Make design
 
 ## Stack
 
-- **Backend:** Node.js + Express
-- **Database:** SQLite via the built-in `node:sqlite` module (no native compile, no extra dependency)
-- **Frontend:** Vanilla HTML/CSS/JS, single shared design system (`public/css/style.css`)
+- **Backend:** Node.js + Express (`server/`)
+- **Database:** SQLite via the built-in `node:sqlite` module (`data/sbynhamhub.db`, no native compile)
+- **Frontend:** Vanilla HTML/CSS/JS, single shared design system (`public/assets/css/style.css`)
+- **Deploy:** Netlify serverless API mirror (`netlify/functions/api.js`) with persistent Netlify Blobs storage
+
+There are **two backends** that must stay in sync: the local Express server (source
+of truth, reads `data/sbynhamhub.db`) and the Netlify functions mirror (blob
+storage). When you change an endpoint or menu seed in `server/`, mirror it in
+`netlify/functions/`.
 
 ## Run
 
@@ -33,17 +39,27 @@ Blobs.
 
 You can also deploy from a terminal after signing in: `npx netlify-cli deploy --prod`.
 
-| Page | URL |
-|---|---|
-| Home | http://localhost:3000/ |
-| Menu | http://localhost:3000/menu |
-| Book a table | http://localhost:3000/book |
-| Manager dashboard | http://localhost:3000/manager |
-| Admin dashboard | http://localhost:3000/admin |
+## Pages
+
+| Page | URL | What it does |
+|---|---|---|
+| Home | `/` | Hero, personalised feed (after 5 visits), menu highlights, hours |
+| Discover | `/discover` | Restaurant search: cuisine/price/rating filters, live table availability |
+| Menu | `/menu` | Full menu with real dish photos, favourites hearts |
+| Book a table | `/book` | Booking flow with promo codes and Nyam Points |
+| Reviews | `/reviews` | Read & submit reviews |
+| Nyam Points | `/points` | Points balance, expiring-soon, redemption history |
+| My taste | `/taste` | Your AI-learned taste profile, correct/remove recommendations, reset |
+| Manage booking | `/manage` | Look up, cancel or modify a booking |
+| Pay your bill | `/pay` | NyamPay checkout (tip, split, mock card) |
+| Receipt | `/receipt` | Printable payment receipt |
+| Manager dashboard | `/manager` | Restaurant workspace |
+| Admin dashboard | `/admin` | Manager workspace + platform overview |
+| Embed widget | `/widget.js` | One-line bookable widget for any site |
 
 ## Roles
 
-There are two staff roles with role-scoped login tokens:
+Two staff roles with role-scoped login tokens:
 
 | Role | Sign-in | Default password | Access |
 |---|---|---|---|
@@ -58,19 +74,57 @@ ADMIN_PASSWORD=admin-secret MANAGER_PASSWORD=manager-secret npm start
 ```
 
 On Netlify, set `ADMIN_PASSWORD` (and optionally `MANAGER_PASSWORD`) in the project's
-environment variables. The default local passwords are deliberately not used on Netlify.
+environment variables. Tokens are HMAC-signed and expire after 12 hours.
 
-## Admin & manager dashboard
+## Features
 
-The dashboards are where staff manage incoming reservations (confirm, mark arrived,
-cancel, no-show, delete) and see daily stats. Signing in as admin also grants access
-to the manager workspace; a manager sign-in only opens the manager view.
+### Bookings & guest management
+Guests book online with a reference (`#id`, shown in the confirmation email), and can
+look up, cancel or modify their booking from `/manage`. Staff can create
+**walk-in / phone / online** bookings from the manager desk, click any booking to see
+the **guest card** (history, preferences, Nyam Points), and the reservation desk and
+floor plan **auto-refresh every 30s**. Confirmed bookings earn Nyam Points.
 
-## Embed widget
+### Restaurant Search & Discovery (F-01)
+The `/discover` page lets guests filter by cuisine, price and rating, see live table
+availability per slot, spot promoted listings, and read reviews — all served by
+`GET /api/discover`.
 
+### Reminders & self-service (F-02)
+A shared `processReminders` scheduler (background timer + `POST /api/reminders`)
+sends 24h and 2h reminders. Guests can cancel or modify a booking up to **1 hour**
+before the slot; within the window it must be handled by staff.
+
+### Review moderation & spam filtering (F-03)
+Submitted reviews are auto-scanned for links, ALL-CAPS, repeated characters,
+suspicious words and duplicate comments. Flagged reviews are held until a manager
+approves (publishing clears the flag) or flags them for removal.
+
+### Nyam Points (F-04)
+Guests earn points on bookings and redeem them at checkout. Points are awarded in
+batches that **expire 18 months after earning**, redemptions use **FIFO** against the
+earliest batches, and the balance is recomputed with expiry on every lookup. The
+points page shows expiring-soon and earliest-expiry dates.
+
+### Promotions (F-06)
+Managers create promo codes with discount type, date/slot windows and an **Auto-end**
+toggle: when the booking slot reaches capacity the promo stops applying and
+disappears from the offers feed.
+
+### NyamPay (v1.2)
+Guest checkout for a reservation bill — from `/pay`, customers enter their booking
+reference, pick a tip, optionally split the bill 2–12 ways, and pay by mock card.
+Receipts are emailed instantly and printable from `/receipt`.
+
+- **Fees**: 0.95% + $0.50 per transaction (configurable under **Settings → Payments**). Computed in cents.
+- **Payment reference**: `NYM-XXXXXXXX`; **demo cards**: any 13–19 digit number works, cards ending in `1111` are declined.
+- **Refunds**: manager → **Payments** view can refund a payment (excluded from analytics once refunded).
+- **Booking attach**: passing `reservation_id` marks the reservation paid, unlocking the NyamPay button in the guest booking manager.
+
+### Embed widget (F-08)
 Any external site can accept bookings with one line of code. The widget is served
-from `/widget.js`, is fully self-contained (no other scripts or styles needed), and
-posts straight to the reservation API with CORS enabled for all origins.
+from `/widget.js`, is fully self-contained, and posts straight to the reservation API
+with CORS enabled.
 
 ```html
 <div id="sby-widget"></div>
@@ -78,62 +132,88 @@ posts straight to the reservation API with CORS enabled for all origins.
 ```
 
 Options are read from `data-*` attributes (or `SbyWidget.render({...})` for dynamic
-pages):
+pages): `data-target`, `data-title`, `data-subtitle`, `data-brand`, `data-promo`,
+`data-points`, `data-api`. The manager dashboard (**Embed & share**) generates a
+ready-to-paste snippet with live preview and one-click copy.
 
-| Attribute | Default | Description |
-|---|---|---|
-| `data-target` | `#sby-widget` | Container selector to render the widget into |
-| `data-title` | `Book a table at SbyNhamHub` | Widget heading |
-| `data-subtitle` | Reserve in seconds… | Sub-heading |
-| `data-brand` | `#FF611F` | Brand accent colour |
-| `data-promo` | `true` | Show the promo-code field |
-| `data-points` | `false` | Show the Nyam Points redeemer |
-| `data-api` | script origin | Override the API base URL |
+### AI personalisation (F-09)
+A rule-based taste engine learns from a guest's bookings, reviews and saved dishes
+and serves a **personalised home feed** that switches on after 5 visits. Hearts on
+the menu save favourites; `/taste` shows the learned categories, lets the guest
+correct or delete recommendations and reset their profile. Shared logic in
+`server/lib/personalize.js` (and the Netlify mirror).
 
-The manager dashboard (→ **Embed & share**) generates a ready-to-paste snippet with
-live preview and one-click copy.
-
-## NyamPay
-
-Guest checkout for a reservation bill — from `/pay`, customers enter their booking
-reference (or are pre-linked from the booking manager), pick a tip, optionally split
-the bill 2–12 ways with per-guest emails, and pay by mock card. Receipts are emailed
-instantly and printable from `/receipt`.
-
-- **Fees**: 0.95% + $0.50 per transaction (configurable by manager under
-  **Settings → Payments**, `GET/PATCH /api/settings`). Fees and tips are computed in
-  cents so totals always round correctly.
-- **Payment reference**: `NYM-XXXXXXXX` (e.g. `NYM-KNWSG2K4`).
-- **Demo cards**: any 13–19 digit number works; cards ending in `1111` are declined
-  so you can see the error path.
-- **Refunds**: manager → **Payments** view can refund a payment (excluded from
-  analytics once refunded).
-- **Booking attach**: passing `reservation_id` marks the reservation `paid`, which
-  unlocks the "Pay your bill with NyamPay" button in the guest booking manager.
+### Menu & photos
+The menu is seeded with 25 dishes across 5 categories, each with a real food photo in
+`public/assets/img/*.jpg` (4:3). The frontend renders `/assets/img/${d.image}`, so a
+manager can change a dish's photo just by setting the image filename. The Netlify
+mirror (`netlify/functions/menu-data.js`) is the static fallback and re-seeds the
+blob store on first run.
 
 ## API
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| GET | `/api/menu?category=&featured=` | — | Menu items |
+| GET | `/api/health` | — | Health check |
+| POST | `/api/auth` | — | Exchange password for role token |
 | GET | `/api/categories` | — | Menu categories |
-| POST | `/api/reservations` | — | Create a reservation |
-| GET | `/api/reservations?date=` | Bearer token | List reservations |
-| PATCH | `/api/reservations/:id` | Bearer token | Update status |
-| DELETE | `/api/reservations/:id` | Bearer token | Delete a reservation |
-| GET | `/api/stats` | Bearer token | Booking stats |
-| POST | `/api/auth` | — | Exchange password for token |
+| GET | `/api/menu?category=&featured=` | — | Menu items |
+| POST | `/api/categories` | Bearer | Create category |
+| DELETE | `/api/categories/:id` | Bearer | Delete category |
+| POST | `/api/menu` | Bearer | Add dish |
+| PATCH | `/api/menu/:id` | Bearer | Update dish (incl. image) |
+| DELETE | `/api/menu/:id` | Bearer | Delete dish |
+| GET | `/api/discover` | — | Discovery feed with live availability |
+| GET | `/api/reviews/summary` | — | Review aggregates |
+| GET | `/api/reviews` | — | Published reviews |
+| POST | `/api/reviews` | — | Submit review (spam-filtered) |
+| PATCH | `/api/reviews/:id` | Bearer | Approve / flag / clear spam |
+| GET | `/api/promos` | — | Promotions |
+| GET | `/api/promos/offers` | — | Active offers feed |
+| POST | `/api/promos` | Bearer | Create promo |
+| PATCH | `/api/promos/:id` | Bearer | Update promo (incl. auto-end) |
+| DELETE | `/api/promos/:id` | Bearer | Delete promo |
+| GET | `/api/personalise` | — | Learned taste profile |
+| GET | `/api/personalise/feed` | — | Personalised home feed |
+| POST | `/api/personalise/correct` | — | Correct a recommendation |
+| POST | `/api/personalise/reset` | — | Reset learned profile |
+| GET | `/api/saves` | — | Saved dishes |
+| POST | `/api/saves` | — | Save a dish |
+| DELETE | `/api/saves` | — | Unsave a dish |
+| GET | `/api/points/lookup` | — | Points balance & expiring-soon |
+| GET | `/api/waitlist` | Bearer | Waitlist |
+| POST | `/api/waitlist` | — | Join waitlist |
+| PATCH | `/api/waitlist/:id` | Bearer | Seat / update |
+| DELETE | `/api/waitlist/:id` | Bearer | Remove |
+| GET | `/api/reservations?date=` | Bearer | List reservations |
+| POST | `/api/reservations` | — | Create (online / walk-in / phone) |
+| POST | `/api/reservations/lookup` | — | Look up a booking by reference |
+| PATCH | `/api/reservations/:id` | Bearer | Confirm / arrive / no-show / cancel |
+| POST | `/api/reservations/:id/cancel` | — | Guest cancel (1h window rules) |
+| PATCH | `/api/reservations/:id/modify` | — | Guest modify |
+| DELETE | `/api/reservations/:id` | Bearer | Delete a reservation |
+| GET | `/api/stats` | Bearer | Booking stats |
+| GET | `/api/analytics` | Bearer | Analytics dashboard |
+| GET | `/api/guests` | Bearer | Guest list with history & points |
+| PATCH | `/api/guests/:id` | Bearer | Update guest |
+| POST | `/api/reminders` | Bearer | Run a reminder pass |
+| GET | `/api/settings` | — | Site settings & payment fees |
+| PATCH | `/api/settings` | Bearer | Update settings |
+| GET | `/api/admin/summary` | Bearer (admin) | Platform summary |
+| GET | `/api/payments` | Bearer | Payment history |
+| GET | `/api/payments/receipt/:ref` | — | Payment receipt |
 | POST | `/api/payments/pay` | — | Charge a bill (tip, split, mock card) |
-| GET | `/api/payments/receipt/:ref` | — | Look up a payment receipt |
-| GET | `/api/payments` | Bearer token | Payment summary + history |
-| POST | `/api/payments/:id/refund` | Bearer token | Refund a payment |
-| GET | `/api/settings` | — | Payment fees & site settings |
-| PATCH | `/api/settings` | Bearer token | Update settings |
+| POST | `/api/payments/:id/refund` | Bearer | Refund a payment |
 
 ## Data
 
-SQLite database lives at `data/sbynhamhub.db` (auto-created on first run and seeded
-with the full menu). Delete the file and run `npm run seed` to reseed.
+- **Local:** SQLite database at `data/sbynhamhub.db` (auto-created on first run and
+  seeded with the full menu). Delete the file and run `npm run seed` to reseed.
+- **Netlify:** reservations, reviews, points and payments live in Netlify Blobs; the
+  static menu in `netlify/functions/menu-data.js` is copied into the blob store on
+  first run.
+- **Images:** dish photos live in `public/assets/img/` and are referenced by filename
+  from the menu `image` field (also set per dish in the manager/admin Menu editor).
 
 ## Design system
 

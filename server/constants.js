@@ -2,6 +2,7 @@
 
 const VALID_STATUS = ['pending', 'confirmed', 'arrived', 'cancelled', 'no-show'];
 const VALID_OCCASIONS = ['', 'Birthday', 'Anniversary', 'Date Night', 'Business', 'Family Gathering', 'Other'];
+const VALID_SOURCES = ['online', 'walk-in', 'phone'];
 const VALID_TABLES = Array.from({ length: 12 }, (_, index) => `T${index + 1}`);
 const VALID_REVIEW_STATUS = ['pending', 'published', 'hidden'];
 
@@ -18,6 +19,7 @@ const TIME_SLOTS = [
 module.exports = {
   VALID_STATUS,
   VALID_OCCASIONS,
+  VALID_SOURCES,
   VALID_TABLES,
   VALID_REVIEW_STATUS,
   POINTS_PER_COVER,

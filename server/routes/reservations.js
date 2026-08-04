@@ -7,6 +7,7 @@ const {
   VALID_STATUS,
   VALID_OCCASIONS,
   VALID_TABLES,
+  VALID_SOURCES,
   POINTS_PER_COVER,
   POINTS_UNIT,
   POINTS_RATE
@@ -68,7 +69,8 @@ router.post('/reservations', (req, res) => {
     occasion = '',
     notes = '',
     redeem_points = '',
-    promo_code = ''
+    promo_code = '',
+    source = 'online'
   } = req.body;
 
   const errs = [];
@@ -79,6 +81,7 @@ router.post('/reservations', (req, res) => {
   const n = Number(guests);
   if (!Number.isInteger(n) || n < 1 || n > 20) errs.push('guests');
   if (occasion && !VALID_OCCASIONS.includes(String(occasion))) errs.push('occasion');
+  if (!VALID_SOURCES.includes(String(source))) errs.push('source');
 
   if (errs.length) {
     return res.status(400).json({ error: 'Invalid fields: ' + errs.join(', ') });
@@ -123,8 +126,8 @@ router.post('/reservations', (req, res) => {
 
   const result = db
     .prepare(
-      `INSERT INTO reservations (name, email, phone, date, time, guests, occasion, notes, points_redeemed, discount, promo_id, promo_name, promo_discount)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO reservations (name, email, phone, date, time, guests, occasion, notes, points_redeemed, discount, promo_id, promo_name, promo_discount, source)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       String(name).trim(),
@@ -139,7 +142,8 @@ router.post('/reservations', (req, res) => {
       discount,
       promo_id,
       promo_name,
-      promo_discount
+      promo_discount,
+      String(source)
     );
 
   const id = Number(result.lastInsertRowid);

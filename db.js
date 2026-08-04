@@ -167,6 +167,7 @@ try { db.exec("ALTER TABLE reservations ADD COLUMN reminder_2h INTEGER NOT NULL 
 try { db.exec("ALTER TABLE reservations ADD COLUMN promo_id INTEGER NOT NULL DEFAULT 0"); } catch { /* Existing local databases already have this column. */ }
 try { db.exec("ALTER TABLE reservations ADD COLUMN promo_name TEXT NOT NULL DEFAULT ''"); } catch { /* Existing local databases already have this column. */ }
 try { db.exec("ALTER TABLE reservations ADD COLUMN promo_discount REAL NOT NULL DEFAULT 0"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE reservations ADD COLUMN source TEXT NOT NULL DEFAULT 'online'"); } catch { /* Existing local databases already have this column. */ }
 try { db.exec("ALTER TABLE settings ADD COLUMN avg_cover REAL NOT NULL DEFAULT 15"); } catch { /* Existing local databases already have this column. */ }
 try { db.exec("ALTER TABLE settings ADD COLUMN fee_rate REAL NOT NULL DEFAULT 0.0095"); } catch { /* Existing local databases already have this column. */ }
 try { db.exec("ALTER TABLE settings ADD COLUMN fee_flat REAL NOT NULL DEFAULT 0.50"); } catch { /* Existing local databases already have this column. */ }

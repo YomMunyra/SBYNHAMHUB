@@ -81,8 +81,41 @@
       </div>
 
       <div id="bookingsView" style="display:none">
-        <div class="manager-date-row"><div><p class="eyebrow">Reservation desk</p><h2>Bookings</h2></div><div class="flex"><input class="input" type="date" id="filterDate" style="max-width:180px"><button class="btn btn-ghost btn-sm" id="clearFilter">All dates</button></div></div>
-        <section class="manager-panel manager-table-panel"><div class="table-wrap"><table class="data"><thead><tr><th>Date</th><th>Time</th><th>Guest</th><th>Contact</th><th>Party</th><th>Occasion</th><th>Notes</th><th>Status</th><th></th></tr></thead><tbody id="resBody"><tr><td colspan="9" style="text-align:center;color:#888780">Loading...</td></tr></tbody></table></div></section>
+        <div class="manager-date-row"><div><p class="eyebrow">Reservation desk</p><h2>Bookings</h2></div><div class="flex"><input class="input" type="date" id="filterDate" style="max-width:180px"><button class="btn btn-ghost btn-sm" id="clearFilter">All dates</button><button class="btn btn-primary btn-sm" id="addBookingBtn">+ Add booking</button></div></div>
+        <div class="form-card" id="addBookingForm" style="display:none;margin-bottom:16px;border:1px dashed var(--brand)">
+          <span class="eyebrow">Manual booking</span>
+          <div class="form">
+            <div class="form-grid">
+              <div class="field"><label>Name <span class="req">*</span></label><input class="input" id="abName"></div>
+              <div class="field"><label>Phone <span class="req">*</span></label><input class="input" id="abPhone"></div>
+            </div>
+            <div class="form-grid">
+              <div class="field"><label>Email</label><input class="input" id="abEmail" type="email"></div>
+              <div class="field"><label>Source</label><select class="select" id="abSource"><option value="walk-in">Walk-in</option><option value="phone">Phone call</option><option value="online">Online</option></select></div>
+            </div>
+            <div class="form-grid">
+              <div class="field"><label>Date <span class="req">*</span></label><input class="input" id="abDate" type="date"></div>
+              <div class="field"><label>Time <span class="req">*</span></label><select class="select" id="abTime"></select></div>
+            </div>
+            <div class="form-grid">
+              <div class="field"><label>Guests <span class="req">*</span></label><input class="input" id="abGuests" type="number" min="1" max="20" value="2"></div>
+              <div class="field"><label>Occasion</label><select class="select" id="abOccasion"></select></div>
+            </div>
+            <div class="field"><label>Notes</label><textarea class="textarea" id="abNotes" rows="2"></textarea></div>
+            <div class="flex" style="gap:10px"><button class="btn btn-primary" id="abSave">Save booking</button><button class="btn btn-ghost" id="abCancel">Cancel</button></div>
+          </div>
+        </div>
+        <div class="guest-layout">
+          <section class="manager-panel manager-table-panel"><div class="table-wrap"><table class="data"><thead><tr><th>Date</th><th>Time</th><th>Guest</th><th>Contact</th><th>Party</th><th>Source</th><th>Status</th><th></th></tr></thead><tbody id="resBody"><tr><td colspan="8" style="text-align:center;color:#888780">Loading...</td></tr></tbody></table></div></section>
+          <section class="manager-panel guest-detail" id="bookingGuestPanel" style="display:none">
+            <p class="eyebrow">Guest on this booking</p>
+            <h2 id="bgName">Select a booking</h2>
+            <p id="bgContact" class="muted">Their preferences and history will appear here.</p>
+            <div id="bgHistory" class="guest-history"></div>
+            <div id="bgPoints" class="guest-points"></div>
+            <div id="bgPrefs" class="guest-history"></div>
+          </section>
+        </div>
       </div>
       <div id="floorView" style="display:none">
         <div class="manager-date-row"><div><p class="eyebrow">Floor management</p><h2>Today's table plan</h2><span>Assign confirmed guests to a table before service.</span></div></div>
@@ -210,7 +243,7 @@
       document.getElementById('todayLabel').textContent = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date(today + 'T12:00:00'));
 
       function statusBadge(status) { const map = { pending:'badge-gold', confirmed:'badge-brand', arrived:'badge-green', cancelled:'badge-neutral', 'no-show':'badge-red' }; return `<span class="badge ${map[status] || 'badge-neutral'}">${escapeHTML(status)}</span>`; }
-      let floorBookings = [], selectedBookingId = '', guestItems = [], selectedGuestId = '', reviewItems = [], menuItems = [], categories = [], waitlistItems = [], analyticsData = null, promoItems = [], editingPromoId = '', paymentItems = [];
+      let floorBookings = [], selectedBookingId = '', guestItems = [], selectedGuestId = '', reviewItems = [], menuItems = [], categories = [], waitlistItems = [], analyticsData = null, promoItems = [], editingPromoId = '', paymentItems = [], renderedReservations = [];
       function showView(view) { ['overview','analytics','bookings','floor','guests','waitlist','menu','promotions','embed','payments','reviews','settings'].forEach((name) => document.getElementById(name + 'View').style.display = view === name ? 'block' : 'none'); document.getElementById('viewTitle').textContent = view === 'settings' ? 'Restaurant settings' : view === 'bookings' ? 'Reservation desk' : view === 'floor' ? 'Floor plan' : view === 'guests' ? 'Guest profiles' : view === 'waitlist' ? 'Waitlist' : view === 'menu' ? 'Menu management' : view === 'promotions' ? 'Promotions' : view === 'embed' ? 'Embed & share' : view === 'payments' ? 'Payments' : view === 'reviews' ? 'Reviews & moderation' : view === 'analytics' ? 'Analytics' : 'Good day, manager'; document.querySelectorAll('[data-view]').forEach((el) => el.classList.toggle('active', el.dataset.view === view && el.classList.contains('manager-nav-link'))); if (view === 'embed') renderEmbed(); }
       function renderReviews() {
         const rows = document.getElementById('reviewBody');
@@ -243,13 +276,65 @@
         notes.disabled = !g; notes.value = g?.preferences || '';
         document.getElementById('saveGuest').disabled = !g;
       }
+      function showBookingGuest(reservation) {
+        const panel = document.getElementById('bookingGuestPanel');
+        if (!reservation) { panel.style.display = 'none'; return; }
+        const g = guestItems.find((item) => (item.email || '').toLowerCase() === (reservation.email || '').toLowerCase() && (item.phone || '') === (reservation.phone || ''));
+        const name = document.getElementById('bgName');
+        const contact = document.getElementById('bgContact');
+        const history = document.getElementById('bgHistory');
+        const points = document.getElementById('bgPoints');
+        const prefs = document.getElementById('bgPrefs');
+        name.textContent = g ? g.name : reservation.name;
+        contact.textContent = (g ? `${g.email || 'No email'} - ${g.phone}` : `${reservation.email || 'No email'} - ${reservation.phone}`) + ` · ${reservation.guests} guests at ${reservation.time}`;
+        history.innerHTML = g && g.visits.length ? `<h3>Booking history</h3>${g.visits.slice().reverse().map((r) => `<div><b>${escapeHTML(r.date)} at ${escapeHTML(r.time)}</b><span>${r.guests} guests - ${escapeHTML(r.status)}${r.points_redeemed ? ' - redeemed ' + r.points_redeemed + ' pts' : ''}</span></div>`).join('')}` : '<p class="muted">No previous visits.</p>';
+        points.innerHTML = g ? `<h3>Nyam Points</h3><div class="points-balance"><b>${g.points || 0}</b> pts available</div>` : '';
+        prefs.innerHTML = g && g.preferences ? `<h3>Service notes &amp; preferences</h3><div>${escapeHTML(g.preferences)}</div>` : '<p class="muted">No saved preferences for this guest.</p>';
+        panel.style.display = 'block';
+      }
       function tableOf(r) { return r.table || r.table_name || ''; }
       function renderFloor() { const active = floorBookings.filter((r) => !['cancelled','no-show'].includes(r.status)); const selected = active.find((r) => r.id === selectedBookingId); document.getElementById('selectedGuest').textContent = selected ? selected.name : 'Select a booking'; document.getElementById('selectedGuestInfo').textContent = selected ? `${selected.guests} guests at ${selected.time}. Pick an available table.` : 'Choose a reservation from today\'s list, then choose an available table.'; document.getElementById('tableGrid').innerHTML = Array.from({length:12}, (_, i) => { const name = `T${i + 1}`, guest = active.find((r) => tableOf(r) === name), state = guest ? (guest.status === 'arrived' ? 'arrived' : 'booked') : 'free'; return `<button class="floor-table ${state}" data-table="${name}" ${!selected || guest ? 'disabled' : ''}><b>${name}</b><span>${guest ? escapeHTML(guest.name) : 'Available'}</span></button>`; }).join(''); document.getElementById('unassignedBookings').innerHTML = active.filter((r) => !tableOf(r)).length ? active.filter((r) => !tableOf(r)).map((r) => `<button class="unassigned-booking ${r.id === selectedBookingId ? 'selected' : ''}" data-booking="${r.id}"><b>${escapeHTML(r.time)} - ${escapeHTML(r.name)}</b><span>${r.guests} guests</span></button>`).join('') : '<p class="muted">All active bookings have a table.</p>'; }
       function showDash() { loginView.style.display = 'none'; dashView.style.display = 'flex'; load(); }
 
       function renderTable(items) {
-        if (!items.length) { resBody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#888780">No reservations found for this date.</td></tr>'; return; }
-        resBody.innerHTML = items.map((r) => `<tr data-id="${r.id}"><td>${escapeHTML(r.date)}</td><td>${escapeHTML(r.time)}</td><td><strong>${escapeHTML(r.name)}</strong>${r.email ? `<div class="muted" style="font-size:12px">${escapeHTML(r.email)}</div>` : ''}</td><td>${escapeHTML(r.phone)}</td><td>${r.guests}</td><td>${r.occasion ? escapeHTML(r.occasion) : '-'}</td><td style="max-width:200px">${r.notes ? escapeHTML(r.notes) : '-'}</td><td><select class="status-select" data-id="${r.id}">${['pending','confirmed','arrived','cancelled','no-show'].map((s) => `<option value="${s}" ${s === r.status ? 'selected' : ''}>${s}</option>`).join('')}</select></td><td><button class="btn btn-sm btn-ghost del" data-id="${r.id}">Delete</button></td></tr>`).join('');
+        renderedReservations = items;
+        if (!items.length) { resBody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888780">No reservations found for this date.</td></tr>'; return; }
+        resBody.innerHTML = items.map((r) => `<tr data-id="${r.id}"><td>${escapeHTML(r.date)}</td><td>${escapeHTML(r.time)}</td><td><strong>${escapeHTML(r.name)}</strong>${r.email ? `<div class="muted" style="font-size:12px">${escapeHTML(r.email)}</div>` : ''}</td><td>${escapeHTML(r.phone)}</td><td>${r.guests}</td><td>${r.source === 'walk-in' ? '<span class="badge badge-blue">Walk-in</span>' : r.source === 'phone' ? '<span class="badge badge-gold">Phone</span>' : '<span class="badge badge-neutral">Online</span>'}</td><td><select class="status-select" data-id="${r.id}">${['pending','confirmed','arrived','cancelled','no-show'].map((s) => `<option value="${s}" ${s === r.status ? 'selected' : ''}>${s}</option>`).join('')}</select></td><td><button class="btn btn-sm btn-ghost guest" data-id="${r.id}" title="Guest profile">Guest</button><button class="btn btn-sm btn-ghost del" data-id="${r.id}">Delete</button></td></tr>`).join('');
+      }
+      const BOOKING_SLOTS = ['11:00','11:30','12:00','12:30','13:00','17:30','18:00','18:30','19:00','19:30','20:00','20:30','21:00'];
+      function initAddBookingForm() {
+        document.getElementById('abTime').innerHTML = BOOKING_SLOTS.map((t) => `<option value="${t}">${t}</option>`).join('');
+        document.getElementById('abOccasion').innerHTML = ['', 'Birthday', 'Anniversary', 'Date Night', 'Business', 'Family Gathering', 'Other'].map((o) => `<option value="${o}">${o || 'No occasion'}</option>`).join('');
+        const d = new Date(); d.setMinutes(d.getMinutes() + 60);
+        document.getElementById('abDate').value = d.toISOString().slice(0, 10);
+        const hh = String(d.getHours()).padStart(2, '0'), mm = String(d.getMinutes()).padStart(2, '0');
+        document.getElementById('abTime').value = `${hh}:${mm}`;
+      }
+      function resetAddBookingForm() {
+        document.getElementById('addBookingForm').style.display = 'none';
+        document.getElementById('addBookingBtn').textContent = '+ Add booking';
+      }
+      async function saveAddBooking() {
+        const payload = {
+          name: document.getElementById('abName').value.trim(),
+          phone: document.getElementById('abPhone').value.trim(),
+          email: document.getElementById('abEmail').value.trim(),
+          guests: Number(document.getElementById('abGuests').value),
+          date: document.getElementById('abDate').value,
+          time: document.getElementById('abTime').value,
+          occasion: document.getElementById('abOccasion').value,
+          notes: document.getElementById('abNotes').value.trim(),
+          source: document.getElementById('abSource').value
+        };
+        if (!payload.name || !payload.phone) { toast('Name and phone are required.', 'error'); return; }
+        try {
+          const res = await api('/api/reservations', { method: 'POST', body: JSON.stringify(payload) });
+          toast(`Booking #${res.reservation.id} created (${payload.source})`);
+          resetAddBookingForm();
+          ['abName','abPhone','abEmail','abNotes'].forEach((id) => document.getElementById(id).value = '');
+          document.getElementById('abGuests').value = 2;
+          load();
+        } catch (err) { toast(err.message, 'error'); }
       }
 
       async function load() {
@@ -276,6 +361,19 @@
           document.getElementById('statusSummary').innerHTML = `<div><b>${pending}</b><span>Pending</span></div><div><b>${confirmed}</b><span>Confirmed</span></div><div><b>${arrived}</b><span>Arrived</span></div>`;
           renderTable(tableItems);
         } catch (err) { if (err.message === 'Unauthorized') { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem('sbynham_admin_token'); loginView.style.display = 'block'; dashView.style.display = 'none'; } toast(err.message, 'error'); }
+      }
+      async function lightRefresh() {
+        try {
+          const headers = { Authorization: 'Bearer ' + token() };
+          const [stats, todayItems, tableItems] = await Promise.all([
+            api('/api/stats', { headers }), api('/api/reservations?date=' + today, { headers }), api('/api/reservations?date=' + (filterDate.value || ''), { headers })
+          ]);
+          statGrid.innerHTML = `<div class="stat-card"><div class="val">${stats.total}</div><div class="lbl">Total bookings</div></div><div class="stat-card"><div class="val">${stats.today}</div><div class="lbl">Bookings today</div></div><div class="stat-card"><div class="val">${stats.covers_today}</div><div class="lbl">Covers today</div></div><div class="stat-card"><div class="val">${stats.confirmed}</div><div class="lbl">Confirmed bookings</div></div>`;
+          floorBookings = todayItems; renderFloor();
+          const active = todayItems.filter((r) => !['cancelled','no-show'].includes(r.status));
+          document.getElementById('todayBookings').innerHTML = active.length ? active.map((r) => `<div class="timeline-booking"><strong>${escapeHTML(r.time)}</strong><div><b>${escapeHTML(r.name)}</b><span>${r.guests} guest${r.guests === 1 ? '' : 's'}${r.occasion ? ' - ' + escapeHTML(r.occasion) : ''}</span></div>${statusBadge(r.status)}</div>`).join('') : '<div class="empty-service"><strong>No bookings yet</strong><span>New reservations will appear here.</span></div>';
+          renderTable(tableItems);
+        } catch (err) { if (err.message === 'Unauthorized') { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem('sbynham_admin_token'); loginView.style.display = 'block'; dashView.style.display = 'none'; } }
       }
       let editingDishId = '';
       function openDishForm(item) {
@@ -595,8 +693,12 @@
       document.getElementById('logoutBtn').addEventListener('click', () => { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem('sbynham_admin_token'); loginView.style.display = 'block'; dashView.style.display = 'none'; });
       document.querySelectorAll('[data-view]').forEach((button) => button.addEventListener('click', () => showView(button.dataset.view)));
       document.getElementById('refreshBtn').addEventListener('click', load); filterDate.addEventListener('change', load); document.getElementById('clearFilter').addEventListener('click', () => { filterDate.value = ''; load(); });
+      document.getElementById('addBookingBtn').addEventListener('click', () => { const form = document.getElementById('addBookingForm'); form.style.display = form.style.display === 'none' ? 'block' : 'none'; document.getElementById('addBookingBtn').textContent = form.style.display === 'none' ? '+ Add booking' : 'Close form'; });
+      document.getElementById('abCancel').addEventListener('click', resetAddBookingForm);
+      document.getElementById('abSave').addEventListener('click', saveAddBooking);
       resBody.addEventListener('change', async (e) => { const sel = e.target.closest('.status-select'); if (!sel) return; try { await api('/api/reservations/' + sel.dataset.id, { method:'PATCH', headers:{ Authorization:'Bearer ' + token() }, body:JSON.stringify({ status:sel.value }) }); toast('Booking updated'); load(); } catch (err) { toast(err.message, 'error'); } });
       resBody.addEventListener('click', async (e) => { const btn = e.target.closest('.del'); if (!btn || !confirm('Delete this reservation?')) return; try { await api('/api/reservations/' + btn.dataset.id, { method:'DELETE', headers:{ Authorization:'Bearer ' + token() } }); toast('Reservation deleted'); load(); } catch (err) { toast(err.message, 'error'); } });
+      resBody.addEventListener('click', (e) => { const btn = e.target.closest('.guest'); if (!btn) return; const found = renderedReservations.find((r) => String(r.id) === String(btn.dataset.id)); showBookingGuest(found); });
       document.getElementById('unassignedBookings').addEventListener('click', (e) => { const btn = e.target.closest('[data-booking]'); if (!btn) return; selectedBookingId = btn.dataset.booking; renderFloor(); });
       document.getElementById('tableGrid').addEventListener('click', async (e) => { const btn = e.target.closest('[data-table]'); if (!btn || !selectedBookingId) return; try { await api('/api/reservations/' + selectedBookingId, { method:'PATCH', headers:{ Authorization:'Bearer ' + token() }, body:JSON.stringify({ table:btn.dataset.table }) }); toast('Table assigned'); selectedBookingId = ''; load(); } catch (err) { toast(err.message, 'error'); } });
       document.getElementById('guestSearch').addEventListener('input', renderGuests); document.getElementById('guestList').addEventListener('click', (e) => { const btn = e.target.closest('[data-guest]'); if (!btn) return; selectedGuestId = btn.dataset.guest; renderGuests(); }); document.getElementById('saveGuest').addEventListener('click', async () => { if (!selectedGuestId) return; try { await api('/api/guests/' + selectedGuestId, { method:'PATCH', headers:{ Authorization:'Bearer ' + token() }, body:JSON.stringify({ preferences:document.getElementById('guestPreferences').value }) }); toast('Guest preferences saved'); load(); } catch (err) { toast(err.message, 'error'); } });
@@ -604,6 +706,8 @@
       reviewBody.addEventListener('change', async (e) => { const sel = e.target.closest('.review-status'); if (!sel) return; try { await api('/api/reviews/' + sel.dataset.id, { method:'PATCH', headers:{ Authorization:'Bearer ' + token() }, body:JSON.stringify({ status:sel.value }) }); toast('Review status updated'); load(); } catch (err) { toast(err.message, 'error'); } });
       reviewBody.addEventListener('click', async (e) => { const spamBtn = e.target.closest('.review-spam'); if (spamBtn) { try { await api('/api/reviews/' + spamBtn.dataset.id, { method:'PATCH', headers:{ Authorization:'Bearer ' + token() }, body:JSON.stringify({ spam:Number(spamBtn.dataset.spam) }) }); toast('Review flag updated'); load(); } catch (err) { toast(err.message, 'error'); } return; } const btn = e.target.closest('.save-reply'); if (!btn) return; const textarea = document.querySelector('.review-reply[data-id="' + btn.dataset.id + '"]'); try { await api('/api/reviews/' + btn.dataset.id, { method:'PATCH', headers:{ Authorization:'Bearer ' + token() }, body:JSON.stringify({ reply:textarea.value.trim() }) }); toast('Reply saved'); load(); } catch (err) { toast(err.message, 'error'); } });
       if (token()) showDash(); else loginView.style.display = 'block';
+      initAddBookingForm();
+      setInterval(() => { if (token() && dashView.style.display !== 'none') lightRefresh(); }, 30000);
     })();
   </script>
 </body>

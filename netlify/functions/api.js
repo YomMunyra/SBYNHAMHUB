@@ -701,7 +701,7 @@ exports.handler = async (event) => {
 
   if (method === 'POST' && path === '/reservations') {
     const body = readBody(event);
-    const { name = '', email = '', phone = '', date = '', time = '', guests = '', occasion = '', notes = '', redeem_points = '', promo_code = '' } = body;
+    const { name = '', email = '', phone = '', date = '', time = '', guests = '', occasion = '', notes = '', redeem_points = '', promo_code = '', source = 'online' } = body;
     const invalid = [];
     if (!String(name).trim()) invalid.push('name');
     if (!String(phone).trim()) invalid.push('phone');
@@ -710,6 +710,7 @@ exports.handler = async (event) => {
     const partySize = Number(guests);
     if (!Number.isInteger(partySize) || partySize < 1 || partySize > 20) invalid.push('guests');
     if (occasion && !VALID_OCCASIONS.includes(String(occasion))) invalid.push('occasion');
+    if (!['online', 'walk-in', 'phone'].includes(String(source))) invalid.push('source');
     if (invalid.length) return json({ error: `Invalid fields: ${invalid.join(', ')}` }, 400);
     if (new Date(`${date} ${time}:00Z`).getTime() <= Date.now() - 15 * 60 * 1000) return json({ error: 'Please pick a future date and time.' }, 400);
 
@@ -750,7 +751,7 @@ exports.handler = async (event) => {
       discount += promo_discount;
     }
 
-    const reservation = { id: crypto.randomUUID(), name: String(name).trim(), email: String(email).trim(), phone: String(phone).trim(), date, time, guests: partySize, occasion: occasion || '', notes: String(notes || '').trim(), table: '', status: 'pending', points_awarded: 0, points_redeemed, discount, promo_id, promo_name, promo_discount, reminder_24h: 0, reminder_2h: 0, created_at: new Date().toISOString() };
+    const reservation = { id: crypto.randomUUID(), name: String(name).trim(), email: String(email).trim(), phone: String(phone).trim(), date, time, guests: partySize, occasion: occasion || '', notes: String(notes || '').trim(), table: '', status: 'pending', points_awarded: 0, points_redeemed, discount, promo_id, promo_name, promo_discount, source: String(source), reminder_24h: 0, reminder_2h: 0, created_at: new Date().toISOString() };
     await store.setJSON(`reservation/${reservation.id}`, reservation);
     if (points_redeemed) {
       await consumeBlobPoints(store, pointsKey, pointsState.ledger, points_redeemed, reservation.id, `Discount $${discount.toFixed(2)} on booking #${reservation.id}`);

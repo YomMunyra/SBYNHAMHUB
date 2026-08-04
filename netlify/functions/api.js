@@ -183,6 +183,21 @@ function publicReview(item) {
   };
 }
 
+function detectSpam(text, opts = {}) {
+  const t = String(text || '').trim();
+  if (!t) return null;
+  if (/(https?:\/\/|www\.|\b[a-z0-9-]+\.(?:com|net|org|io|xyz|info|biz|site|online)\b)/i.test(t)) return 'Contains a link';
+  const caps = (t.match(/[A-Z]/g) || []).length;
+  if (t.length > 24 && caps / t.length > 0.6) return 'Mostly capital letters';
+  if (/(.)\1{4,}/.test(t)) return 'Repeated characters';
+  const lower = t.toLowerCase();
+  for (const word of ['viagra', 'casino', 'bitcoin', 'crypto', 'forex', 'loan', 'buy followers', 'cheap followers', 'follow me', 'dm me', 'click here', 'free prize', 'cash prize', 'giveaway', 'lottery', 'discount code', 'weight loss', 'free gift', 'seo services']) {
+    if (lower.includes(word)) return 'Suspicious wording';
+  }
+  if (opts.isDuplicate) return 'Same comment as an existing review';
+  return null;
+}
+
 async function pointsAccount(store, key) {
   return (await store.get(`points/${key}`, { type: 'json' })) || { guest_key: key, name: '', email: '', phone: '', balance: 0, lifetime: 0 };
 }
@@ -817,6 +832,12 @@ exports.handler = async (event) => {
     const existing = (await reviews(event)).find((item) => item.reservation_id === reservation_id);
     if (existing) return json({ error: 'A review already exists for this booking.' }, 409);
 
+    const text = String(comment).trim();
+    const gid = guestId({ email, phone });
+    const allReviews = await reviews(event);
+    const isDuplicate = allReviews.some((r) => r.comment === text && guestId({ email: r.email, phone: r.phone }) === gid);
+    const spamReason = detectSpam(text, { isDuplicate });
+
     const review = {
       id: crypto.randomUUID(),
       reservation_id,
@@ -824,9 +845,11 @@ exports.handler = async (event) => {
       email: String(reservation.email || '').trim(),
       phone: String(reservation.phone || '').trim(),
       rating_food: ratings[0], rating_service: ratings[1], rating_ambience: ratings[2], rating_value: ratings[3],
-      comment: String(comment).trim(),
+      comment: text,
       reply: '',
       status: 'pending',
+      spam: spamReason ? 1 : 0,
+      spam_reason: spamReason || '',
       created_at: new Date().toISOString()
     };
     await store.setJSON(`review/${review.id}`, review);
@@ -836,15 +859,24 @@ exports.handler = async (event) => {
   const reviewMatch = path.match(/^\/reviews\/([^/]+)$/);
   if (reviewMatch && method === 'PATCH') {
     if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
-    const { status, reply } = readBody(event);
+    const { status, reply, spam, spam_reason } = readBody(event);
     if (status !== undefined && !['pending', 'published', 'hidden'].includes(status)) return json({ error: 'Invalid status' }, 400);
     if (reply !== undefined && String(reply).length > 1000) return json({ error: 'Reply is too long' }, 400);
+    if (spam !== undefined && ![0, 1].includes(Number(spam))) return json({ error: 'Invalid spam flag' }, 400);
     const store = await reservationStore(event);
     const key = `review/${reviewMatch[1]}`;
     const review = await store.get(key, { type: 'json' });
     if (!review) return json({ error: 'Review not found' }, 404);
     if (status !== undefined) review.status = status;
     if (reply !== undefined) review.reply = String(reply).trim();
+    if (review.status === 'published') {
+      review.spam = 0;
+      review.spam_reason = '';
+    }
+    if (spam !== undefined) {
+      review.spam = Number(spam);
+      review.spam_reason = Number(spam) ? String(spam_reason || 'Marked by staff') : '';
+    }
     await store.setJSON(key, review);
     return json({ ok: true, review });
   }

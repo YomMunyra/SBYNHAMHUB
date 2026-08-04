@@ -5,6 +5,8 @@ const { db } = require('../../db');
 const { requireAuth } = require('../middleware/auth');
 const { VALID_REVIEW_STATUS } = require('../constants');
 const { publicReview } = require('../format');
+const { detectSpam } = require('../lib/spam');
+const { guestId } = require('../format');
 
 const router = express.Router();
 
@@ -82,10 +84,19 @@ router.post('/reviews', (req, res) => {
     return res.status(409).json({ error: 'A review already exists for this booking.' });
   }
 
+  const text = String(comment).trim();
+  const gid = guestId(reservation.email, reservation.phone);
+  const isDuplicate = db
+    .prepare('SELECT * FROM reviews WHERE comment = ?')
+    .all(text)
+    .some((r) => guestId(r.email, r.phone) === gid);
+  const spamReason = detectSpam(text, { isDuplicate });
+  const spamFlag = spamReason ? 1 : 0;
+
   const result = db
     .prepare(
-      `INSERT INTO reviews (reservation_id, name, email, phone, rating_food, rating_service, rating_ambience, rating_value, comment, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`
+      `INSERT INTO reviews (reservation_id, name, email, phone, rating_food, rating_service, rating_ambience, rating_value, comment, status, spam, spam_reason)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`
     )
     .run(
       rid,
@@ -96,7 +107,9 @@ router.post('/reviews', (req, res) => {
       ratings[1],
       ratings[2],
       ratings[3],
-      String(comment).trim()
+      text,
+      spamFlag,
+      spamReason || ''
     );
 
   const row = db.prepare('SELECT * FROM reviews WHERE id = ?').get(result.lastInsertRowid);
@@ -105,19 +118,39 @@ router.post('/reviews', (req, res) => {
 
 router.patch('/reviews/:id', requireAuth, (req, res) => {
   const id = Number(req.params.id);
-  const { status, reply } = req.body;
+  const { status, reply, spam, spam_reason } = req.body;
   if (status !== undefined && !VALID_REVIEW_STATUS.includes(status)) {
     return res.status(400).json({ error: 'Invalid status' });
   }
   if (reply !== undefined && String(reply).length > 1000) {
     return res.status(400).json({ error: 'Reply is too long' });
   }
-  const result = db
-    .prepare('UPDATE reviews SET status = COALESCE(?, status), reply = COALESCE(?, reply) WHERE id = ?')
-    .run(status ?? null, reply ?? null, id);
-  if (result.changes === 0) {
+  if (spam !== undefined && ![0, 1].includes(Number(spam))) {
+    return res.status(400).json({ error: 'Invalid spam flag' });
+  }
+  const row0 = db.prepare('SELECT * FROM reviews WHERE id = ?').get(id);
+  if (!row0) {
     return res.status(404).json({ error: 'Review not found' });
   }
+  const newStatus = status ?? row0.status;
+  const newReply = reply ?? row0.reply;
+  let newSpam = spam !== undefined ? Number(spam) : Number(row0.spam);
+  let newReason = String(row0.spam_reason || '');
+  if (newStatus === 'published') {
+    newSpam = 0;
+    newReason = '';
+  }
+  if (spam !== undefined) {
+    newSpam = Number(spam);
+    newReason = newSpam ? String(spam_reason || 'Marked by staff') : '';
+  }
+  db.prepare('UPDATE reviews SET status = ?, reply = ?, spam = ?, spam_reason = ? WHERE id = ?').run(
+    newStatus,
+    newReply,
+    newSpam,
+    newReason,
+    id
+  );
   const row = db.prepare('SELECT * FROM reviews WHERE id = ?').get(id);
   res.json({ ok: true, review: row });
 });

@@ -169,6 +169,8 @@ try { db.exec("ALTER TABLE settings ADD COLUMN avg_cover REAL NOT NULL DEFAULT 1
 try { db.exec("ALTER TABLE settings ADD COLUMN fee_rate REAL NOT NULL DEFAULT 0.0095"); } catch { /* Existing local databases already have this column. */ }
 try { db.exec("ALTER TABLE settings ADD COLUMN fee_flat REAL NOT NULL DEFAULT 0.50"); } catch { /* Existing local databases already have this column. */ }
 try { db.exec("ALTER TABLE settings ADD COLUMN capacity INTEGER NOT NULL DEFAULT 48"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE reviews ADD COLUMN spam INTEGER NOT NULL DEFAULT 0"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE reviews ADD COLUMN spam_reason TEXT NOT NULL DEFAULT ''"); } catch { /* Existing local databases already have this column. */ }
 
 function seedSettings() {
   const existing = db.prepare('SELECT id FROM settings WHERE id = 1').get();

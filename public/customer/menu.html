@@ -54,6 +54,7 @@
       const grid = document.getElementById('menuGrid');
       let items = [];
       let current = '';
+      let saved = new Set();
 
       Promise.all([fetch('/api/menu').then((r) => r.json()), fetch('/api/categories').then((r) => r.json())])
         .then(([menu, cats]) => {
@@ -72,11 +73,43 @@
             filterBar.querySelectorAll('.filter-chip').forEach((c) => c.classList.toggle('active', c === chip));
             render();
           });
-          render();
+          return loadSaves().then(() => render());
         })
         .catch(() => {
           grid.innerHTML = '<div class="card-tile" style="padding:60px;text-align:center;grid-column:1/-1"><p class="muted">Could not load the menu. Please try again later.</p></div>';
         });
+
+      function loadSaves() {
+        const params = guestIdentityParam();
+        if (!params.toString()) return Promise.resolve();
+        return fetch(`/api/saves?${params.toString()}`)
+          .then((r) => r.json())
+          .then((data) => {
+            saved = new Set((data.items || []).map((i) => Number(i.id)));
+          })
+          .catch(() => {});
+      }
+
+      async function toggleSave(d) {
+        const identity = await ensureGuestIdentity();
+        if (!identity) return;
+        const params = guestIdentityParam();
+        const isSaved = saved.has(Number(d.id));
+        try {
+          if (isSaved) {
+            await api(`/api/saves?${params.toString()}`, { method: 'DELETE', body: JSON.stringify({ item_id: d.id }) });
+            saved.delete(Number(d.id));
+            toast('Removed from your favourites', 'success');
+          } else {
+            await api('/api/saves', { method: 'POST', body: JSON.stringify({ item_id: d.id, ...identity }) });
+            saved.add(Number(d.id));
+            toast('Saved to your favourites', 'success');
+          }
+          render();
+        } catch (err) {
+          toast(err.message, 'error');
+        }
+      }
 
       function render() {
         const shown = current ? items.filter((d) => d.category_slug === current) : items;
@@ -96,10 +129,20 @@
               <div class="dish-meta">
                 ${d.tag ? `<span class="badge badge-gold">${escapeHTML(d.tag)}</span>` : ''}
                 <span class="badge badge-brand">${escapeHTML(d.category)}</span>
+                <button class="dish-save ${saved.has(Number(d.id)) ? 'saved' : ''}" data-save="${escapeHTML(d.id)}" aria-label="Save ${escapeHTML(d.name)} to favourites" title="Save to favourites">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="${saved.has(Number(d.id)) ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+                </button>
               </div>
             </div>
           </article>
         `).join('');
+        grid.querySelectorAll('.dish-save').forEach((btn) => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const item = items.find((d) => Number(d.id) === Number(btn.dataset.save));
+            if (item) toggleSave(item, btn);
+          });
+        });
       }
     })();
   </script>

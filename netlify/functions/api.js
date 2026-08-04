@@ -221,6 +221,77 @@ async function reviews(event) {
   return values.filter(Boolean);
 }
 
+async function blobSaves(store) {
+  const { blobs } = await store.list({ prefix: 'save/' });
+  const values = await Promise.all(blobs.map(({ key }) => store.get(key, { type: 'json' })));
+  return values.filter(Boolean);
+}
+
+async function blobCorrections(store) {
+  const { blobs } = await store.list({ prefix: 'pref/' });
+  const values = await Promise.all(blobs.map(({ key }) => store.get(key, { type: 'json' })));
+  return values.filter(Boolean);
+}
+
+function netlifyAffinity(menu, saves, corrections) {
+  const affinity = {};
+  const bump = (item, amount) => {
+    if (!item || !item.category_id) return;
+    affinity[item.category_id] = (affinity[item.category_id] || 0) + amount;
+  };
+  const correctionsByItem = {};
+  for (const c of corrections) correctionsByItem[Number(c.item_id)] = Number(c.signal);
+  for (const s of saves) bump(menu.find((m) => Number(m.id) === Number(s.item_id)), 3);
+  for (const [itemId, signal] of Object.entries(correctionsByItem)) bump(menu.find((m) => Number(m.id) === Number(itemId)), signal > 0 ? 2 : -2);
+  return { affinity, correctionsByItem };
+}
+
+async function netlifyProfile(event, key, limit = 6) {
+  const store = await reservationStore(event);
+  const [allReservations, allReviews, allSaves, allCorrections, menu, cats] = await Promise.all([
+    reservations(event),
+    reviews(event),
+    blobSaves(store),
+    blobCorrections(store),
+    loadMenu(store),
+    loadCategories(store)
+  ]);
+  const guestReservations = allReservations.filter((r) => guestId(r) === key && ['confirmed', 'arrived', 'completed'].includes(r.status));
+  const guestReviews = allReviews.filter((r) => guestId(r) === key);
+  const bookings = guestReservations.length;
+  const reviewsCount = guestReviews.length;
+  const signals = bookings + reviewsCount;
+  const state = { bookings, reviews: reviewsCount, signals, personalised: signals >= 5, progress: Math.min(100, Math.round((signals / 5) * 100)), to_go: Math.max(0, 5 - signals) };
+
+  const saves = allSaves.filter((s) => s.guest_key === key);
+  const corrections = allCorrections.filter((c) => c.guest_key === key);
+  const { affinity, correctionsByItem } = netlifyAffinity(menu, saves, corrections);
+  const savedSet = new Set(saves.map((s) => Number(s.item_id)));
+
+  const scored = menu
+    .filter((m) => m.available !== false)
+    .map((m) => {
+      let score = 0;
+      if (savedSet.has(Number(m.id))) score += 2;
+      if (m.featured) score += 1;
+      score += (affinity[m.category_id] || 0) * 1.5;
+      const correction = correctionsByItem[Number(m.id)];
+      if (correction) score += correction * 3;
+      return { item: m, score };
+    })
+    .sort((a, b) => b.score - a.score || String(a.item.name).localeCompare(String(b.item.name)));
+
+  const topCategories = cats
+    .map((c) => ({ id: c.id, name: c.name, slug: c.slug, score: affinity[c.id] || 0 }))
+    .filter((c) => c.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 4);
+
+  const savedItems = menu.filter((m) => savedSet.has(Number(m.id)));
+
+  return { state, categories: topCategories, saved: savedItems, corrections: corrections.length, feed: scored.slice(0, limit).map(({ item }) => item) };
+}
+
 function reviewOverall(item) {
   return Math.round((item.rating_food + item.rating_service + item.rating_ambience + item.rating_value) / 4);
 }
@@ -719,6 +790,85 @@ exports.handler = async (event) => {
     if (String(preferences).length > 1000) return json({ error: 'Preferences are too long' }, 400);
     const store = await reservationStore(event);
     await store.setJSON(`guest/${guestMatch[1]}`, { preferences: String(preferences).trim(), updated_at: new Date().toISOString() });
+    return json({ ok: true });
+  }
+
+  const personalise = (req) => {
+    const email = String((req.query && req.query.email) || (req.body && req.body.email) || '').trim();
+    const phone = String((req.query && req.query.phone) || (req.body && req.body.phone) || '').trim();
+    return email || phone ? guestId({ email, phone }) : null;
+  };
+
+  if (method === 'GET' && path === '/personalise') {
+    const key = personalise({ query: url.searchParams });
+    if (!key) return json({ error: 'Enter an email or phone.' }, 400);
+    const profile = await netlifyProfile(event, key);
+    return json({ guest_key: key, state: profile.state, categories: profile.categories, saved: profile.saved, corrections: profile.corrections });
+  }
+
+  if (method === 'GET' && path === '/personalise/feed') {
+    const key = personalise({ query: url.searchParams });
+    if (!key) return json({ error: 'Enter an email or phone.' }, 400);
+    const limit = Math.min(12, Math.max(1, Number(url.searchParams.get('limit')) || 6));
+    const profile = await netlifyProfile(event, key, limit);
+    return json({ ...profile.state, items: profile.feed });
+  }
+
+  if (method === 'GET' && path === '/saves') {
+    const key = personalise({ query: url.searchParams });
+    if (!key) return json({ error: 'Enter an email or phone.' }, 400);
+    const store = await reservationStore(event);
+    const menu = await loadMenu(store);
+    const allSaves = await blobSaves(store);
+    const ids = new Set(allSaves.filter((s) => s.guest_key === key).map((s) => Number(s.item_id)));
+    return json({ items: menu.filter((m) => ids.has(Number(m.id))) });
+  }
+
+  if (method === 'POST' && path === '/saves') {
+    const body = readBody(event);
+    const key = personalise({ body });
+    if (!key) return json({ error: 'Enter an email or phone.' }, 400);
+    const itemId = Number(body.item_id);
+    if (!itemId) return json({ error: 'Dish not found' }, 400);
+    const store = await reservationStore(event);
+    const menu = await loadMenu(store);
+    if (!menu.some((m) => Number(m.id) === itemId)) return json({ error: 'Dish not found' }, 400);
+    await store.setJSON(`save/${key}-${itemId}`, { guest_key: key, item_id: itemId, created_at: new Date().toISOString() });
+    return json({ ok: true });
+  }
+
+  if (method === 'DELETE' && path === '/saves') {
+    const body = readBody(event);
+    const key = personalise({ body });
+    if (!key) return json({ error: 'Enter an email or phone.' }, 400);
+    const store = await reservationStore(event);
+    await store.delete(`save/${key}-${Number(body.item_id)}`);
+    return json({ ok: true });
+  }
+
+  if (method === 'POST' && path === '/personalise/correct') {
+    const body = readBody(event);
+    const key = personalise({ body });
+    if (!key) return json({ error: 'Enter an email or phone.' }, 400);
+    const itemId = Number(body.item_id);
+    if (!itemId) return json({ error: 'Dish not found' }, 400);
+    const store = await reservationStore(event);
+    const menu = await loadMenu(store);
+    if (!menu.some((m) => Number(m.id) === itemId)) return json({ error: 'Dish not found' }, 400);
+    const signal = Number(body.signal) > 0 ? 1 : -1;
+    await store.setJSON(`pref/${key}-${itemId}`, { guest_key: key, item_id: itemId, signal, updated_at: new Date().toISOString() });
+    return json({ ok: true });
+  }
+
+  if (method === 'POST' && path === '/personalise/reset') {
+    const body = readBody(event);
+    const key = personalise({ body });
+    if (!key) return json({ error: 'Enter an email or phone.' }, 400);
+    const store = await reservationStore(event);
+    const saves = await blobSaves(store);
+    const corrections = await blobCorrections(store);
+    for (const s of saves.filter((s) => s.guest_key === key)) await store.delete(`save/${key}-${s.item_id}`);
+    for (const c of corrections.filter((c) => c.guest_key === key)) await store.delete(`pref/${key}-${c.item_id}`);
     return json({ ok: true });
   }
 

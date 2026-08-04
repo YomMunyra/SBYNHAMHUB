@@ -21,7 +21,8 @@ function renderHeader(active) {
     ['/reviews', 'Reviews'],
     ['/book', 'Reservations'],
     ['/pay', 'Pay'],
-    ['/points', 'Nyam Points']
+    ['/points', 'Nyam Points'],
+    ['/taste', 'My taste']
   ];
   const portal = [
     ['/manager', 'Manager'],
@@ -33,6 +34,7 @@ function renderHeader(active) {
     ['/manage', 'Manage my booking'],
     ['/pay', 'Pay your bill'],
     ['/points', 'Nyam Points'],
+    ['/taste', 'My taste & favourites'],
     ['/reviews', 'Leave a review']
   ];
   const nav = document.getElementById('nav');
@@ -196,6 +198,36 @@ function escapeHTML(str) {
 function stars(rating) {
   const full = Math.round(rating);
   return '★★★★★'.slice(0, full) + '☆☆☆☆☆'.slice(0, 5 - full);
+}
+
+function guestIdentity() {
+  try {
+    return JSON.parse(localStorage.getItem('sby_guest') || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function setGuestIdentity(identity) {
+  localStorage.setItem('sby_guest', JSON.stringify({ ...guestIdentity(), ...identity }));
+}
+
+function guestIdentityParam() {
+  const identity = guestIdentity();
+  const params = new URLSearchParams();
+  if (identity.email) params.set('email', identity.email);
+  if (identity.phone) params.set('phone', identity.phone);
+  return params;
+}
+
+async function ensureGuestIdentity() {
+  const identity = guestIdentity();
+  if (identity.email || identity.phone) return identity;
+  const email = window.prompt('Enter your email so we can learn your taste and remember your favourites:');
+  if (!email || !String(email).trim()) return null;
+  const phone = window.prompt('And the phone number you book with (so we can match your visits):') || '';
+  setGuestIdentity({ email: String(email).trim(), phone: String(phone).trim() });
+  return guestIdentity();
 }
 
 document.addEventListener('DOMContentLoaded', () => {

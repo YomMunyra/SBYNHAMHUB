@@ -17,6 +17,7 @@ const promoRoutes = require('./routes/promos');
 const adminRoutes = require('./routes/admin');
 const paymentRoutes = require('./routes/payments');
 const discoverRoutes = require('./routes/discover');
+const personaliseRoutes = require('./routes/personalise');
 
 function createApp() {
   const app = express();
@@ -46,6 +47,7 @@ function createApp() {
   app.use('/api', adminRoutes);
   app.use('/api', paymentRoutes);
   app.use('/api', discoverRoutes);
+  app.use('/api', personaliseRoutes);
 
   const publicDir = path.join(__dirname, '..', 'public');
   app.use(express.static(publicDir));
@@ -57,6 +59,7 @@ function createApp() {
     '/book': ['customer', 'book.html'],
     '/reviews': ['customer', 'reviews.html'],
     '/points': ['customer', 'points.html'],
+    '/taste': ['customer', 'taste.html'],
     '/manage': ['customer', 'manage.html'],
     '/pay': ['customer', 'pay.html'],
     '/receipt': ['customer', 'receipt.html'],

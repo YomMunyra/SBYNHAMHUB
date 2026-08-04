@@ -69,6 +69,23 @@ CREATE TABLE IF NOT EXISTS guest_profiles (
   updated_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS saves (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  guest_key TEXT NOT NULL,
+  item_id INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (guest_key, item_id)
+);
+
+CREATE TABLE IF NOT EXISTS pref_corrections (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  guest_key TEXT NOT NULL,
+  item_id INTEGER NOT NULL,
+  signal INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (guest_key, item_id)
+);
+
 CREATE TABLE IF NOT EXISTS points_accounts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   guest_key TEXT NOT NULL UNIQUE,

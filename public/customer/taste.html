@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>My taste — SbyNhamHub</title>
+  <meta name="description" content="See what SbyNhamHub has learned about your taste and correct or reset your personal recommendations.">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body data-page="/taste">
+
+  <header class="nav" id="nav"></header>
+
+  <section class="page-hero">
+    <div class="container">
+      <p class="eyebrow">SbyNhamHub · Personalisation</p>
+      <h1>Your taste, <span class="italic-accent">learned.</span></h1>
+      <p class="lede">We learn what you love from your bookings, reviews and saved dishes — then recommend dishes that actually match your taste. After five visits, your home feed is truly yours.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container" style="max-width:820px">
+      <div class="form-card">
+        <span class="eyebrow">Identify yourself</span>
+        <h3 style="margin-bottom:20px">Enter the email or phone you booked with</h3>
+        <div class="form">
+          <div class="form-grid">
+            <div class="field">
+              <label for="tEmail">Email</label>
+              <input class="input" id="tEmail" type="email" placeholder="you@example.com">
+            </div>
+            <div class="field">
+              <label for="tPhone">Phone</label>
+              <input class="input" id="tPhone" type="tel" placeholder="+855 12 345 678">
+            </div>
+          </div>
+          <button class="btn btn-primary btn-lg btn-block" id="tLookup">See my taste profile</button>
+        </div>
+      </div>
+
+      <div id="tasteResult" style="display:none;margin-top:32px">
+        <div class="card-tile" style="padding:30px;background:#fff">
+          <div class="flex-between" style="align-items:center">
+            <div>
+              <span class="eyebrow">Learning progress</span>
+              <h3 style="margin:4px 0 8px" id="tName">My profile</h3>
+              <p class="muted" id="tStatus" style="margin:0;font-size:14px"></p>
+            </div>
+            <button class="btn btn-secondary" id="tReset">Reset preferences</button>
+          </div>
+          <div class="taste-progress-bar mt-8"><i id="tProgressBar" style="width:0%"></i></div>
+          <p class="muted" id="tProgressLabel" style="margin:8px 0 0;font-size:13px"></p>
+        </div>
+
+        <div class="card-tile" style="padding:30px;background:#fff;margin-top:24px" id="tasteCategories">
+          <span class="eyebrow">What we've learned</span>
+          <h3 style="margin:4px 0 14px">You seem to love</h3>
+          <div id="tCategoryChips"><p class="muted">Nothing learned yet — keep booking and saving dishes you love.</p></div>
+        </div>
+
+        <div class="card-tile" style="padding:30px;background:#fff;margin-top:24px" id="tasteSaved">
+          <div class="flex-between" style="align-items:center">
+            <div>
+              <span class="eyebrow">Saved dishes</span>
+              <h3 style="margin:4px 0 8px">Your favourites</h3>
+            </div>
+            <a class="btn btn-secondary btn-sm" href="/menu">Save more from the menu</a>
+          </div>
+          <div id="tSavedList" style="margin-top:14px"></div>
+        </div>
+
+        <div class="card-tile" style="padding:30px;background:#fff;margin-top:24px">
+          <span class="eyebrow">Correct my recommendations</span>
+          <h3 style="margin:4px 0 8px">Tell us what's on or off target</h3>
+          <p class="muted" style="margin:0 0 16px;font-size:14px">Tap a dish to teach your profile what you like or don't like.</p>
+          <div class="grid-2" id="tCorrectGrid"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer" id="footer"></footer>
+
+  <script src="/assets/js/main.js"></script>
+  <script>
+    (function () {
+      const email = document.getElementById('tEmail');
+      const phone = document.getElementById('tPhone');
+      const result = document.getElementById('tasteResult');
+      let current = {};
+
+      const prefill = guestIdentity();
+      if (prefill.email) email.value = prefill.email;
+      if (prefill.phone) phone.value = prefill.phone;
+
+      document.getElementById('tLookup').addEventListener('click', async () => {
+        const e = email.value.trim();
+        const p = phone.value.trim();
+        if (!e && !p) { toast('Enter an email or phone.', 'error'); return; }
+        setGuestIdentity({ email: e, phone: p });
+        try {
+          const data = await api(`/api/personalise?email=${encodeURIComponent(e)}&phone=${encodeURIComponent(p)}`);
+          current = data;
+          renderProfile(data);
+          loadMenuForCorrections();
+          result.style.display = 'block';
+        } catch (err) {
+          toast(err.message, 'error');
+        }
+      });
+
+      function renderProfile(data) {
+        document.getElementById('tName').textContent = 'My profile';
+        const st = data.state;
+        const statusParts = [];
+        statusParts.push(`${st.bookings} booking${st.bookings === 1 ? '' : 's'}`);
+        statusParts.push(`${st.reviews} review${st.reviews === 1 ? '' : 's'}`);
+        document.getElementById('tStatus').textContent = st.personalised ? `Personalised · based on ${statusParts.join(' and ')}` : `Not personalised yet · ${statusParts.join(' and ')}`;
+        document.getElementById('tProgressBar').style.width = st.progress + '%';
+        document.getElementById('tProgressLabel').textContent = st.personalised
+          ? 'Your home feed is personalised. Update your taste any time with the buttons below.'
+          : `${st.progress}% personalised — ${st.to_go} more visit${st.to_go === 1 ? '' : 's'} before recommendations switch on.`;
+
+        const chipsWrap = document.getElementById('tCategoryChips');
+        if (data.categories && data.categories.length) {
+          chipsWrap.innerHTML = data.categories.map((c) => `<span class="pref-chip on">${escapeHTML(c.name)}</span>`).join('');
+        } else {
+          chipsWrap.innerHTML = '<p class="muted">Nothing learned yet — keep booking and saving dishes you love.</p>';
+        }
+
+        const savedWrap = document.getElementById('tSavedList');
+        if (data.saved && data.saved.length) {
+          savedWrap.innerHTML = data.saved.map((d) => `
+            <div class="flex-between" style="padding:10px 0;border-bottom:1px solid var(--hair)">
+              <div style="display:flex;align-items:center;gap:12px">
+                <img src="/assets/img/${escapeHTML(d.image)}" alt="" style="width:44px;height:44px;border-radius:10px;object-fit:cover;background:var(--brand-soft)">
+                <div>
+                  <b style="font-size:14.5px">${escapeHTML(d.name)}</b>
+                  <p class="muted" style="margin:0;font-size:12.5px">${escapeHTML(d.category)} · ${money(d.price)}</p>
+                </div>
+              </div>
+              <button class="btn btn-secondary btn-sm" data-remove="${escapeHTML(d.id)}">Remove</button>
+            </div>`).join('');
+          savedWrap.querySelectorAll('[data-remove]').forEach((btn) => {
+            btn.addEventListener('click', async () => {
+              const params = guestIdentityParam();
+              await api(`/api/saves?${params.toString()}`, { method: 'DELETE', body: JSON.stringify({ item_id: btn.dataset.remove }) });
+              toast('Removed from favourites', 'success');
+              reloadProfile();
+            });
+          });
+        } else {
+          savedWrap.innerHTML = '<p class="muted" style="margin:0">No saved dishes yet. Save dishes you love from the menu.</p>';
+        }
+      }
+
+      function loadMenuForCorrections() {
+        fetch('/api/menu')
+          .then((r) => r.json())
+          .then((items) => {
+            const grid = document.getElementById('tCorrectGrid');
+            grid.innerHTML = items.slice(0, 8).map((d) => `
+              <div class="dish" style="padding:16px">
+                <div style="display:flex;align-items:center;gap:12px">
+                  <img src="/assets/img/${escapeHTML(d.image)}" alt="" style="width:52px;height:52px;border-radius:10px;object-fit:cover;background:var(--brand-soft)">
+                  <div style="flex:1">
+                    <b style="font-size:14.5px">${escapeHTML(d.name)}</b>
+                    <p class="muted" style="margin:0;font-size:12.5px">${escapeHTML(d.category)}</p>
+                  </div>
+                </div>
+                <div style="display:flex;gap:8px;margin-top:12px">
+                  <button class="btn btn-secondary btn-sm" data-correct="${escapeHTML(d.id)}" data-signal="1">More like this</button>
+                  <button class="btn btn-secondary btn-sm" data-correct="${escapeHTML(d.id)}" data-signal="-1">Less like this</button>
+                </div>
+              </div>`).join('');
+            grid.querySelectorAll('[data-correct]').forEach((btn) => {
+              btn.addEventListener('click', async () => {
+                try {
+                  await api('/api/personalise/correct', { method: 'POST', body: JSON.stringify({ item_id: btn.dataset.correct, signal: btn.dataset.signal, ...guestIdentity() }) });
+                  toast(btn.dataset.signal === '1' ? 'Got it — more dishes like this' : 'Got it — fewer dishes like this', 'success');
+                  reloadProfile();
+                } catch (err) {
+                  toast(err.message, 'error');
+                }
+              });
+            });
+          })
+          .catch(() => {
+            document.getElementById('tCorrectGrid').innerHTML = '<p class="muted">Could not load dishes.</p>';
+          });
+      }
+
+      function reloadProfile() {
+        const params = guestIdentityParam();
+        api(`/api/personalise?${params.toString()}`)
+          .then((data) => {
+            current = data;
+            renderProfile(data);
+            loadMenuForCorrections();
+          })
+          .catch(() => {});
+      }
+
+      document.getElementById('tReset').addEventListener('click', async () => {
+        if (!window.confirm('Reset your taste profile? This clears your saved dishes and corrections. Bookings and reviews stay untouched.')) return;
+        try {
+          await api('/api/personalise/reset', { method: 'POST', body: JSON.stringify(guestIdentity()) });
+          toast('Preferences reset', 'success');
+          reloadProfile();
+        } catch (err) {
+          toast(err.message, 'error');
+        }
+      });
+
+      if (prefill.email || prefill.phone) {
+        document.getElementById('tLookup').click();
+      }
+    })();
+  </script>
+</body>
+</html>

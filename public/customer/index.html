@@ -245,6 +245,25 @@
     </div>
   </section>
 
+  <!-- Personalised feed -->
+  <section class="section" id="personalisedSection" style="display:none;padding-top:0">
+    <div class="container">
+      <div class="flex-between" style="margin-bottom:28px">
+        <div>
+          <span class="eyebrow" id="personalisedEyebrow">Made for you</span>
+          <h2 style="margin:0" id="personalisedTitle">Recommendations just for you</h2>
+          <p class="muted" id="personalisedSub" style="margin:8px 0 0"></p>
+        </div>
+        <a class="btn btn-secondary" href="/taste">View my taste</a>
+      </div>
+      <div class="grid-3" id="personalisedGrid">
+        <div class="card-tile" style="padding:40px;text-align:center;grid-column:1/-1">
+          <p class="muted">Loading your recommendations…</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- Today's offers -->
   <section class="section" id="homeOffersSection" style="padding-top:0;display:none">
     <div class="container">
@@ -465,6 +484,51 @@
           if (s.count && el) el.textContent = s.avg.toFixed(1) + '★';
         })
         .catch(() => {});
+
+      (function loadPersonalised() {
+        const section = document.getElementById('personalisedSection');
+        const params = guestIdentityParam();
+        if (!params.toString()) return;
+        fetch(`/api/personalise/feed?${params.toString()}`)
+          .then((r) => r.json())
+          .then((data) => {
+            if (!data.personalised) {
+              document.getElementById('personalisedTitle').textContent = 'Getting to know you';
+              document.getElementById('personalisedEyebrow').textContent = 'Learning your taste';
+              document.getElementById('personalisedSub').textContent = `Recommendations switch on after ${data.to_go} more visit${data.to_go === 1 ? '' : 's'}. Save dishes you love on the menu to speed things up.`;
+              const wrap = document.getElementById('personalisedGrid');
+              wrap.innerHTML = `
+                <div class="card-tile" style="padding:34px;text-align:center;grid-column:1/-1">
+                  <div class="taste-progress-bar" style="max-width:360px;margin:0 auto 14px"><i style="width:${Math.max(8, data.progress)}%"></i></div>
+                  <p class="muted" style="margin:0 0 4px"><strong>${data.progress}%</strong> personalised — ${data.to_go} signal${data.to_go === 1 ? '' : 's'} to go</p>
+                  <a class="btn btn-primary btn-sm mt-8" href="/taste">Manage my taste</a>
+                </div>`;
+            } else {
+              document.getElementById('personalisedSub').textContent = `Based on ${data.bookings} visit${data.bookings === 1 ? '' : 's'} and ${data.reviews} review${data.reviews === 1 ? '' : 's'}.`;
+              const wrap = document.getElementById('personalisedGrid');
+              if (!data.items.length) { wrap.innerHTML = ''; section.style.display = 'none'; return; }
+              wrap.innerHTML = data.items.map((d) => `
+                <article class="dish">
+                  <div class="dish-img"><img src="/assets/img/${escapeHTML(d.image)}" alt="${escapeHTML(d.name)}"></div>
+                  <div class="dish-body">
+                    <div class="dish-top">
+                      <h3 class="dish-name">${escapeHTML(d.name)}</h3>
+                      <span class="dish-price">${money(d.price)}</span>
+                    </div>
+                    <p class="dish-desc">${escapeHTML(d.description)}</p>
+                    <div class="dish-meta">
+                      <span class="badge badge-brand">${escapeHTML(d.category)}</span>
+                      ${d.tag ? `<span class="badge badge-gold">${escapeHTML(d.tag)}</span>` : ''}
+                    </div>
+                    <a class="btn btn-secondary btn-sm mt-8" href="/menu">See on menu</a>
+                  </div>
+                </article>
+              `).join('');
+            }
+            section.style.display = 'block';
+          })
+          .catch(() => {});
+      })();
 
       fetch('/api/reviews')
         .then((r) => r.json())

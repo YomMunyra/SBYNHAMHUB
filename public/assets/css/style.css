@@ -459,7 +459,50 @@ p { margin: 0 0 1em; }
 .dish-name { font-size: 18px; font-weight: 500; }
 .dish-price { color: var(--brand); font-size: 18px; font-weight: 600; white-space: nowrap; }
 .dish-desc { color: var(--sub); font-size: 13.5px; margin: 8px 0 14px; flex: 1; }
-.dish-meta { display: flex; gap: 8px; flex-wrap: wrap; }
+.dish-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.dish-save {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--hair);
+  background: #fff;
+  color: var(--sub);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.dish-save:hover { color: var(--brand); border-color: var(--brand); transform: scale(1.08); }
+.dish-save.saved { color: var(--brand); border-color: var(--brand); background: var(--brand-soft); }
+
+/* ---------- Personalisation (F-09) ---------- */
+
+.pref-form-card {
+  background: #fff;
+  border: 1px solid var(--hair);
+  border-radius: var(--r-2xl);
+  padding: 28px;
+}
+.pref-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 15px;
+  border-radius: 999px;
+  border: 1px solid var(--hair);
+  background: #fff;
+  color: var(--ink);
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.pref-chip:hover { border-color: var(--brand); color: var(--brand); }
+.pref-chip.on { background: var(--brand-soft); border-color: var(--brand); color: var(--brand); font-weight: 600; }
+.feed-reason { color: var(--sub); font-size: 12.5px; margin-top: 4px; }
+.taste-progress-bar { height: 8px; border-radius: 999px; background: var(--brand-soft); overflow: hidden; }
+.taste-progress-bar i { display: block; height: 100%; background: var(--brand); border-radius: 999px; }
 
 /* ---------- How it works timeline ---------- */
 

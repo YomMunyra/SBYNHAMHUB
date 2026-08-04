@@ -29,6 +29,11 @@
   status = 200
 
 [[redirects]]
+  from = "/taste"
+  to = "/customer/taste.html"
+  status = 200
+
+[[redirects]]
   from = "/manage"
   to = "/customer/manage.html"
   status = 200

@@ -1,6 +1,9 @@
 [build]
   publish = "public"
   functions = "netlify/functions"
+  # Skip builds when nothing that affects the deployed site changed
+  # (docs, server code, etc. don't trigger deploys and burn build minutes).
+  ignore = "git diff --quiet HEAD^ HEAD -- public netlify netlify.toml package.json package-lock.json"
 
 [[redirects]]
   from = "/api/*"

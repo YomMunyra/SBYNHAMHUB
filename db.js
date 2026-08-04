@@ -86,7 +86,9 @@ CREATE TABLE IF NOT EXISTS points_ledger (
   reason TEXT NOT NULL DEFAULT 'earned',
   ref_id TEXT NOT NULL DEFAULT '',
   note TEXT NOT NULL DEFAULT '',
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  expires_at TEXT,
+  remaining INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS waitlist (
@@ -171,6 +173,9 @@ try { db.exec("ALTER TABLE settings ADD COLUMN fee_flat REAL NOT NULL DEFAULT 0.
 try { db.exec("ALTER TABLE settings ADD COLUMN capacity INTEGER NOT NULL DEFAULT 48"); } catch { /* Existing local databases already have this column. */ }
 try { db.exec("ALTER TABLE reviews ADD COLUMN spam INTEGER NOT NULL DEFAULT 0"); } catch { /* Existing local databases already have this column. */ }
 try { db.exec("ALTER TABLE reviews ADD COLUMN spam_reason TEXT NOT NULL DEFAULT ''"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE points_ledger ADD COLUMN expires_at TEXT"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE points_ledger ADD COLUMN remaining INTEGER"); } catch { /* Existing local databases already have this column. */ }
+db.exec("UPDATE points_ledger SET remaining = delta, expires_at = datetime(created_at, '+18 months') WHERE reason = 'earned' AND remaining IS NULL");
 
 function seedSettings() {
   const existing = db.prepare('SELECT id FROM settings WHERE id = 1').get();

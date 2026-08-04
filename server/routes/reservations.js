@@ -14,6 +14,7 @@ const {
 const { guestId } = require('../format');
 const { sendBookingConfirmation } = require('../lib/mailer');
 const { resolvePromo, redeemPromo } = require('../lib/promos');
+const { computeBalance, redeemPoints, syncBalance } = require('../lib/points');
 
 const router = express.Router();
 
@@ -37,8 +38,9 @@ function awardPoints(reservation) {
     ).run(key, reservation.name, reservation.email, reservation.phone, earned, earned);
   }
   db.prepare(
-    `INSERT INTO points_ledger (guest_key, delta, reason, ref_id, note) VALUES (?, ?, 'earned', ?, ?)`
-  ).run(key, earned, String(reservation.id), `Arrived booking #${reservation.id}`);
+    `INSERT INTO points_ledger (guest_key, delta, reason, ref_id, note, expires_at, remaining)
+     VALUES (?, ?, 'earned', ?, ?, datetime('now', '+18 months'), ?)`
+  ).run(key, earned, String(reservation.id), `Arrived booking #${reservation.id}`, earned);
   db.prepare('UPDATE reservations SET points_awarded = 1 WHERE id = ?').run(reservation.id);
   return { key, earned };
 }
@@ -98,7 +100,8 @@ router.post('/reservations', (req, res) => {
     }
     redeemKey = guestId(email, phone);
     const account = db.prepare('SELECT balance FROM points_accounts WHERE guest_key = ?').get(redeemKey);
-    if (!account || account.balance < rp) {
+    const available = account ? computeBalance(db, redeemKey) : 0;
+    if (available < rp) {
       return res.status(400).json({ error: 'Not enough points for that email.' });
     }
     discount = (rp / POINTS_UNIT) * POINTS_RATE;
@@ -147,10 +150,8 @@ router.post('/reservations', (req, res) => {
     }
   }
   if (points_redeemed) {
-    db.prepare('UPDATE points_accounts SET balance = balance - ? WHERE guest_key = ?').run(points_redeemed, redeemKey);
-    db.prepare(
-      `INSERT INTO points_ledger (guest_key, delta, reason, ref_id, note) VALUES (?, ?, 'redeemed', ?, ?)`
-    ).run(redeemKey, -points_redeemed, String(id), `Discount $${discount.toFixed(2)} on booking #${id}`);
+    redeemPoints(db, redeemKey, points_redeemed, String(id), `Discount $${discount.toFixed(2)} on booking #${id}`);
+    syncBalance(db, redeemKey);
   }
 
   const row = db.prepare('SELECT * FROM reservations WHERE id = ?').get(id);

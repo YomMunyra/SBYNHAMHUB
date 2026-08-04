@@ -11,8 +11,65 @@ const TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
 const POINTS_PER_COVER = 100;
 const POINTS_UNIT = 100;
 const POINTS_RATE = 0.5;
+const POINTS_EXPIRY_MONTHS = 18;
+const POINTS_EXPIRY_SOON_MS = 30 * 24 * 60 * 60 * 1000;
 const PAY_FEE_RATE = 0.0095;
 const PAY_FEE_FLAT = 0.5;
+
+function addMonths(iso, months) {
+  const d = iso ? new Date(iso) : new Date();
+  if (isNaN(d.getTime())) return new Date().toISOString();
+  d.setMonth(d.getMonth() + Number(months));
+  return d.toISOString();
+}
+
+function normalizeLedgerEntry(entry) {
+  if (!entry) return entry;
+  return {
+    ...entry,
+    remaining: Number(entry.remaining ?? (entry.reason === 'earned' ? Number(entry.delta) : 0)),
+    expires_at: entry.expires_at || (entry.reason === 'earned' ? addMonths(entry.created_at, POINTS_EXPIRY_MONTHS) : '')
+  };
+}
+
+async function blobPointsState(store, key) {
+  const { blobs } = await store.list({ prefix: `ledger/${key}/` });
+  const now = Date.now();
+  const ledger = [];
+  let balance = 0;
+  let expiringSoon = 0;
+  let earliest = null;
+  for (const { key: blobKey } of blobs) {
+    const raw = await store.get(blobKey, { type: 'json' });
+    const entry = normalizeLedgerEntry(raw);
+    if (!entry) continue;
+    entry.__blob = blobKey;
+    ledger.push(entry);
+    if (entry.reason !== 'earned') continue;
+    const expMs = new Date(entry.expires_at).getTime();
+    if (expMs <= now) continue;
+    balance += entry.remaining;
+    if (expMs <= now + POINTS_EXPIRY_SOON_MS) expiringSoon += entry.remaining;
+    if (!earliest || expMs < earliest) earliest = entry.expires_at;
+  }
+  return { ledger, balance, expiringSoon, earliest, now };
+}
+
+async function consumeBlobPoints(store, key, ledger, amount, refId, note) {
+  let left = Number(amount);
+  for (const entry of ledger) {
+    if (entry.reason !== 'earned' || entry.remaining <= 0) continue;
+    const expMs = new Date(entry.expires_at).getTime();
+    if (expMs <= Date.now()) continue;
+    const take = Math.min(entry.remaining, left);
+    entry.remaining -= take;
+    await store.setJSON(entry.__blob, entry);
+    left -= take;
+    if (left <= 0) break;
+  }
+  if (left > 0) throw new Error('Not enough points');
+  await store.setJSON(`ledger/${key}/${crypto.randomUUID()}`, { delta: -Number(amount), reason: 'redeemed', ref_id: String(refId), note, created_at: new Date().toISOString() });
+}
 
 function round2(n) {
   return Math.round(Number(n) * 100) / 100;
@@ -205,9 +262,21 @@ async function pointsAccount(store, key) {
 async function pointsLookup(event, store, email, phone) {
   const key = guestId({ email, phone });
   const account = await pointsAccount(store, key);
-  const { blobs } = await store.list({ prefix: `ledger/${key}/` });
-  const ledger = await Promise.all(blobs.map(({ key: blobKey }) => store.get(blobKey, { type: 'json' })));
-  return { balance: account.balance, lifetime: account.lifetime, name: account.name, history: (ledger.filter(Boolean).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))).slice(0, 50) };
+  const state = await blobPointsState(store, key);
+  account.balance = state.balance;
+  await store.setJSON(`points/${key}`, account);
+  return {
+    balance: state.balance,
+    lifetime: account.lifetime,
+    name: account.name,
+    expiring_soon: state.expiringSoon,
+    earliest_expiry: state.earliest,
+    expiry_months: POINTS_EXPIRY_MONTHS,
+    history: state.ledger
+      .map(({ __blob, ...entry }) => entry)
+      .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+      .slice(0, 50)
+  };
 }
 
 async function awardPoints(event, store, reservation) {
@@ -221,7 +290,15 @@ async function awardPoints(event, store, reservation) {
   if (String(reservation.email || '').trim()) account.email = String(reservation.email).trim();
   if (String(reservation.phone || '').trim()) account.phone = String(reservation.phone).trim();
   await store.setJSON(`points/${key}`, account);
-  await store.setJSON(`ledger/${key}/${crypto.randomUUID()}`, { delta: earned, reason: 'earned', ref_id: String(reservation.id), note: `Arrived booking #${reservation.id}`, created_at: new Date().toISOString() });
+  await store.setJSON(`ledger/${key}/${crypto.randomUUID()}`, {
+    delta: earned,
+    reason: 'earned',
+    ref_id: String(reservation.id),
+    note: `Arrived booking #${reservation.id}`,
+    created_at: new Date().toISOString(),
+    expires_at: addMonths(new Date().toISOString(), POINTS_EXPIRY_MONTHS),
+    remaining: earned
+  });
   reservation.points_awarded = 1;
   await store.setJSON(`reservation/${reservation.id}`, reservation);
   return { key, earned };
@@ -638,16 +715,16 @@ exports.handler = async (event) => {
 
     let points_redeemed = 0;
     let discount = 0;
+    let pointsState = null;
+    let pointsKey = '';
     const rp = Number(redeem_points);
     if (rp) {
       if (!String(email).trim()) return json({ error: 'Add an email to redeem points.' }, 400);
       if (!Number.isInteger(rp) || rp < POINTS_UNIT || rp % POINTS_UNIT !== 0) return json({ error: `Points must be a multiple of ${POINTS_UNIT}.` }, 400);
       const store = await reservationStore(event);
-      const key = guestId({ email, phone });
-      const account = await pointsAccount(store, key);
-      if (account.balance < rp) return json({ error: 'Not enough points for that email.' }, 400);
-      account.balance -= rp;
-      await store.setJSON(`points/${key}`, account);
+      pointsKey = guestId({ email, phone });
+      pointsState = await blobPointsState(store, pointsKey);
+      if (pointsState.balance < rp) return json({ error: 'Not enough points for that email.' }, 400);
       discount = (rp / POINTS_UNIT) * POINTS_RATE;
       points_redeemed = rp;
     }
@@ -676,7 +753,10 @@ exports.handler = async (event) => {
     const reservation = { id: crypto.randomUUID(), name: String(name).trim(), email: String(email).trim(), phone: String(phone).trim(), date, time, guests: partySize, occasion: occasion || '', notes: String(notes || '').trim(), table: '', status: 'pending', points_awarded: 0, points_redeemed, discount, promo_id, promo_name, promo_discount, reminder_24h: 0, reminder_2h: 0, created_at: new Date().toISOString() };
     await store.setJSON(`reservation/${reservation.id}`, reservation);
     if (points_redeemed) {
-      await store.setJSON(`ledger/${guestId({ email, phone })}/${crypto.randomUUID()}`, { delta: -points_redeemed, reason: 'redeemed', ref_id: String(reservation.id), note: `Discount $${discount.toFixed(2)} on booking #${reservation.id}`, created_at: new Date().toISOString() });
+      await consumeBlobPoints(store, pointsKey, pointsState.ledger, points_redeemed, reservation.id, `Discount $${discount.toFixed(2)} on booking #${reservation.id}`);
+      const account = await pointsAccount(store, pointsKey);
+      account.balance = pointsState.balance - points_redeemed;
+      await store.setJSON(`points/${pointsKey}`, account);
     }
     try { await sendBookingConfirmation(reservation); } catch { /* email is best-effort */ }
     return json({ ok: true, reservation }, 201);

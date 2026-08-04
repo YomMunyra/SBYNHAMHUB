@@ -4,6 +4,7 @@ const express = require('express');
 const { db } = require('../../db');
 const { requireAuth } = require('../middleware/auth');
 const { guestId } = require('../format');
+const { computeBalance } = require('../lib/points');
 
 const router = express.Router();
 
@@ -23,7 +24,7 @@ router.get('/guests', requireAuth, (req, res) => {
     const profile = db.prepare('SELECT preferences FROM guest_profiles WHERE guest_key = ?').get(guest.id);
     guest.preferences = profile?.preferences || '';
     const account = db.prepare('SELECT balance FROM points_accounts WHERE guest_key = ?').get(guest.id);
-    guest.points = account?.balance || 0;
+    guest.points = account ? computeBalance(db, guest.id) : 0;
     return guest;
   });
   res.json(guests);

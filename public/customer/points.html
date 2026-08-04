@@ -16,7 +16,7 @@
     <div class="container">
       <p class="eyebrow">SbyNhamHub · Loyalty</p>
       <h1>Your <span class="italic-accent">Nyam Points.</span></h1>
-      <p class="lede">Earn 100 points for every cover you book and honour. Redeem 100 points for $0.50 off your bill — at every single visit.</p>
+      <p class="lede">Earn 100 points for every cover you book and honour. Redeem 100 points for $0.50 off your bill — at every single visit. Points expire 18 months after they're earned.</p>
     </div>
   </section>
 
@@ -49,6 +49,7 @@
             <p class="muted" style="margin:0;font-size:13px" id="pName">Balance</p>
             <div class="points-total"><b id="pBalance">0</b><span>Nyam Points</span></div>
             <p class="muted" style="margin:4px 0 0;font-size:13px">Worth up to <strong id="pWorth">$0.00</strong> off your next table</p>
+            <p class="muted" id="pExpiry" style="margin:6px 0 0;font-size:13px;color:#C4471A"></p>
           </div>
         </div>
         <div class="points-actions">
@@ -70,11 +71,12 @@
       <div class="grid-3" style="text-align:center">
         <div class="tile center"><div class="num">100</div><div class="cap">Points per cover booked &amp; honoured</div></div>
         <div class="tile center"><div class="num">$0.50</div><div class="cap">Off per 100 points redeemed</div></div>
-        <div class="tile center"><div class="num">2×</div><div class="cap">Points on special-occasion tables</div></div>
+        <div class="tile center"><div class="num">18 mo</div><div class="cap">Before earned points expire</div></div>
       </div>
       <div class="callout blue mt-8">
         <strong>How it works:</strong> book through the site, arrive and be seated, and points are
-        credited automatically. Your balance is tied to the email or phone on your booking.
+        credited automatically. Your balance is tied to the email or phone on your booking, and
+        points expire 18 months after they are earned.
       </div>
     </div>
   </section>
@@ -98,6 +100,14 @@
           document.getElementById('pName').textContent = data.name ? `${data.name}'s balance` : 'Balance';
           document.getElementById('pBalance').textContent = balance;
           document.getElementById('pWorth').textContent = '$' + ((Math.floor(balance / 100) * 50) / 100).toFixed(2);
+          const expiryEl = document.getElementById('pExpiry');
+          const expiryNotes = [];
+          if (data.expiring_soon > 0) expiryNotes.push(`${data.expiring_soon} pts expire within 30 days`);
+          if (data.earliest_expiry) {
+            const d = new Date(data.earliest_expiry);
+            if (!isNaN(d.getTime())) expiryNotes.push(`Earliest expiry ${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`);
+          }
+          expiryEl.textContent = expiryNotes.join(' · ');
           document.getElementById('pointsResult').style.display = 'block';
           const history = data.history || [];
           const historyCard = document.getElementById('pointsHistory');

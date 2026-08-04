@@ -48,9 +48,14 @@
 
       <div class="manager-date-row"><div><strong>Marketplace health</strong><span>Current activity across your restaurant workspace.</span></div><button class="btn btn-ghost btn-sm" id="refreshBtn">Refresh data</button></div>
       <div class="stat-grid manager-stats" id="statGrid"><div class="stat-card"><div class="val">-</div><div class="lbl">Total bookings</div></div><div class="stat-card"><div class="val">-</div><div class="lbl">Bookings today</div></div><div class="stat-card"><div class="val">-</div><div class="lbl">Covers today</div></div><div class="stat-card"><div class="val">-</div><div class="lbl">Confirmed bookings</div></div></div>
+      <div class="stat-grid manager-stats" id="analyticsStats"><div class="stat-card"><div class="val">-</div><div class="lbl">Covers all-time</div></div><div class="stat-card"><div class="val">-</div><div class="lbl">No-show rate</div></div><div class="stat-card"><div class="val">-</div><div class="lbl">Net revenue</div></div><div class="stat-card"><div class="val">-</div><div class="lbl">Avg rating</div></div></div>
       <div class="manager-dashboard-grid">
+        <section class="manager-panel"><div class="manager-panel-head"><div><p class="eyebrow">Restaurant intelligence</p><h2>Performance snapshot</h2></div></div><div id="intelList" class="status-summary"><p class="muted">Loading analytics...</p></div></section>
         <section class="manager-panel"><div class="manager-panel-head"><div><p class="eyebrow">Recent activity</p><h2>Latest reservations</h2></div></div><div id="recent" class="booking-timeline"><p class="muted">Loading bookings...</p></div></section>
-        <section class="manager-panel manager-action-panel"><p class="eyebrow">Admin tools</p><h2>Restaurant operations</h2><p>Use Manager View to handle bookings, guests, floor plans, promotions and restaurant settings. Admin has full access to both.</p><a class="btn btn-primary btn-block" href="/manager">Switch to Manager</a></section>
+        <section class="manager-panel"><div class="manager-panel-head"><div><p class="eyebrow">Payments</p><h2>Latest transactions</h2></div></div><div id="paymentsList" class="booking-timeline"><p class="muted">Loading payments...</p></div></section>
+        <section class="manager-panel"><div class="manager-panel-head"><div><p class="eyebrow">Reviews</p><h2>Latest feedback</h2></div></div><div id="reviewsList" class="booking-timeline"><p class="muted">Loading reviews...</p></div></section>
+        <section class="manager-panel"><div class="manager-panel-head"><div><p class="eyebrow">Guests</p><h2>Top diners</h2></div></div><div id="guestsList" class="booking-timeline"><p class="muted">Loading guests...</p></div></section>
+        <section class="manager-panel manager-action-panel"><p class="eyebrow">Admin tools</p><h2>Restaurant operations</h2><p>Handle bookings, floor plans, menu, promotions and settings from the Manager workspace — admin has full access to both.</p><a class="btn btn-primary btn-block" href="/manager">Open Manager view</a></section>
       </div>
     </main>
   </section>
@@ -67,15 +72,48 @@
 
       async function load() {
         try {
-          const s = await api('/api/admin/summary', { headers: { Authorization: 'Bearer ' + adminToken() } });
+          const headers = { Authorization: 'Bearer ' + adminToken() };
+          const [s, a, pay, rev, gsts] = await Promise.all([
+            api('/api/admin/summary', { headers }),
+            api('/api/analytics', { headers }),
+            api('/api/payments', { headers }),
+            api('/api/reviews?all=1', { headers }),
+            api('/api/guests', { headers })
+          ]);
           document.getElementById('statGrid').innerHTML = `
             <div class="stat-card"><div class="val">${s.total}</div><div class="lbl">Total bookings</div></div>
             <div class="stat-card"><div class="val">${s.today}</div><div class="lbl">Bookings today</div></div>
             <div class="stat-card"><div class="val">${s.covers_today}</div><div class="lbl">Covers today</div></div>
             <div class="stat-card"><div class="val">${s.confirmed}</div><div class="lbl">Confirmed bookings</div></div>`;
+          document.getElementById('analyticsStats').innerHTML = `
+            <div class="stat-card"><div class="val">${a.totals.covers}</div><div class="lbl">Covers all-time</div></div>
+            <div class="stat-card"><div class="val">${a.noShowRate}%</div><div class="lbl">No-show rate</div></div>
+            <div class="stat-card"><div class="val">$${Number(a.payments.net).toFixed(2)}</div><div class="lbl">Net revenue</div></div>
+            <div class="stat-card"><div class="val">${a.reviews.avg}<span style="color:#BA7517">★</span></div><div class="lbl">Avg rating · ${a.reviews.count} reviews</div></div>`;
+          document.getElementById('intelList').innerHTML = `
+            <div><b>${a.promos.uses}</b><span>Promo uses · $${Number(a.promos.discount).toFixed(2)} off</span></div>
+            <div><b>${a.points.earned}</b><span>Points earned</span></div>
+            <div><b>${a.points.redeemed}</b><span>Points redeemed</span></div>
+            <div><b>${pay.summary.count}</b><span>Transactions · $${Number(pay.summary.gross).toFixed(2)} gross</span></div>`;
           document.getElementById('recent').innerHTML = s.recent.length
             ? s.recent.map((x) => `<div class="timeline-booking"><strong>${escapeHTML(x.date)}</strong><div><b>${escapeHTML(x.name)}</b><span>${x.guests} guest${x.guests === 1 ? '' : 's'} at ${escapeHTML(x.time)}</span></div><span class="badge badge-brand">${escapeHTML(x.status)}</span></div>`).join('')
             : '<p class="muted">No reservations yet.</p>';
+          const pays = (pay.payments || []).slice(0, 5);
+          document.getElementById('paymentsList').innerHTML = pays.length
+            ? pays.map((p) => `<div class="timeline-booking"><strong>${escapeHTML(String(p.created_at).slice(0, 10))}</strong><div><b>${escapeHTML(p.name)}</b><span>${escapeHTML(p.payment_ref)}</span></div><span class="badge ${p.status === 'refunded' ? 'badge-gold' : 'badge-brand'}">${escapeHTML(p.status)} · $${Number(p.total).toFixed(2)}</span></div>`).join('')
+            : '<p class="muted">No payments yet.</p>';
+          const revs = (rev || []).slice(0, 5);
+          document.getElementById('reviewsList').innerHTML = revs.length
+            ? revs.map((r) => {
+                const overall = Math.round((r.rating_food + r.rating_service + r.rating_ambience + r.rating_value) / 4);
+                const badge = Number(r.spam) ? 'badge-gold' : (r.status === 'published' ? 'badge-brand' : '');
+                return `<div class="timeline-booking"><strong>${overall}★</strong><div><b>${escapeHTML(r.name)}</b><span>${escapeHTML(String(r.comment || '').slice(0, 60))}</span></div><span class="badge ${badge}">${Number(r.spam) ? 'SPAM' : escapeHTML(r.status)}</span></div>`;
+              }).join('')
+            : '<p class="muted">No reviews yet.</p>';
+          const topGuests = (gsts || []).sort((x, y) => y.total_bookings - x.total_bookings).slice(0, 5);
+          document.getElementById('guestsList').innerHTML = topGuests.length
+            ? topGuests.map((g) => `<div class="timeline-booking"><strong>${g.total_bookings}×</strong><div><b>${escapeHTML(g.name || 'Guest')}</b><span>${escapeHTML(g.email || g.phone || 'no contact')}</span></div><span class="badge badge-brand">${g.points} pts</span></div>`).join('')
+            : '<p class="muted">No guests yet.</p>';
         } catch (err) {
           toast(err.message, 'error');
           if (err.message === 'Unauthorized' || err.message === 'Admin access required') { localStorage.removeItem(ADMIN_KEY); localStorage.removeItem(MANAGER_KEY); loginView.style.display = 'block'; dashView.style.display = 'none'; }

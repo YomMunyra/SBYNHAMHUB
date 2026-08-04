@@ -12,7 +12,7 @@ router.get('/points/lookup', (req, res) => {
   const key = guestId(email, phone);
   const account = db.prepare('SELECT * FROM points_accounts WHERE guest_key = ?').get(key);
   if (!account) {
-    return res.json({ balance: 0, lifetime: 0, name: '', history: [], expiring_soon: 0, earliest_expiry: null });
+    return res.json({ balance: 0, lifetime: 0, name: '', history: [], expiring_soon: 0, earliest_expiry: null, expiry_months: POINTS_EXPIRY_MONTHS });
   }
   const balance = computeBalance(db, key);
   syncBalance(db, key);

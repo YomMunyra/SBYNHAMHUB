@@ -3,14 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Platform Admin — SbyNhamHub</title>
+  <title>Platform Admin - SbyNhamHub</title>
   <meta name="robots" content="noindex">
   <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
   <link rel="stylesheet" href="/assets/css/style.css">
   <link rel="stylesheet" href="/assets/css/manager.css">
 </head>
-<body data-page="/admin" class="manager-body">
-
+<body data-page="/manager" class="manager-body">
   <section id="loginView">
     <header class="nav" id="nav"></header>
     <div class="container"><div class="auth-box form-card">
@@ -30,7 +29,22 @@
       <a class="manager-brand" href="/" aria-label="SbyNhamHub home"><img src="/assets/img/logo.svg" alt=""><span>SbyNham<strong>Hub</strong></span></a>
       <p class="manager-label">Platform control</p>
       <nav class="manager-nav" aria-label="Admin navigation">
-        <button class="manager-nav-link active"><span class="manager-icon">&#9632;</span>Overview</button>
+        <button class="manager-nav-link active" data-view="platform"><span class="manager-icon">&#9672;</span>Platform overview</button>
+      </nav>
+      <p class="manager-label">Restaurant workspace</p>
+      <nav class="manager-nav" aria-label="Workspace navigation">
+        <button class="manager-nav-link" data-view="overview"><span class="manager-icon">&#9632;</span>Overview</button>
+        <button class="manager-nav-link" data-view="analytics"><span class="manager-icon">&#9650;</span>Analytics</button>
+        <button class="manager-nav-link" data-view="bookings"><span class="manager-icon">&#9783;</span>Bookings</button>
+        <button class="manager-nav-link" data-view="floor"><span class="manager-icon">&#9635;</span>Floor plan</button>
+        <button class="manager-nav-link" data-view="guests"><span class="manager-icon">&#9786;</span>Guests</button>
+        <button class="manager-nav-link" data-view="waitlist"><span class="manager-icon">&#9775;</span>Waitlist <span class="manager-nav-badge" id="waitlistBadge" style="display:none">0</span></button>
+        <button class="manager-nav-link" data-view="menu"><span class="manager-icon">&#9776;</span>Menu</button>
+        <button class="manager-nav-link" data-view="promotions"><span class="manager-icon">&#37;</span>Promotions</button>
+        <button class="manager-nav-link" data-view="embed"><span class="manager-icon">&lt;/&gt;</span>Embed &amp; share</button>
+        <button class="manager-nav-link" data-view="payments"><span class="manager-icon">&#36;</span>Payments</button>
+        <button class="manager-nav-link" data-view="reviews"><span class="manager-icon">&#9734;</span>Reviews <span class="manager-nav-badge" id="reviewBadge" style="display:none">0</span></button>
+        <button class="manager-nav-link" data-view="settings"><span class="manager-icon">&#9881;</span>Restaurant settings</button>
       </nav>
       <div class="manager-role-switch">
         <p class="manager-label">Quick switch</p>
@@ -44,101 +58,730 @@
     </aside>
 
     <main class="manager-main">
-      <header class="manager-topbar"><div><p class="eyebrow">SbyNhamHub Platform</p><h1>Admin overview</h1></div><a class="btn btn-primary btn-sm" href="/manager">Open Manager view</a></header>
+      <header class="manager-topbar"><div><p class="eyebrow">SbyNhamHub Platform</p><h1 id="viewTitle">Platform overview</h1></div><a class="btn btn-ghost btn-sm" href="/manager">Open Manager view</a><a class="btn btn-primary btn-sm" href="/book">+ New booking</a></header>
 
-      <div class="manager-date-row"><div><strong>Marketplace health</strong><span>Current activity across your restaurant workspace.</span></div><button class="btn btn-ghost btn-sm" id="refreshBtn">Refresh data</button></div>
-      <div class="stat-grid manager-stats" id="statGrid"><div class="stat-card"><div class="val">-</div><div class="lbl">Total bookings</div></div><div class="stat-card"><div class="val">-</div><div class="lbl">Bookings today</div></div><div class="stat-card"><div class="val">-</div><div class="lbl">Covers today</div></div><div class="stat-card"><div class="val">-</div><div class="lbl">Confirmed bookings</div></div></div>
-      <div class="stat-grid manager-stats" id="analyticsStats"><div class="stat-card"><div class="val">-</div><div class="lbl">Covers all-time</div></div><div class="stat-card"><div class="val">-</div><div class="lbl">No-show rate</div></div><div class="stat-card"><div class="val">-</div><div class="lbl">Net revenue</div></div><div class="stat-card"><div class="val">-</div><div class="lbl">Avg rating</div></div></div>
-      <div class="manager-dashboard-grid">
-        <section class="manager-panel"><div class="manager-panel-head"><div><p class="eyebrow">Restaurant intelligence</p><h2>Performance snapshot</h2></div></div><div id="intelList" class="status-summary"><p class="muted">Loading analytics...</p></div></section>
-        <section class="manager-panel"><div class="manager-panel-head"><div><p class="eyebrow">Recent activity</p><h2>Latest reservations</h2></div></div><div id="recent" class="booking-timeline"><p class="muted">Loading bookings...</p></div></section>
-        <section class="manager-panel"><div class="manager-panel-head"><div><p class="eyebrow">Payments</p><h2>Latest transactions</h2></div></div><div id="paymentsList" class="booking-timeline"><p class="muted">Loading payments...</p></div></section>
-        <section class="manager-panel"><div class="manager-panel-head"><div><p class="eyebrow">Reviews</p><h2>Latest feedback</h2></div></div><div id="reviewsList" class="booking-timeline"><p class="muted">Loading reviews...</p></div></section>
-        <section class="manager-panel"><div class="manager-panel-head"><div><p class="eyebrow">Guests</p><h2>Top diners</h2></div></div><div id="guestsList" class="booking-timeline"><p class="muted">Loading guests...</p></div></section>
-        <section class="manager-panel manager-action-panel"><p class="eyebrow">Admin tools</p><h2>Restaurant operations</h2><p>Handle bookings, floor plans, menu, promotions and settings from the Manager workspace — admin has full access to both.</p><a class="btn btn-primary btn-block" href="/manager">Open Manager view</a></section>
+      <div id="platformView">
+        <div class="manager-date-row"><div><strong>Marketplace health</strong><span>Current activity across your restaurant workspace.</span></div><button class="btn btn-ghost btn-sm" id="platformRefreshBtn">Refresh data</button></div>
+        <div class="stat-grid manager-stats" id="platformStats"><div class="stat-card"><div class="val">-</div><div class="lbl">Total bookings</div></div><div class="stat-card"><div class="val">-</div><div class="lbl">Bookings today</div></div><div class="stat-card"><div class="val">-</div><div class="lbl">Covers today</div></div><div class="stat-card"><div class="val">-</div><div class="lbl">Confirmed bookings</div></div></div>
+        <div class="stat-grid manager-stats" id="platformAnalytics"><div class="stat-card"><div class="val">-</div><div class="lbl">Covers all-time</div></div><div class="stat-card"><div class="val">-</div><div class="lbl">No-show rate</div></div><div class="stat-card"><div class="val">-</div><div class="lbl">Net revenue</div></div><div class="stat-card"><div class="val">-</div><div class="lbl">Avg rating</div></div></div>
+        <div class="manager-dashboard-grid">
+          <section class="manager-panel"><div class="manager-panel-head"><div><p class="eyebrow">Restaurant intelligence</p><h2>Performance snapshot</h2></div></div><div id="platformIntel" class="status-summary"><p class="muted">Loading analytics...</p></div></section>
+          <section class="manager-panel"><div class="manager-panel-head"><div><p class="eyebrow">Recent activity</p><h2>Latest reservations</h2></div></div><div id="platformRecent" class="booking-timeline"><p class="muted">Loading bookings...</p></div></section>
+          <section class="manager-panel"><div class="manager-panel-head"><div><p class="eyebrow">Payments</p><h2>Latest transactions</h2></div></div><div id="platformPayments" class="booking-timeline"><p class="muted">Loading payments...</p></div></section>
+          <section class="manager-panel"><div class="manager-panel-head"><div><p class="eyebrow">Reviews</p><h2>Latest feedback</h2></div></div><div id="platformReviews" class="booking-timeline"><p class="muted">Loading reviews...</p></div></section>
+          <section class="manager-panel"><div class="manager-panel-head"><div><p class="eyebrow">Guests</p><h2>Top diners</h2></div></div><div id="platformGuests" class="booking-timeline"><p class="muted">Loading guests...</p></div></section>
+          <section class="manager-panel manager-action-panel"><p class="eyebrow">Admin tools</p><h2>Restaurant operations</h2><p>Handle bookings, floor plans, menu, promotions and settings from this dashboard — admin has full access to the workspace.</p><button class="btn btn-primary btn-block" data-view="bookings">Manage bookings</button></section>
+        </div>
       </div>
+
+      <div id="overviewView">
+        <div class="manager-date-row"><div><strong id="todayLabel">Today</strong><span>Here is your restaurant at a glance.</span></div><button class="btn btn-ghost btn-sm" id="refreshBtn">Refresh data</button></div>
+        <div class="stat-grid manager-stats" id="statGrid"><div class="stat-card"><div class="val">-</div><div class="lbl">Total bookings</div></div><div class="stat-card"><div class="val">-</div><div class="lbl">Bookings today</div></div><div class="stat-card"><div class="val">-</div><div class="lbl">Covers today</div></div><div class="stat-card"><div class="val">-</div><div class="lbl">Confirmed bookings</div></div></div>
+        <div class="manager-dashboard-grid">
+          <section class="manager-panel"><div class="manager-panel-head"><div><p class="eyebrow">Today's service</p><h2>Upcoming bookings</h2></div><button class="text-button" data-view="bookings">View all</button></div><div id="todayBookings" class="booking-timeline"><p class="muted">Loading bookings...</p></div></section>
+          <section class="manager-panel manager-action-panel"><p class="eyebrow">Service pulse</p><h2>Keep the floor moving</h2><p>Confirm pending tables before service, then mark guests as arrived when they are seated.</p><div id="statusSummary" class="status-summary"></div><button class="btn btn-primary btn-block" data-view="bookings">Manage bookings</button></section>
+        </div>
+      </div>
+
+      <div id="analyticsView" style="display:none">
+        <div class="manager-date-row"><div><p class="eyebrow">Restaurant intelligence</p><h2>Analytics</h2><span>Last 30 days of bookings, covers, no-shows and loyalty activity.</span></div></div>
+        <div class="stat-grid manager-stats" id="analyticsStats"></div>
+        <section class="manager-panel" style="margin-bottom:16px">
+          <div class="manager-panel-head"><div><p class="eyebrow">NyamPay revenue</p><h2>Collected over the last 30 days</h2></div><div class="flex" style="gap:16px;flex-wrap:wrap"><span class="muted" style="font-size:13px">Gross <b id="payGross">$0.00</b></span><span class="muted" style="font-size:13px">Fees <b id="payFees">$0.00</b></span><span class="muted" style="font-size:13px">Tips <b id="payTips">$0.00</b></span><span class="muted" style="font-size:13px">Net <b id="payNet">$0.00</b></span></div></div>
+          <div id="payChart" class="analytics-bars" style="max-height:180px"></div>
+        </section>
+        <div class="manager-dashboard-grid" style="grid-template-columns:1fr 1fr">
+          <section class="manager-panel"><div class="manager-panel-head"><div><p class="eyebrow">Trend</p><h2>Bookings &amp; covers</h2></div></div><div id="trendChart" class="analytics-bars"></div></section>
+          <section class="manager-panel"><div class="manager-panel-head"><div><p class="eyebrow">Service times</p><h2>Bookings by hour</h2></div></div><div id="hourChart" class="analytics-bars"></div></section>
+          <section class="manager-panel"><div class="manager-panel-head"><div><p class="eyebrow">Week pattern</p><h2>Bookings by weekday</h2></div></div><div id="dowChart" class="analytics-bars"></div></section>
+          <section class="manager-panel"><div class="manager-panel-head"><div><p class="eyebrow">Occasions</p><h2>Most popular occasions</h2></div></div><div id="occasionList" class="guest-list"></div></section>
+        </div>
+      </div>
+
+      <div id="bookingsView" style="display:none">
+        <div class="manager-date-row"><div><p class="eyebrow">Reservation desk</p><h2>Bookings</h2></div><div class="flex"><input class="input" type="date" id="filterDate" style="max-width:180px"><button class="btn btn-ghost btn-sm" id="clearFilter">All dates</button><button class="btn btn-primary btn-sm" id="addBookingBtn">+ Add booking</button></div></div>
+        <div class="form-card" id="addBookingForm" style="display:none;margin-bottom:16px;border:1px dashed var(--brand)">
+          <span class="eyebrow">Manual booking</span>
+          <div class="form">
+            <div class="form-grid">
+              <div class="field"><label>Name <span class="req">*</span></label><input class="input" id="abName"></div>
+              <div class="field"><label>Phone <span class="req">*</span></label><input class="input" id="abPhone"></div>
+            </div>
+            <div class="form-grid">
+              <div class="field"><label>Email</label><input class="input" id="abEmail" type="email"></div>
+              <div class="field"><label>Source</label><select class="select" id="abSource"><option value="walk-in">Walk-in</option><option value="phone">Phone call</option><option value="online">Online</option></select></div>
+            </div>
+            <div class="form-grid">
+              <div class="field"><label>Date <span class="req">*</span></label><input class="input" id="abDate" type="date"></div>
+              <div class="field"><label>Time <span class="req">*</span></label><select class="select" id="abTime"></select></div>
+            </div>
+            <div class="form-grid">
+              <div class="field"><label>Guests <span class="req">*</span></label><input class="input" id="abGuests" type="number" min="1" max="20" value="2"></div>
+              <div class="field"><label>Occasion</label><select class="select" id="abOccasion"></select></div>
+            </div>
+            <div class="field"><label>Notes</label><textarea class="textarea" id="abNotes" rows="2"></textarea></div>
+            <div class="flex" style="gap:10px"><button class="btn btn-primary" id="abSave">Save booking</button><button class="btn btn-ghost" id="abCancel">Cancel</button></div>
+          </div>
+        </div>
+        <div class="guest-layout">
+          <section class="manager-panel manager-table-panel"><div class="table-wrap"><table class="data"><thead><tr><th>Date</th><th>Time</th><th>Guest</th><th>Contact</th><th>Party</th><th>Source</th><th>Status</th><th></th></tr></thead><tbody id="resBody"><tr><td colspan="8" style="text-align:center;color:#888780">Loading...</td></tr></tbody></table></div></section>
+          <section class="manager-panel guest-detail" id="bookingGuestPanel" style="display:none">
+            <p class="eyebrow">Guest on this booking</p>
+            <h2 id="bgName">Select a booking</h2>
+            <p id="bgContact" class="muted">Their preferences and history will appear here.</p>
+            <div id="bgHistory" class="guest-history"></div>
+            <div id="bgPoints" class="guest-points"></div>
+            <div id="bgPrefs" class="guest-history"></div>
+          </section>
+        </div>
+      </div>
+      <div id="floorView" style="display:none">
+        <div class="manager-date-row"><div><p class="eyebrow">Floor management</p><h2>Today's table plan</h2><span>Assign confirmed guests to a table before service.</span></div></div>
+        <div class="floor-layout"><section class="manager-panel"><div class="floor-legend"><span><i class="table-free"></i>Available</span><span><i class="table-booked"></i>Reserved</span><span><i class="table-arrived"></i>Seated</span></div><div class="floor-zone"><span>Window seats</span><div class="table-grid" id="tableGrid"></div></div></section><section class="manager-panel assignment-panel"><p class="eyebrow">Assign a table</p><h2 id="selectedGuest">Select a booking</h2><p id="selectedGuestInfo">Choose a reservation from today's list, then choose an available table.</p><div id="unassignedBookings" class="unassigned-list"></div></section></div>
+      </div>
+      <div id="guestsView" style="display:none"><div class="manager-date-row"><div><p class="eyebrow">Guest CRM</p><h2>Guest profiles</h2><span>Remember preferences, track visits and Nyam Points for repeat guests.</span></div><input class="input" id="guestSearch" placeholder="Search name, email or phone" style="max-width:300px"></div><div class="guest-layout"><section class="manager-panel"><div id="guestList" class="guest-list"><p class="muted">Loading guests...</p></div></section><section class="manager-panel guest-detail"><p class="eyebrow">Guest details</p><h2 id="guestName">Select a guest</h2><p id="guestContact" class="muted">Their booking history will appear here.</p><div id="guestHistory" class="guest-history"></div><div id="guestPoints" class="guest-points"></div><div class="field"><label for="guestPreferences">Service notes and preferences</label><textarea class="textarea" id="guestPreferences" placeholder="Favourite table, allergies, celebrations..." disabled></textarea></div><button class="btn btn-primary" id="saveGuest" disabled>Save preferences</button></section></div></div>
+      <div id="waitlistView" style="display:none"><div class="manager-date-row"><div><p class="eyebrow">Standby list</p><h2>Waitlist</h2><span>Guests who couldn't find a table — call them when space opens up.</span></div><div class="flex"><input class="input" type="date" id="waitlistDate" style="max-width:180px"><button class="btn btn-ghost btn-sm" id="clearWaitlist">All dates</button></div></div><section class="manager-panel manager-table-panel"><div class="table-wrap"><table class="data"><thead><tr><th>Name</th><th>Contact</th><th>Party</th><th>Preferred</th><th>Notes</th><th>Status</th><th></th></tr></thead><tbody id="waitlistBody"><tr><td colspan="7" style="text-align:center;color:#888780">Loading...</td></tr></tbody></table></div></section></div>
+      <div id="menuView" style="display:none">
+        <div class="manager-date-row"><div><p class="eyebrow">Restaurant menu</p><h2>Menu management</h2><span>Add, edit, price and de-list dishes. Changes go live instantly.</span></div><a class="btn btn-primary btn-sm" href="/menu">View public menu</a></div>
+        <section class="manager-panel" style="margin-bottom:16px">
+          <div class="manager-panel-head"><div><p class="eyebrow">Categories</p><h2>Dish categories</h2></div></div>
+          <div class="form-grid" style="grid-template-columns:1fr 200px auto">
+            <div class="field"><label>New category</label><input class="input" id="catName" placeholder="e.g. Brunch"></div>
+            <div class="field"><label>&nbsp;</label><button class="btn btn-secondary btn-block" id="addCatBtn">Add category</button></div>
+            <div class="field"><label>&nbsp;</label><div id="catList" class="category-chips"></div></div>
+          </div>
+        </section>
+        <section class="manager-panel manager-table-panel">
+          <div class="manager-panel-head"><div><p class="eyebrow">Dishes</p><h2>Menu items</h2></div><button class="btn btn-secondary btn-sm" id="newDishBtn">+ Add dish</button></div>
+          <div class="form-card" id="dishForm" style="display:none;margin:0 0 16px;border:1px dashed var(--brand)">
+            <span class="eyebrow">New dish</span>
+            <div class="form">
+              <div class="form-grid">
+                <div class="field"><label>Name <span class="req">*</span></label><input class="input" id="dName"></div>
+                <div class="field"><label>Category <span class="req">*</span></label><select class="select" id="dCategory"></select></div>
+              </div>
+              <div class="form-grid">
+                <div class="field"><label>Price ($) <span class="req">*</span></label><input class="input" id="dPrice" type="number" step="0.1" min="0"></div>
+                <div class="field"><label>Image file</label><input class="input" id="dImage" placeholder="amok.svg"></div>
+              </div>
+              <div class="field"><label>Description</label><textarea class="textarea" id="dDesc"></textarea></div>
+              <div class="form-grid">
+                <div class="field"><label>Tag</label><input class="input" id="dTag" placeholder="Chef's Pick"></div>
+                <div class="field flex"><label class="check"><input type="checkbox" id="dFeatured"> Featured</label><label class="check"><input type="checkbox" id="dAvailable" checked> Available</label></div>
+              </div>
+              <div class="flex" style="gap:10px"><button class="btn btn-primary" id="saveDishBtn">Save dish</button><button class="btn btn-ghost" id="cancelDishBtn">Cancel</button></div>
+            </div>
+          </div>
+          <div class="table-wrap"><table class="data"><thead><tr><th>Dish</th><th>Category</th><th>Price</th><th>Tag</th><th>Flags</th><th></th></tr></thead><tbody id="managerMenu"><tr><td colspan="6" style="text-align:center;color:#888780">Loading menu...</td></tr></tbody></table></div>
+        </section>
+      </div>
+      <div id="promotionsView" style="display:none">
+        <div class="manager-date-row"><div><p class="eyebrow">Offers &amp; discounts</p><h2>Promotions</h2><span>Create seasonal offers and promo codes. Guests see active offers and can redeem codes at booking.</span></div><button class="btn btn-secondary btn-sm" id="newPromoBtn">+ New promotion</button></div>
+        <section class="manager-panel manager-table-panel">
+          <div class="form-card" id="promoForm" style="display:none;margin:0 0 16px;border:1px dashed var(--brand)">
+            <span class="eyebrow" id="promoFormLabel">New promotion</span>
+            <div class="form">
+              <div class="form-grid">
+                <div class="field"><label>Name <span class="req">*</span></label><input class="input" id="pName" placeholder="e.g. Lunch Special"></div>
+                <div class="field"><label>Promo code</label><input class="input" id="pCode" placeholder="LUNCH20" style="text-transform:uppercase"></div>
+              </div>
+              <div class="form-grid">
+                <div class="field"><label>Discount type</label><select class="select" id="pType"><option value="percent">Percent off</option><option value="flat">Fixed amount off</option></select></div>
+                <div class="field"><label>Value <span class="req">*</span></label><input class="input" id="pValue" type="number" step="1" min="1" placeholder="20"></div>
+              </div>
+              <div class="form-grid">
+                <div class="field"><label>Start date</label><input class="input" id="pStartDate" type="date"></div>
+                <div class="field"><label>End date</label><input class="input" id="pEndDate" type="date"></div>
+              </div>
+              <div class="field"><label>Days of the week <span class="muted">(leave all off for every day)</span></label><div class="form-grid" id="pDays" style="grid-template-columns:repeat(7,1fr)"><label class="check"><input type="checkbox" data-day="0"> Sun</label><label class="check"><input type="checkbox" data-day="1"> Mon</label><label class="check"><input type="checkbox" data-day="2"> Tue</label><label class="check"><input type="checkbox" data-day="3"> Wed</label><label class="check"><input type="checkbox" data-day="4"> Thu</label><label class="check"><input type="checkbox" data-day="5"> Fri</label><label class="check"><input type="checkbox" data-day="6"> Sat</label></div></div>
+              <div class="form-grid">
+                <div class="field"><label>Window start time</label><input class="input" id="pStartTime" type="time"></div>
+                <div class="field"><label>Window end time</label><input class="input" id="pEndTime" type="time"></div>
+              </div>
+              <div class="form-grid">
+                <div class="field"><label>Minimum covers</label><input class="input" id="pMinCovers" type="number" min="0" placeholder="0 = any party"></div>
+                <div class="field"><label>Usage limit</label><input class="input" id="pMaxUses" type="number" min="0" placeholder="0 = unlimited"></div>
+              </div>
+              <div class="form-grid">
+                <div class="field flex"><label class="check"><input type="checkbox" id="pFeatured" checked> Feature on home page</label><label class="check"><input type="checkbox" id="pActive" checked> Active</label><label class="check"><input type="checkbox" id="pAutoEnd"> Auto-end when at capacity</label></div>
+              </div>
+              <div class="flex" style="gap:10px"><button class="btn btn-primary" id="savePromoBtn">Save promotion</button><button class="btn btn-ghost" id="cancelPromoBtn">Cancel</button></div>
+            </div>
+          </div>
+          <div class="table-wrap"><table class="data"><thead><tr><th>Promotion</th><th>Code</th><th>Discount</th><th>Window</th><th>Limits</th><th>Usage</th><th>Flags</th><th></th></tr></thead><tbody id="promoBody"><tr><td colspan="8" style="text-align:center;color:#888780">Loading promotions...</td></tr></tbody></table></div>
+        </section>
+      </div>
+      <div id="embedView" style="display:none">
+        <div class="manager-date-row"><div><p class="eyebrow">Booking widget</p><h2>Embed &amp; share</h2><span>Drop the SbyNhamHub booking widget on any website with one line of code. Customise it, watch it live, then copy the snippet.</span></div></div>
+        <div class="embed-layout">
+          <section class="manager-panel">
+            <div class="manager-panel-head"><div><p class="eyebrow">Widget settings</p><h2>Customise</h2></div></div>
+            <div class="form">
+              <div class="form-grid">
+                <div class="field"><label>Heading</label><input class="input" id="embedTitle" value="Book a table at SbyNhamHub"></div>
+                <div class="field"><label>Brand colour</label><input class="input" id="embedBrand" type="color" value="#FF611F" style="height:44px;padding:4px"></div>
+              </div>
+              <div class="field flex">
+                <label class="check"><input type="checkbox" id="embedPromo" checked> Show promo-code field</label>
+                <label class="check"><input type="checkbox" id="embedPoints"> Show Nyam Points redeemer</label>
+              </div>
+              <p class="muted" style="margin:0;font-size:13px">The widget posts bookings straight to your reservation system, applies valid promo codes, and even lets guests redeem Nyam Points. Your theme colours are used automatically.</p>
+            </div>
+            <div class="manager-panel-head" style="margin-top:20px"><div><p class="eyebrow">Copy &amp; paste</p><h2>Embed code</h2></div><button class="btn btn-secondary btn-sm" id="copyEmbedBtn">Copy code</button></div>
+            <pre class="embed-code" id="embedCode"></pre>
+          </section>
+          <section class="manager-panel embed-preview-panel">
+            <div class="manager-panel-head"><div><p class="eyebrow">Live preview</p><h2>How it looks</h2></div></div>
+            <div id="embedPreview" style="background:#f3ede4;border-radius:14px;padding:26px 18px"></div>
+          </section>
+        </div>
+      </div>
+      <div id="paymentsView" style="display:none">
+        <div class="manager-date-row"><div><p class="eyebrow">NyamPay revenue</p><h2>Payments</h2><span>Integrated checkout at 0.95% + $0.50 per transaction. Tips go 100% to your servers.</span></div></div>
+        <div class="stat-grid manager-stats" id="paymentStats"></div>
+        <section class="manager-panel manager-table-panel">
+          <div class="table-wrap"><table class="data"><thead><tr><th>Receipt</th><th>Guest</th><th>Booking</th><th>Bill</th><th>Tip</th><th>Fee</th><th>Total</th><th>Split</th><th>Card</th><th>Date</th><th>Status</th><th></th></tr></thead><tbody id="paymentBody"><tr><td colspan="12" style="text-align:center;color:#888780">Loading payments...</td></tr></tbody></table></div>
+        </section>
+      </div>
+      <div id="reviewsView" style="display:none"><div class="manager-date-row"><div><p class="eyebrow">Guest feedback</p><h2>Reviews & moderation</h2><span>Check what guests are saying, reply on behalf of the restaurant, and publish what goes live.</span></div><a class="btn btn-primary btn-sm" href="/reviews">View public page</a></div><section class="manager-panel manager-table-panel"><div class="table-wrap"><table class="data"><thead><tr><th>Guest</th><th>Booking</th><th>Rating</th><th>Review</th><th>Status</th><th>Reply</th><th></th></tr></thead><tbody id="reviewBody"><tr><td colspan="7" style="text-align:center;color:#888780">Loading...</td></tr></tbody></table></div></section></div>
+      <div id="settingsView" style="display:none"><div class="manager-date-row"><div><p class="eyebrow">Restaurant setup</p><h2>Restaurant profile</h2><span>Saved settings appear on the public site.</span></div></div><section class="manager-panel"><div class="form"><div class="form-grid"><div class="field"><label>Restaurant name</label><input class="input" id="setName"></div><div class="field"><label>Phone</label><input class="input" id="setPhone"></div></div><div class="field"><label>Address</label><input class="input" id="setAddress"></div><div class="field"><label>Opening hours <span class="muted">(one per line: Label | 11:00 - 22:00)</span></label><textarea class="textarea" id="setHours" rows="5"></textarea></div><div class="form-grid"><div class="field"><label>NyamPay fee rate (%)</label><input class="input" id="setFeeRate" type="number" step="0.01" min="0" max="10"></div><div class="field"><label>NyamPay flat fee ($)</label><input class="input" id="setFeeFlat" type="number" step="0.05" min="0"></div></div><button class="btn btn-primary" id="saveSettings">Save settings</button></div></section></div>
     </main>
   </section>
 
   <script src="/assets/js/main.js"></script>
+  <script src="/assets/js/manager.js"></script>
+  <script src="/widget.js" defer></script>
   <script>
     (function () {
+      const TOKEN_KEY = 'sbynham_token';
       const ADMIN_KEY = 'sbynham_admin_token';
-      const MANAGER_KEY = 'sbynham_token';
       const loginView = document.getElementById('loginView'), dashView = document.getElementById('dashView');
-      const adminToken = () => localStorage.getItem(ADMIN_KEY) || '';
+      const resBody = document.getElementById('resBody'), statGrid = document.getElementById('statGrid'), filterDate = document.getElementById('filterDate');
+      const token = () => localStorage.getItem(ADMIN_KEY) || localStorage.getItem(TOKEN_KEY) || '';
+      const today = new Date().toISOString().slice(0, 10);
+      document.getElementById('todayLabel').textContent = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date(today + 'T12:00:00'));
 
-      function showDash() { loginView.style.display = 'none'; dashView.style.display = 'flex'; load(); }
+      function statusBadge(status) { const map = { pending:'badge-gold', confirmed:'badge-brand', arrived:'badge-green', cancelled:'badge-neutral', 'no-show':'badge-red' }; return `<span class="badge ${map[status] || 'badge-neutral'}">${escapeHTML(status)}</span>`; }
+      let floorBookings = [], selectedBookingId = '', guestItems = [], selectedGuestId = '', reviewItems = [], menuItems = [], categories = [], waitlistItems = [], analyticsData = null, promoItems = [], editingPromoId = '', paymentItems = [], renderedReservations = [], platformSummary = null, statsFallback = null;
+      function showView(view) { ['platform','overview','analytics','bookings','floor','guests','waitlist','menu','promotions','embed','payments','reviews','settings'].forEach((name) => document.getElementById(name + 'View').style.display = view === name ? 'block' : 'none'); document.getElementById('viewTitle').textContent = view === 'platform' ? 'Platform overview' : view === 'settings' ? 'Restaurant settings' : view === 'bookings' ? 'Reservation desk' : view === 'floor' ? 'Floor plan' : view === 'guests' ? 'Guest profiles' : view === 'waitlist' ? 'Waitlist' : view === 'menu' ? 'Menu management' : view === 'promotions' ? 'Promotions' : view === 'embed' ? 'Embed & share' : view === 'payments' ? 'Payments' : view === 'reviews' ? 'Reviews & moderation' : view === 'analytics' ? 'Analytics' : 'Overview'; document.querySelectorAll('[data-view]').forEach((el) => el.classList.toggle('active', el.dataset.view === view && el.classList.contains('manager-nav-link'))); if (view === 'embed') renderEmbed(); }
+      function renderReviews() {
+        const rows = document.getElementById('reviewBody');
+        if (!reviewItems.length) { rows.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888780">No reviews yet. Guest reviews will appear here once submitted.</td></tr>'; return; }
+        rows.innerHTML = reviewItems.map((r) => {
+          const overall = Math.round((r.rating_food + r.rating_service + r.rating_ambience + r.rating_value) / 4);
+          const starMap = { pending: 'badge-gold', published: 'badge-green', hidden: 'badge-neutral' };
+          return `<tr data-id="${r.id}"><td><strong>${escapeHTML(r.name)}</strong><div class="muted" style="font-size:12px">${escapeHTML(r.email || r.phone || '')}</div></td><td>${r.reservation_id ? '#' + escapeHTML(r.reservation_id) : 'Featured'}</td><td>${'★'.repeat(overall)}${'☆'.repeat(5 - overall)}<div class="muted" style="font-size:12px">Food ${r.rating_food} · Service ${r.rating_service} · Ambience ${r.rating_ambience} · Value ${r.rating_value}</div></td><td style="max-width:260px">${escapeHTML(r.comment)}<div class="muted" style="font-size:11px;margin-top:4px">${new Date(r.created_at).toLocaleString()}</div>${r.spam ? `<span class="badge badge-red" style="margin-top:6px">SPAM · ${escapeHTML(r.spam_reason || 'flagged')}</span>` : ''}</td><td><select class="status-select review-status" data-id="${r.id}">${['pending','published','hidden'].map((s) => `<option value="${s}" ${s === r.status ? 'selected' : ''}>${s}</option>`).join('')}</select></td><td><textarea class="textarea review-reply" data-id="${r.id}" rows="2" style="min-height:50px" placeholder="Reply as SbyNhamHub…">${escapeHTML(r.reply || '')}</textarea></td><td><button class="btn btn-sm btn-ghost review-spam" data-id="${r.id}" data-spam="${r.spam ? 0 : 1}">${r.spam ? 'Not spam' : 'Flag spam'}</button><button class="btn btn-sm btn-ghost save-reply" data-id="${r.id}">Save</button></td></tr>`;
+        }).join('');
+      }
+      function renderGuests() {
+        const q = document.getElementById('guestSearch').value.toLowerCase();
+        const items = guestItems.filter((g) => `${g.name} ${g.email} ${g.phone}`.toLowerCase().includes(q));
+        document.getElementById('guestList').innerHTML = items.length ? items.map((g) => `<button class="guest-row ${g.id === selectedGuestId ? 'selected' : ''}" data-guest="${g.id}"><b>${escapeHTML(g.name)}</b><span>${g.total_bookings} booking${g.total_bookings === 1 ? '' : 's'}${g.points ? ' - ' + g.points + ' pts' : ''}${g.preferences ? ' - notes saved' : ''}</span></button>`).join('') : '<p class="muted">No guests found.</p>';
+        const g = guestItems.find((item) => item.id === selectedGuestId);
+        document.getElementById('guestName').textContent = g ? g.name : 'Select a guest';
+        document.getElementById('guestContact').textContent = g ? `${g.email || 'No email'} - ${g.phone}` : 'Their booking history will appear here.';
+        document.getElementById('guestHistory').innerHTML = g ? `<h3>Booking history</h3>${g.visits.slice().reverse().map((r) => `<div><b>${escapeHTML(r.date)} at ${escapeHTML(r.time)}</b><span>${r.guests} guests - ${escapeHTML(r.status)}${r.points_redeemed ? ' - redeemed ' + r.points_redeemed + ' pts' : ''}</span></div>`).join('')}` : '';
+        document.getElementById('guestPoints').innerHTML = g ? `<h3>Nyam Points</h3><div class="points-balance"><b>${g.points || 0}</b> pts available</div><div id="guestPointsHistory"></div>` : '';
+        if (g) {
+          api(`/api/points/lookup?email=${encodeURIComponent(g.email || '')}&phone=${encodeURIComponent(g.phone || '')}`)
+            .then((p) => {
+              if (selectedGuestId !== g.id) return;
+              const history = (p.history || []).map((h) => `<div><b>${h.delta > 0 ? '+' : ''}${h.delta} pts</b><span>${escapeHTML(h.note)}<i>${new Date(h.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</i></span></div>`).join('');
+              document.getElementById('guestPointsHistory').innerHTML = history || '<p class="muted">No points activity yet.</p>';
+            })
+            .catch(() => {});
+        }
+        const notes = document.getElementById('guestPreferences');
+        notes.disabled = !g; notes.value = g?.preferences || '';
+        document.getElementById('saveGuest').disabled = !g;
+      }
+      function showBookingGuest(reservation) {
+        const panel = document.getElementById('bookingGuestPanel');
+        if (!reservation) { panel.style.display = 'none'; return; }
+        const g = guestItems.find((item) => (item.email || '').toLowerCase() === (reservation.email || '').toLowerCase() && (item.phone || '') === (reservation.phone || ''));
+        const name = document.getElementById('bgName');
+        const contact = document.getElementById('bgContact');
+        const history = document.getElementById('bgHistory');
+        const points = document.getElementById('bgPoints');
+        const prefs = document.getElementById('bgPrefs');
+        name.textContent = g ? g.name : reservation.name;
+        contact.textContent = (g ? `${g.email || 'No email'} - ${g.phone}` : `${reservation.email || 'No email'} - ${reservation.phone}`) + ` · ${reservation.guests} guests at ${reservation.time}`;
+        history.innerHTML = g && g.visits.length ? `<h3>Booking history</h3>${g.visits.slice().reverse().map((r) => `<div><b>${escapeHTML(r.date)} at ${escapeHTML(r.time)}</b><span>${r.guests} guests - ${escapeHTML(r.status)}${r.points_redeemed ? ' - redeemed ' + r.points_redeemed + ' pts' : ''}</span></div>`).join('')}` : '<p class="muted">No previous visits.</p>';
+        points.innerHTML = g ? `<h3>Nyam Points</h3><div class="points-balance"><b>${g.points || 0}</b> pts available</div>` : '';
+        prefs.innerHTML = g && g.preferences ? `<h3>Service notes &amp; preferences</h3><div>${escapeHTML(g.preferences)}</div>` : '<p class="muted">No saved preferences for this guest.</p>';
+        panel.style.display = 'block';
+      }
+      function tableOf(r) { return r.table || r.table_name || ''; }
+      function renderFloor() { const active = floorBookings.filter((r) => !['cancelled','no-show'].includes(r.status)); const selected = active.find((r) => r.id === selectedBookingId); document.getElementById('selectedGuest').textContent = selected ? selected.name : 'Select a booking'; document.getElementById('selectedGuestInfo').textContent = selected ? `${selected.guests} guests at ${selected.time}. Pick an available table.` : 'Choose a reservation from today\'s list, then choose an available table.'; document.getElementById('tableGrid').innerHTML = Array.from({length:12}, (_, i) => { const name = `T${i + 1}`, guest = active.find((r) => tableOf(r) === name), state = guest ? (guest.status === 'arrived' ? 'arrived' : 'booked') : 'free'; return `<button class="floor-table ${state}" data-table="${name}" ${!selected || guest ? 'disabled' : ''}><b>${name}</b><span>${guest ? escapeHTML(guest.name) : 'Available'}</span></button>`; }).join(''); document.getElementById('unassignedBookings').innerHTML = active.filter((r) => !tableOf(r)).length ? active.filter((r) => !tableOf(r)).map((r) => `<button class="unassigned-booking ${r.id === selectedBookingId ? 'selected' : ''}" data-booking="${r.id}"><b>${escapeHTML(r.time)} - ${escapeHTML(r.name)}</b><span>${r.guests} guests</span></button>`).join('') : '<p class="muted">All active bookings have a table.</p>'; }
+      function showDash() { loginView.style.display = 'none'; dashView.style.display = 'flex'; showView('platform'); load(); }
+
+      function renderTable(items) {
+        renderedReservations = items;
+        if (!items.length) { resBody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888780">No reservations found for this date.</td></tr>'; return; }
+        resBody.innerHTML = items.map((r) => `<tr data-id="${r.id}"><td>${escapeHTML(r.date)}</td><td>${escapeHTML(r.time)}</td><td><strong>${escapeHTML(r.name)}</strong>${r.email ? `<div class="muted" style="font-size:12px">${escapeHTML(r.email)}</div>` : ''}</td><td>${escapeHTML(r.phone)}</td><td>${r.guests}</td><td>${r.source === 'walk-in' ? '<span class="badge badge-blue">Walk-in</span>' : r.source === 'phone' ? '<span class="badge badge-gold">Phone</span>' : '<span class="badge badge-neutral">Online</span>'}</td><td><select class="status-select" data-id="${r.id}">${['pending','confirmed','arrived','cancelled','no-show'].map((s) => `<option value="${s}" ${s === r.status ? 'selected' : ''}>${s}</option>`).join('')}</select></td><td><button class="btn btn-sm btn-ghost guest" data-id="${r.id}" title="Guest profile">Guest</button><button class="btn btn-sm btn-ghost del" data-id="${r.id}">Delete</button></td></tr>`).join('');
+      }
+      const BOOKING_SLOTS = ['11:00','11:30','12:00','12:30','13:00','17:30','18:00','18:30','19:00','19:30','20:00','20:30','21:00'];
+      function initAddBookingForm() {
+        document.getElementById('abTime').innerHTML = BOOKING_SLOTS.map((t) => `<option value="${t}">${t}</option>`).join('');
+        document.getElementById('abOccasion').innerHTML = ['', 'Birthday', 'Anniversary', 'Date Night', 'Business', 'Family Gathering', 'Other'].map((o) => `<option value="${o}">${o || 'No occasion'}</option>`).join('');
+        const d = new Date(); d.setMinutes(d.getMinutes() + 60);
+        document.getElementById('abDate').value = d.toISOString().slice(0, 10);
+        const hh = String(d.getHours()).padStart(2, '0'), mm = String(d.getMinutes()).padStart(2, '0');
+        document.getElementById('abTime').value = `${hh}:${mm}`;
+      }
+      function resetAddBookingForm() {
+        document.getElementById('addBookingForm').style.display = 'none';
+        document.getElementById('addBookingBtn').textContent = '+ Add booking';
+      }
+      async function saveAddBooking() {
+        const payload = {
+          name: document.getElementById('abName').value.trim(),
+          phone: document.getElementById('abPhone').value.trim(),
+          email: document.getElementById('abEmail').value.trim(),
+          guests: Number(document.getElementById('abGuests').value),
+          date: document.getElementById('abDate').value,
+          time: document.getElementById('abTime').value,
+          occasion: document.getElementById('abOccasion').value,
+          notes: document.getElementById('abNotes').value.trim(),
+          source: document.getElementById('abSource').value
+        };
+        if (!payload.name || !payload.phone) { toast('Name and phone are required.', 'error'); return; }
+        try {
+          const res = await api('/api/reservations', { method: 'POST', body: JSON.stringify(payload) });
+          toast(`Booking #${res.reservation.id} created (${payload.source})`);
+          resetAddBookingForm();
+          ['abName','abPhone','abEmail','abNotes'].forEach((id) => document.getElementById(id).value = '');
+          document.getElementById('abGuests').value = 2;
+          load();
+        } catch (err) { toast(err.message, 'error'); }
+      }
 
       async function load() {
         try {
-          const headers = { Authorization: 'Bearer ' + adminToken() };
-          const [s, a, pay, rev, gsts] = await Promise.all([
-            api('/api/admin/summary', { headers }),
-            api('/api/analytics', { headers }),
-            api('/api/payments', { headers }),
-            api('/api/reviews?all=1', { headers }),
-            api('/api/guests', { headers })
+          const headers = { Authorization: 'Bearer ' + token() };
+          const [stats, todayItems, tableItems] = await Promise.all([
+            api('/api/stats', { headers }), api('/api/reservations?date=' + today, { headers }), api('/api/reservations?date=' + (filterDate.value || ''), { headers })
           ]);
-          document.getElementById('statGrid').innerHTML = `
-            <div class="stat-card"><div class="val">${s.total}</div><div class="lbl">Total bookings</div></div>
-            <div class="stat-card"><div class="val">${s.today}</div><div class="lbl">Bookings today</div></div>
-            <div class="stat-card"><div class="val">${s.covers_today}</div><div class="lbl">Covers today</div></div>
-            <div class="stat-card"><div class="val">${s.confirmed}</div><div class="lbl">Confirmed bookings</div></div>`;
-          document.getElementById('analyticsStats').innerHTML = `
-            <div class="stat-card"><div class="val">${a.totals.covers}</div><div class="lbl">Covers all-time</div></div>
-            <div class="stat-card"><div class="val">${a.noShowRate}%</div><div class="lbl">No-show rate</div></div>
-            <div class="stat-card"><div class="val">$${Number(a.payments.net).toFixed(2)}</div><div class="lbl">Net revenue</div></div>
-            <div class="stat-card"><div class="val">${a.reviews.avg}<span style="color:#BA7517">★</span></div><div class="lbl">Avg rating · ${a.reviews.count} reviews</div></div>`;
-          document.getElementById('intelList').innerHTML = `
-            <div><b>${a.promos.uses}</b><span>Promo uses · $${Number(a.promos.discount).toFixed(2)} off</span></div>
-            <div><b>${a.points.earned}</b><span>Points earned</span></div>
-            <div><b>${a.points.redeemed}</b><span>Points redeemed</span></div>
-            <div><b>${pay.summary.count}</b><span>Transactions · $${Number(pay.summary.gross).toFixed(2)} gross</span></div>`;
-          document.getElementById('recent').innerHTML = s.recent.length
-            ? s.recent.map((x) => `<div class="timeline-booking"><strong>${escapeHTML(x.date)}</strong><div><b>${escapeHTML(x.name)}</b><span>${x.guests} guest${x.guests === 1 ? '' : 's'} at ${escapeHTML(x.time)}</span></div><span class="badge badge-brand">${escapeHTML(x.status)}</span></div>`).join('')
-            : '<p class="muted">No reservations yet.</p>';
-          const pays = (pay.payments || []).slice(0, 5);
-          document.getElementById('paymentsList').innerHTML = pays.length
-            ? pays.map((p) => `<div class="timeline-booking"><strong>${escapeHTML(String(p.created_at).slice(0, 10))}</strong><div><b>${escapeHTML(p.name)}</b><span>${escapeHTML(p.payment_ref)}</span></div><span class="badge ${p.status === 'refunded' ? 'badge-gold' : 'badge-brand'}">${escapeHTML(p.status)} · $${Number(p.total).toFixed(2)}</span></div>`).join('')
-            : '<p class="muted">No payments yet.</p>';
-          const revs = (rev || []).slice(0, 5);
-          document.getElementById('reviewsList').innerHTML = revs.length
-            ? revs.map((r) => {
-                const overall = Math.round((r.rating_food + r.rating_service + r.rating_ambience + r.rating_value) / 4);
-                const badge = Number(r.spam) ? 'badge-gold' : (r.status === 'published' ? 'badge-brand' : '');
-                return `<div class="timeline-booking"><strong>${overall}★</strong><div><b>${escapeHTML(r.name)}</b><span>${escapeHTML(String(r.comment || '').slice(0, 60))}</span></div><span class="badge ${badge}">${Number(r.spam) ? 'SPAM' : escapeHTML(r.status)}</span></div>`;
-              }).join('')
-            : '<p class="muted">No reviews yet.</p>';
-          const topGuests = (gsts || []).sort((x, y) => y.total_bookings - x.total_bookings).slice(0, 5);
-          document.getElementById('guestsList').innerHTML = topGuests.length
-            ? topGuests.map((g) => `<div class="timeline-booking"><strong>${g.total_bookings}×</strong><div><b>${escapeHTML(g.name || 'Guest')}</b><span>${escapeHTML(g.email || g.phone || 'no contact')}</span></div><span class="badge badge-brand">${g.points} pts</span></div>`).join('')
-            : '<p class="muted">No guests yet.</p>';
-        } catch (err) {
-          toast(err.message, 'error');
-          if (err.message === 'Unauthorized' || err.message === 'Admin access required') { localStorage.removeItem(ADMIN_KEY); localStorage.removeItem(MANAGER_KEY); loginView.style.display = 'block'; dashView.style.display = 'none'; }
+          statsFallback = stats;
+          statGrid.innerHTML = `<div class="stat-card"><div class="val">${stats.total}</div><div class="lbl">Total bookings</div></div><div class="stat-card"><div class="val">${stats.today}</div><div class="lbl">Bookings today</div></div><div class="stat-card"><div class="val">${stats.covers_today}</div><div class="lbl">Covers today</div></div><div class="stat-card"><div class="val">${stats.confirmed}</div><div class="lbl">Confirmed bookings</div></div>`;
+          const active = todayItems.filter((r) => !['cancelled','no-show'].includes(r.status));
+          floorBookings = todayItems; renderFloor();
+          guestItems = await api('/api/guests', { headers }); renderGuests();
+          menuItems = await api('/api/menu'); categories = await api('/api/categories'); renderMenu(); renderCategories();
+          waitlistItems = await api('/api/waitlist', { headers }); renderWaitlist();
+          analyticsData = await api('/api/analytics', { headers }); renderAnalytics();
+          paymentItems = await api('/api/payments', { headers }); renderPayments();
+          await loadSettings();
+          reviewItems = await api('/api/reviews?all=1', { headers }); renderReviews();
+          promoItems = await api('/api/promos?all=1', { headers }); renderPromos();          const pendingCount = reviewItems.filter((r) => r.status === 'pending').length;
+          const badge = document.getElementById('reviewBadge');
+          if (pendingCount) { badge.textContent = pendingCount; badge.style.display = 'inline-flex'; } else { badge.style.display = 'none'; }
+          document.getElementById('todayBookings').innerHTML = active.length ? active.map((r) => `<div class="timeline-booking"><strong>${escapeHTML(r.time)}</strong><div><b>${escapeHTML(r.name)}</b><span>${r.guests} guest${r.guests === 1 ? '' : 's'}${r.occasion ? ' - ' + escapeHTML(r.occasion) : ''}</span></div>${statusBadge(r.status)}</div>`).join('') : '<div class="empty-service"><strong>No bookings yet</strong><span>New reservations will appear here.</span></div>';
+          const pending = todayItems.filter((r) => r.status === 'pending').length, confirmed = todayItems.filter((r) => r.status === 'confirmed').length, arrived = todayItems.filter((r) => r.status === 'arrived').length;
+          document.getElementById('statusSummary').innerHTML = `<div><b>${pending}</b><span>Pending</span></div><div><b>${confirmed}</b><span>Confirmed</span></div><div><b>${arrived}</b><span>Arrived</span></div>`;
+          renderTable(tableItems);
+          try { platformSummary = await api('/api/admin/summary', { headers }); } catch (e) { platformSummary = null; }
+          renderPlatform();
+        } catch (err) { if (err.message === 'Unauthorized') { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem('sbynham_admin_token'); loginView.style.display = 'block'; dashView.style.display = 'none'; } toast(err.message, 'error'); }
+      }
+      async function lightRefresh() {
+        try {
+          const headers = { Authorization: 'Bearer ' + token() };
+          const [stats, todayItems, tableItems] = await Promise.all([
+            api('/api/stats', { headers }), api('/api/reservations?date=' + today, { headers }), api('/api/reservations?date=' + (filterDate.value || ''), { headers })
+          ]);
+          statsFallback = stats;
+          statGrid.innerHTML = `<div class="stat-card"><div class="val">${stats.total}</div><div class="lbl">Total bookings</div></div><div class="stat-card"><div class="val">${stats.today}</div><div class="lbl">Bookings today</div></div><div class="stat-card"><div class="val">${stats.covers_today}</div><div class="lbl">Covers today</div></div><div class="stat-card"><div class="val">${stats.confirmed}</div><div class="lbl">Confirmed bookings</div></div>`;
+          floorBookings = todayItems; renderFloor();
+          const active = todayItems.filter((r) => !['cancelled','no-show'].includes(r.status));
+          document.getElementById('todayBookings').innerHTML = active.length ? active.map((r) => `<div class="timeline-booking"><strong>${escapeHTML(r.time)}</strong><div><b>${escapeHTML(r.name)}</b><span>${r.guests} guest${r.guests === 1 ? '' : 's'}${r.occasion ? ' - ' + escapeHTML(r.occasion) : ''}</span></div>${statusBadge(r.status)}</div>`).join('') : '<div class="empty-service"><strong>No bookings yet</strong><span>New reservations will appear here.</span></div>';
+          renderTable(tableItems);
+          try { platformSummary = await api('/api/admin/summary', { headers }); } catch (e) { platformSummary = null; }
+          renderPlatform();
+        } catch (err) { if (err.message === 'Unauthorized') { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem('sbynham_admin_token'); loginView.style.display = 'block'; dashView.style.display = 'none'; } }
+      }
+      let editingDishId = '';
+      function renderPlatform() {
+        const s = platformSummary || statsFallback || {};
+        const a = analyticsData || {};
+        const t = a.totals || {};
+        const payments = a.payments || {};
+        const rv = a.reviews || {};
+        const pr = a.promos || {};
+        const pt = a.points || {};
+        const payData = (paymentItems && paymentItems.summary) || {};
+        document.getElementById('platformStats').innerHTML = `
+          <div class="stat-card"><div class="val">${s.total ?? '-'}</div><div class="lbl">Total bookings</div></div>
+          <div class="stat-card"><div class="val">${s.today ?? '-'}</div><div class="lbl">Bookings today</div></div>
+          <div class="stat-card"><div class="val">${s.covers_today ?? '-'}</div><div class="lbl">Covers today</div></div>
+          <div class="stat-card"><div class="val">${s.confirmed ?? '-'}</div><div class="lbl">Confirmed bookings</div></div>`;
+        document.getElementById('platformAnalytics').innerHTML = `
+          <div class="stat-card"><div class="val">${t.covers ?? '-'}</div><div class="lbl">Covers all-time</div></div>
+          <div class="stat-card"><div class="val">${a.noShowRate ?? '-'}%</div><div class="lbl">No-show rate</div></div>
+          <div class="stat-card"><div class="val">$${Number(payments.net || 0).toFixed(2)}</div><div class="lbl">Net revenue</div></div>
+          <div class="stat-card"><div class="val">${rv.avg ?? '-'}<span style="color:#BA7517">★</span></div><div class="lbl">Avg rating · ${rv.count || 0} reviews</div></div>`;
+        document.getElementById('platformIntel').innerHTML = `
+          <div><b>${pr.uses ?? 0}</b><span>Promo uses · $${Number(pr.discount || 0).toFixed(2)} off</span></div>
+          <div><b>${pt.earned ?? 0}</b><span>Points earned</span></div>
+          <div><b>${pt.redeemed ?? 0}</b><span>Points redeemed</span></div>
+          <div><b>${payData.count ?? 0}</b><span>Transactions · $${Number(payData.gross || 0).toFixed(2)} gross</span></div>`;
+        const recent = (s && s.recent) || [];
+        document.getElementById('platformRecent').innerHTML = recent.length
+          ? recent.map((x) => `<div class="timeline-booking"><strong>${escapeHTML(x.date)}</strong><div><b>${escapeHTML(x.name)}</b><span>${x.guests} guest${x.guests === 1 ? '' : 's'} at ${escapeHTML(x.time)}</span></div><span class="badge badge-brand">${escapeHTML(x.status)}</span></div>`).join('')
+          : '<p class="muted">No reservations yet.</p>';
+        const pays = ((paymentItems && paymentItems.payments) || []).slice(0, 5);
+        document.getElementById('platformPayments').innerHTML = pays.length
+          ? pays.map((p) => `<div class="timeline-booking"><strong>${escapeHTML(String(p.created_at).slice(0, 10))}</strong><div><b>${escapeHTML(p.name)}</b><span>${escapeHTML(p.payment_ref)}</span></div><span class="badge ${p.status === 'refunded' ? 'badge-gold' : 'badge-brand'}">${escapeHTML(p.status)} · $${Number(p.total).toFixed(2)}</span></div>`).join('')
+          : '<p class="muted">No payments yet.</p>';
+        const revs = (reviewItems || []).slice(0, 5);
+        document.getElementById('platformReviews').innerHTML = revs.length
+          ? revs.map((r) => {
+              const overall = Math.round((r.rating_food + r.rating_service + r.rating_ambience + r.rating_value) / 4);
+              const badge = Number(r.spam) ? 'badge-gold' : (r.status === 'published' ? 'badge-brand' : '');
+              return `<div class="timeline-booking"><strong>${overall}★</strong><div><b>${escapeHTML(r.name)}</b><span>${escapeHTML(String(r.comment || '').slice(0, 60))}</span></div><span class="badge ${badge}">${Number(r.spam) ? 'SPAM' : escapeHTML(r.status)}</span></div>`;
+            }).join('')
+          : '<p class="muted">No reviews yet.</p>';
+        const topGuests = (guestItems || []).slice().sort((x, y) => y.total_bookings - x.total_bookings).slice(0, 5);
+        document.getElementById('platformGuests').innerHTML = topGuests.length
+          ? topGuests.map((g) => `<div class="timeline-booking"><strong>${g.total_bookings}×</strong><div><b>${escapeHTML(g.name || 'Guest')}</b><span>${escapeHTML(g.email || g.phone || 'no contact')}</span></div><span class="badge badge-brand">${g.points} pts</span></div>`).join('')
+          : '<p class="muted">No guests yet.</p>';
+      }
+      function openDishForm(item) {
+        editingDishId = item ? item.id : '';
+        document.getElementById('dName').value = item ? item.name : '';
+        document.getElementById('dCategory').value = item ? item.category_id : '';
+        document.getElementById('dPrice').value = item ? item.price : '';
+        document.getElementById('dImage').value = item ? item.image : '';
+        document.getElementById('dDesc').value = item ? item.description : '';
+        document.getElementById('dTag').value = item ? (item.tag || '') : '';
+        document.getElementById('dFeatured').checked = item ? item.featured : false;
+        document.getElementById('dAvailable').checked = item ? item.available !== false : true;
+        document.getElementById('dishForm').style.display = 'block';
+        document.getElementById('dishForm').scrollIntoView({ block: 'nearest' });
+      }
+      function renderMenu() {
+        const body = document.getElementById('managerMenu');
+        if (!menuItems.length) { body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#888780">No dishes yet — add your first one.</td></tr>'; return; }
+        body.innerHTML = menuItems.map((item) => `
+          <tr data-id="${item.id}" class="${item.available ? '' : 'dish-off'}">
+            <td><strong>${escapeHTML(item.name)}</strong><div class="muted" style="font-size:12px">${escapeHTML(item.description)}</div></td>
+            <td>${escapeHTML(item.category)}</td>
+            <td>$${Number(item.price).toFixed(2)}</td>
+            <td>${item.tag ? `<span class="badge badge-gold">${escapeHTML(item.tag)}</span>` : '-'}</td>
+            <td class="flex" style="gap:8px">
+              <label class="check"><input type="checkbox" data-id="${item.id}" data-field="available" ${item.available ? 'checked' : ''}> On</label>
+              <label class="check"><input type="checkbox" data-id="${item.id}" data-field="featured" ${item.featured ? 'checked' : ''}> Star</label>
+            </td>
+            <td class="flex" style="gap:6px"><button class="btn btn-sm btn-ghost edit" data-id="${item.id}">Edit</button><button class="btn btn-sm btn-ghost del" data-id="${item.id}">Delete</button></td>
+          </tr>`).join('');
+      }
+      function renderCategories() {
+        document.getElementById('dCategory').innerHTML = categories.map((c) => `<option value="${c.id}">${escapeHTML(c.name)}</option>`).join('');
+        document.getElementById('catList').innerHTML = categories.map((c) => `<span class="chip">${escapeHTML(c.name)}<button class="chip-x" data-delcat="${c.id}" title="Delete if empty">×</button></span>`).join('');
+      }
+      function promoWindow(p) {
+        const days = (p.days || []).slice().sort();
+        const parts = [];
+        if (p.start_date) parts.push(`${p.start_date}${p.end_date ? ' to ' + p.end_date : ' onward'}`);
+        if (p.start_time) parts.push(`${p.start_time}${p.end_time ? ' - ' + p.end_time : ''}`);
+        if (days.length) { const names = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']; parts.push(days.map((d) => names[d]).join(', ')); }
+        return parts.length ? parts.join('<br>') : '<span class="muted">Always on</span>';
+      }
+      function renderPromos() {
+        const body = document.getElementById('promoBody');
+        if (!promoItems.length) { body.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888780">No promotions yet — create your first offer.</td></tr>'; return; }
+        body.innerHTML = promoItems.map((p) => `
+          <tr data-id="${p.id}">
+            <td><strong>${escapeHTML(p.name)}</strong></td>
+            <td>${p.code ? `<span class="badge badge-brand" style="letter-spacing:1px">${escapeHTML(p.code)}</span>` : '<span class="muted">-</span>'}</td>
+            <td><b>${escapeHTML(p.discount_label)}</b></td>
+            <td style="font-size:13px">${promoWindow(p)}</td>
+            <td style="font-size:13px">${p.min_covers ? `Min ${p.min_covers} cover${p.min_covers === 1 ? '' : 's'}` : 'Any party'}${p.max_uses ? `<br>${p.max_uses} use${p.max_uses === 1 ? '' : 's'} max` : '<br>Unlimited'}</td>
+            <td><div class="usage-cell"><b>${p.used}</b>${p.max_uses ? ` / ${p.max_uses}` : ''}${p.max_uses && p.used >= p.max_uses ? ' <span class="badge badge-red">used up</span>' : ''}</div></td>
+            <td class="flex" style="gap:8px">
+              <label class="check"><input type="checkbox" data-id="${p.id}" data-field="active" ${p.active ? 'checked' : ''}> On</label>
+              <label class="check"><input type="checkbox" data-id="${p.id}" data-field="featured" ${p.featured ? 'checked' : ''}> Featured</label>
+              ${p.auto_end ? '<span class="badge badge-gold">Auto-end</span>' : ''}
+            </td>
+            <td class="flex" style="gap:6px"><button class="btn btn-sm btn-ghost edit" data-id="${p.id}">Edit</button><button class="btn btn-sm btn-ghost del" data-id="${p.id}">Delete</button></td>
+          </tr>`).join('');
+      }
+      function openPromoForm(p) {
+        editingPromoId = p ? p.id : '';
+        document.getElementById('promoFormLabel').textContent = p ? 'Edit promotion' : 'New promotion';
+        document.getElementById('pName').value = p ? p.name : '';
+        document.getElementById('pCode').value = p ? (p.code || '') : '';
+        document.getElementById('pType').value = p ? p.type : 'percent';
+        document.getElementById('pValue').value = p ? p.value : '';
+        document.getElementById('pStartDate').value = p ? (p.start_date || '') : '';
+        document.getElementById('pEndDate').value = p ? (p.end_date || '') : '';
+        document.getElementById('pStartTime').value = p ? (p.start_time || '') : '';
+        document.getElementById('pEndTime').value = p ? (p.end_time || '') : '';
+        document.getElementById('pMinCovers').value = p ? p.min_covers : 0;
+        document.getElementById('pMaxUses').value = p ? p.max_uses : 0;
+        document.getElementById('pFeatured').checked = p ? !!p.featured : true;
+        document.getElementById('pActive').checked = p ? !!p.active : true;
+        document.getElementById('pAutoEnd').checked = p ? !!p.auto_end : false;
+        document.querySelectorAll('#pDays input[data-day]').forEach((box) => { box.checked = p ? (p.days || []).includes(Number(box.dataset.day)) : false; });
+        const form = document.getElementById('promoForm');
+        form.style.display = 'block';
+        form.scrollIntoView({ block: 'nearest' });
+      }
+      function collectPromoForm() {
+        return {
+          name: document.getElementById('pName').value.trim(),
+          code: document.getElementById('pCode').value.trim(),
+          type: document.getElementById('pType').value,
+          value: Number(document.getElementById('pValue').value),
+          start_date: document.getElementById('pStartDate').value,
+          end_date: document.getElementById('pEndDate').value,
+          start_time: document.getElementById('pStartTime').value,
+          end_time: document.getElementById('pEndTime').value,
+          min_covers: Number(document.getElementById('pMinCovers').value) || 0,
+          max_uses: Number(document.getElementById('pMaxUses').value) || 0,
+          days: Array.from(document.querySelectorAll('#pDays input[data-day]:checked')).map((box) => Number(box.dataset.day)),
+          featured: document.getElementById('pFeatured').checked,
+          active: document.getElementById('pActive').checked,
+          auto_end: document.getElementById('pAutoEnd').checked
+        };
+      }
+      function barRow(label, value, max, color) {
+        const pct = max ? Math.round((value / max) * 100) : 0;
+        return `<div class="bar-row"><span>${escapeHTML(label)}</span><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color || 'var(--brand)'}"></div></div><b>${value}</b></div>`;
+      }
+      function renderAnalytics() {
+        if (!analyticsData) return;
+        const d = analyticsData;
+        const maxTrend = Math.max(1, ...d.trend.map((t) => t.bookings));
+        document.getElementById('analyticsStats').innerHTML = `
+          <div class="stat-card"><div class="val">${d.totals.bookings}</div><div class="lbl">Bookings all-time</div></div>
+          <div class="stat-card"><div class="val">${d.totals.covers}</div><div class="lbl">Covers</div></div>
+          <div class="stat-card"><div class="val">${d.noShowRate}%</div><div class="lbl">No-show rate</div></div>
+          <div class="stat-card"><div class="val">${d.reviews.avg}<span style="color:#BA7517">★</span></div><div class="lbl">Avg rating · ${d.reviews.count} reviews</div></div>
+          <div class="stat-card"><div class="val">${d.points.earned}</div><div class="lbl">Points earned</div></div>
+          <div class="stat-card"><div class="val">$${Number(d.points.discount).toFixed(2)}</div><div class="lbl">Points discounts</div></div>`;
+        document.getElementById('trendChart').innerHTML = d.trend.map((t) => barRow(t.date.slice(5), t.bookings, maxTrend)).join('');
+        const maxHour = Math.max(1, ...d.byHour.map((h) => h.count));
+        document.getElementById('hourChart').innerHTML = d.byHour.length ? d.byHour.map((h) => barRow(h.time, h.count, maxHour)).join('') : '<p class="muted">No bookings yet.</p>';
+        const maxDow = Math.max(1, ...d.byDay.map((x) => x.bookings));
+        document.getElementById('dowChart').innerHTML = d.byDay.map((x) => barRow(x.day, x.bookings, maxDow, 'var(--gold)')).join('');
+        document.getElementById('occasionList').innerHTML = d.topOccasions.length ? d.topOccasions.map((o) => `<div class="guest-row"><b>${escapeHTML(o.name)}</b><span>${o.count} booking${o.count === 1 ? '' : 's'}</span></div>`).join('') : '<p class="muted">No occasion bookings yet.</p>';
+        if (d.payments) {
+          document.getElementById('payGross').textContent = '$' + Number(d.payments.gross).toFixed(2);
+          document.getElementById('payFees').textContent = '$' + Number(d.payments.fees).toFixed(2);
+          document.getElementById('payTips').textContent = '$' + Number(d.payments.tips).toFixed(2);
+          document.getElementById('payNet').textContent = '$' + Number(d.payments.net).toFixed(2);
+          const maxPay = Math.max(1, ...d.payments.byDay.map((x) => x.revenue));
+          document.getElementById('payChart').innerHTML = d.payments.byDay.map((x) => barRow(x.date.slice(5), '$' + Number(x.revenue).toFixed(2), maxPay, 'var(--gold)')).join('');
         }
       }
-
-      document.getElementById('loginForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
+      function renderPayments() {
+        const data = paymentItems || { summary: {}, payments: [] };
+        const s = data.summary || {};
+        document.getElementById('paymentStats').innerHTML = `
+          <div class="stat-card"><div class="val">$${Number(s.gross || 0).toFixed(2)}</div><div class="lbl">Gross collected</div></div>
+          <div class="stat-card"><div class="val">$${Number(s.fees || 0).toFixed(2)}</div><div class="lbl">NyamPay fees</div></div>
+          <div class="stat-card"><div class="val">$${Number(s.tips || 0).toFixed(2)}</div><div class="lbl">Tips for servers</div></div>
+          <div class="stat-card"><div class="val">$${Number(s.net || 0).toFixed(2)}</div><div class="lbl">Net to restaurant</div></div>`;
+        const rows = data.payments || [];
+        const body = document.getElementById('paymentBody');
+        if (!rows.length) { body.innerHTML = '<tr><td colspan="12" style="text-align:center;color:#888780">No payments yet — they will appear here as guests check out with NyamPay.</td></tr>'; return; }
+        body.innerHTML = rows.map((p) => `
+          <tr data-id="${p.id}">
+            <td><strong>${escapeHTML(p.payment_ref)}</strong></td>
+            <td>${escapeHTML(p.name)}${p.email ? `<div class="muted" style="font-size:12px">${escapeHTML(p.email)}</div>` : ''}</td>
+            <td>${p.reservation_id ? '<a href="/manage">#' + p.reservation_id + '</a>' : '-'}</td>
+            <td>$${Number(p.amount).toFixed(2)}</td>
+            <td>${p.tip_amount ? `$${Number(p.tip_amount).toFixed(2)} <span class="muted" style="font-size:12px">(${p.tip_pct}%)</span>` : '-'}</td>
+            <td>$${Number(p.fee_total).toFixed(2)}</td>
+            <td><strong>$${Number(p.total).toFixed(2)}</strong></td>
+            <td>${p.split_across > 1 ? `${p.split_index}/${p.split_across}` : '-'}</td>
+            <td>•••• ${escapeHTML(p.card_last4)}</td>
+            <td>${new Date(p.created_at).toLocaleString()}</td>
+            <td><span class="badge ${p.status === 'refunded' ? 'badge-neutral' : 'badge-green'}">${escapeHTML(p.status)}</span></td>
+            <td>${p.status === 'refunded' ? '<span class="muted" style="font-size:12px">Refunded</span>' : `<button class="btn btn-sm btn-ghost refund-pay" data-id="${p.id}">Refund</button>`}</td>
+          </tr>`).join('');
+      }
+      function renderWaitlist() {
+        const body = document.getElementById('waitlistBody');
+        const q = document.getElementById('waitlistDate').value;
+        const items = q ? waitlistItems.filter((w) => w.preferred_date === q) : waitlistItems;
+        const badge = document.getElementById('waitlistBadge');
+        if (waitlistItems.length) { badge.textContent = waitlistItems.length; badge.style.display = 'inline-flex'; } else { badge.style.display = 'none'; }
+        if (!items.length) { body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888780">No one on the waitlist.</td></tr>'; return; }
+        body.innerHTML = items.map((w) => `
+          <tr data-id="${w.id}">
+            <td><strong>${escapeHTML(w.name)}</strong></td>
+            <td>${escapeHTML(w.phone)}${w.email ? `<div class="muted" style="font-size:12px">${escapeHTML(w.email)}</div>` : ''}</td>
+            <td>${w.party_size}</td>
+            <td>${escapeHTML(w.preferred_date)} at ${escapeHTML(w.preferred_time)}</td>
+            <td style="max-width:200px">${w.notes ? escapeHTML(w.notes) : '-'}</td>
+            <td><select class="status-select wait-status" data-id="${w.id}">${['waiting','notified','seated','cancelled'].map((s) => `<option value="${s}" ${s === w.status ? 'selected' : ''}>${s}</option>`).join('')}</select></td>
+            <td><button class="btn btn-sm btn-ghost del" data-id="${w.id}">Remove</button></td>
+          </tr>`).join('');
+      }
+      async function loadSettings() {
         try {
-          const data = await api('/api/auth', { method: 'POST', body: JSON.stringify({ password: document.getElementById('pw').value, role: 'admin' }) });
-          localStorage.setItem(ADMIN_KEY, data.token);
-          localStorage.setItem(MANAGER_KEY, data.token);
-          document.getElementById('pw').value = '';
-          showDash();
+          const s = await api('/api/settings');
+          document.getElementById('setName').value = s.name || '';
+          document.getElementById('setPhone').value = s.phone || '';
+          document.getElementById('setAddress').value = s.address || '';
+          document.getElementById('setHours').value = (s.hours || []).map((h) => `${h.day} | ${h.hours}`).join('\n');
+          document.getElementById('setFeeRate').value = s.fee_rate !== undefined ? Number(s.fee_rate * 100) : 0.95;
+          document.getElementById('setFeeFlat').value = s.fee_flat !== undefined ? Number(s.fee_flat) : 0.5;
+        } catch (e) { /* settings are optional on first load */ }
+      }
+
+      document.getElementById('newDishBtn').addEventListener('click', () => openDishForm(null));
+      document.getElementById('cancelDishBtn').addEventListener('click', () => { document.getElementById('dishForm').style.display = 'none'; editingDishId = ''; });
+      document.getElementById('saveDishBtn').addEventListener('click', async () => {
+        const payload = {
+          name: document.getElementById('dName').value.trim(),
+          category_id: Number(document.getElementById('dCategory').value),
+          price: Number(document.getElementById('dPrice').value),
+          description: document.getElementById('dDesc').value.trim(),
+          image: document.getElementById('dImage').value.trim(),
+          tag: document.getElementById('dTag').value.trim(),
+          featured: document.getElementById('dFeatured').checked,
+          available: document.getElementById('dAvailable').checked
+        };
+        try {
+          if (editingDishId) await api('/api/menu/' + editingDishId, { method: 'PATCH', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify(payload) });
+          else await api('/api/menu', { method: 'POST', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify(payload) });
+          toast('Dish saved'); document.getElementById('dishForm').style.display = 'none'; editingDishId = ''; load();
         } catch (err) { toast(err.message, 'error'); }
       });
-
-      document.getElementById('logoutBtn').addEventListener('click', () => {
-        localStorage.removeItem(ADMIN_KEY);
-        localStorage.removeItem(MANAGER_KEY);
-        loginView.style.display = 'block'; dashView.style.display = 'none';
+      document.getElementById('addCatBtn').addEventListener('click', async () => {
+        const name = document.getElementById('catName').value.trim();
+        if (!name) return;
+        try { await api('/api/categories', { method: 'POST', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify({ name }) }); document.getElementById('catName').value = ''; toast('Category added'); load(); } catch (err) { toast(err.message, 'error'); }
       });
-      document.getElementById('refreshBtn').addEventListener('click', load);
+      document.getElementById('catList').addEventListener('click', async (e) => {
+        const btn = e.target.closest('[data-delcat]');
+        if (!btn) return;
+        try { await api('/api/categories/' + btn.dataset.delcat, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token() } }); toast('Category deleted'); load(); } catch (err) { toast(err.message, 'error'); }
+      });
+      document.getElementById('managerMenu').addEventListener('click', async (e) => {
+        const btn = e.target.closest('.edit, .del');
+        if (!btn) return;
+        const id = btn.dataset.id;
+        if (btn.classList.contains('edit')) { openDishForm(menuItems.find((m) => m.id === id)); return; }
+        if (!confirm('Delete this dish?')) return;
+        try { await api('/api/menu/' + id, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token() } }); toast('Dish deleted'); load(); } catch (err) { toast(err.message, 'error'); }
+      });
+      document.getElementById('managerMenu').addEventListener('change', async (e) => {
+        const box = e.target.closest('input[data-field]');
+        if (!box) return;
+        try { await api('/api/menu/' + box.dataset.id, { method: 'PATCH', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify({ [box.dataset.field]: box.checked }) }); toast('Menu updated'); load(); } catch (err) { toast(err.message, 'error'); }
+      });
+      document.getElementById('waitlistBody').addEventListener('change', async (e) => {
+        const sel = e.target.closest('.wait-status');
+        if (!sel) return;
+        try { await api('/api/waitlist/' + sel.dataset.id, { method: 'PATCH', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify({ status: sel.value }) }); toast('Waitlist updated'); load(); } catch (err) { toast(err.message, 'error'); }
+      });
+      document.getElementById('waitlistBody').addEventListener('click', async (e) => {
+        const btn = e.target.closest('.del');
+        if (!btn) return;
+        try { await api('/api/waitlist/' + btn.dataset.id, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token() } }); toast('Entry removed'); load(); } catch (err) { toast(err.message, 'error'); }
+      });
+      document.getElementById('saveSettings').addEventListener('click', async () => {
+        const hours = document.getElementById('setHours').value.split('\n').map((line) => line.trim()).filter(Boolean).map((line) => {
+          const [day, ...rest] = line.split('|');
+          return { day: (day || '').trim(), hours: (rest.join('|') || '').trim() };
+        });
+        try {
+          await api('/api/settings', { method: 'PATCH', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify({
+            name: document.getElementById('setName').value.trim(),
+            phone: document.getElementById('setPhone').value.trim(),
+            address: document.getElementById('setAddress').value.trim(),
+            hours,
+            fee_rate: Number(document.getElementById('setFeeRate').value) / 100,
+            fee_flat: Number(document.getElementById('setFeeFlat').value)
+          }) });
+          toast('Settings saved');
+        } catch (err) { toast(err.message, 'error'); }
+      });
+      document.getElementById('waitlistDate').addEventListener('change', renderWaitlist);
+      document.getElementById('clearWaitlist').addEventListener('click', () => { document.getElementById('waitlistDate').value = ''; renderWaitlist(); });
+      document.getElementById('newPromoBtn').addEventListener('click', () => openPromoForm(null));
+      document.getElementById('cancelPromoBtn').addEventListener('click', () => { document.getElementById('promoForm').style.display = 'none'; editingPromoId = ''; });
+      document.getElementById('savePromoBtn').addEventListener('click', async () => {
+        const payload = collectPromoForm();
+        if (!payload.name || !payload.value) { toast('Name and discount value are required', 'error'); return; }
+        try {
+          if (editingPromoId) await api('/api/promos/' + editingPromoId, { method: 'PATCH', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify(payload) });
+          else await api('/api/promos', { method: 'POST', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify(payload) });
+          toast('Promotion saved'); document.getElementById('promoForm').style.display = 'none'; editingPromoId = ''; load();
+        } catch (err) { toast(err.message, 'error'); }
+      });
+      document.getElementById('promoBody').addEventListener('click', async (e) => {
+        const btn = e.target.closest('.edit, .del');
+        if (!btn) return;
+        const id = btn.dataset.id;
+        if (btn.classList.contains('edit')) { openPromoForm(promoItems.find((p) => p.id === id)); return; }
+        if (!confirm('Delete this promotion?')) return;
+        try { await api('/api/promos/' + id, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token() } }); toast('Promotion deleted'); load(); } catch (err) { toast(err.message, 'error'); }
+      });
+      document.getElementById('promoBody').addEventListener('change', async (e) => {
+        const box = e.target.closest('input[data-field]');
+        if (!box) return;
+        try { await api('/api/promos/' + box.dataset.id, { method: 'PATCH', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify({ [box.dataset.field]: box.checked }) }); toast('Promotion updated'); load(); } catch (err) { toast(err.message, 'error'); }
+      });
+      document.getElementById('paymentBody').addEventListener('click', async (e) => {
+        const btn = e.target.closest('.refund-pay');
+        if (!btn || !confirm('Refund this NyamPay transaction?')) return;
+        try { await api('/api/payments/' + btn.dataset.id + '/refund', { method: 'POST', headers: { Authorization: 'Bearer ' + token() } }); toast('Payment refunded'); load(); } catch (err) { toast(err.message, 'error'); }
+      });
 
-      if (adminToken()) showDash(); else loginView.style.display = 'block';
+      function embedConfig() {
+        return {
+          title: document.getElementById('embedTitle').value.trim() || 'Book a table at SbyNhamHub',
+          brand: document.getElementById('embedBrand').value,
+          promo: document.getElementById('embedPromo').checked,
+          points: document.getElementById('embedPoints').checked
+        };
+      }
+      function embedSnippet() {
+        const c = embedConfig();
+        const attrs = ['target="#sby-widget"', 'title="' + c.title.replace(/"/g, '&quot;') + '"', 'brand="' + c.brand + '"', 'promo="' + c.promo + '"', 'points="' + c.points + '"'];
+        return '<div id="sby-widget"></div>\n<script src="' + window.location.origin + '/widget.js" ' + attrs.join(' ') + ' defer><\/script>';
+      }
+      function renderEmbed() {
+        if (!window.SbyWidget) return;
+        const c = embedConfig();
+        document.getElementById('embedPreview').innerHTML = '<div id="sbyWidgetPreview"></div>';
+        window.SbyWidget.render(c, document.getElementById('sbyWidgetPreview'));
+        document.getElementById('embedCode').textContent = embedSnippet();
+      }
+      document.getElementById('embedTitle').addEventListener('input', renderEmbed);
+      document.getElementById('embedBrand').addEventListener('input', renderEmbed);
+      document.getElementById('embedPromo').addEventListener('change', renderEmbed);
+      document.getElementById('embedPoints').addEventListener('change', renderEmbed);
+      document.getElementById('copyEmbedBtn').addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(embedSnippet()); toast('Embed code copied to clipboard'); }
+        catch (e) { const ta = document.createElement('textarea'); ta.value = embedSnippet(); document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('Embed code copied to clipboard'); }
+      });
+
+      document.getElementById('loginForm').addEventListener('submit', async (e) => { e.preventDefault(); try { const data = await api('/api/auth', { method:'POST', body: JSON.stringify({ password: document.getElementById('pw').value, role:'admin' }) }); localStorage.setItem(ADMIN_KEY, data.token); localStorage.setItem(TOKEN_KEY, data.token); document.getElementById('pw').value = ''; showDash(); } catch (err) { toast(err.message, 'error'); } });
+      document.getElementById('logoutBtn').addEventListener('click', () => { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(ADMIN_KEY); loginView.style.display = 'block'; dashView.style.display = 'none'; });
+      document.querySelectorAll('[data-view]').forEach((button) => button.addEventListener('click', () => showView(button.dataset.view)));
+      document.getElementById('platformRefreshBtn').addEventListener('click', load);
+      document.getElementById('refreshBtn').addEventListener('click', load); filterDate.addEventListener('change', load); document.getElementById('clearFilter').addEventListener('click', () => { filterDate.value = ''; load(); });
+      document.getElementById('addBookingBtn').addEventListener('click', () => { const form = document.getElementById('addBookingForm'); form.style.display = form.style.display === 'none' ? 'block' : 'none'; document.getElementById('addBookingBtn').textContent = form.style.display === 'none' ? '+ Add booking' : 'Close form'; });
+      document.getElementById('abCancel').addEventListener('click', resetAddBookingForm);
+      document.getElementById('abSave').addEventListener('click', saveAddBooking);
+      resBody.addEventListener('change', async (e) => { const sel = e.target.closest('.status-select'); if (!sel) return; try { await api('/api/reservations/' + sel.dataset.id, { method:'PATCH', headers:{ Authorization:'Bearer ' + token() }, body:JSON.stringify({ status:sel.value }) }); toast('Booking updated'); load(); } catch (err) { toast(err.message, 'error'); } });
+      resBody.addEventListener('click', async (e) => { const btn = e.target.closest('.del'); if (!btn || !confirm('Delete this reservation?')) return; try { await api('/api/reservations/' + btn.dataset.id, { method:'DELETE', headers:{ Authorization:'Bearer ' + token() } }); toast('Reservation deleted'); load(); } catch (err) { toast(err.message, 'error'); } });
+      resBody.addEventListener('click', (e) => { const btn = e.target.closest('.guest'); if (!btn) return; const found = renderedReservations.find((r) => String(r.id) === String(btn.dataset.id)); showBookingGuest(found); });
+      document.getElementById('unassignedBookings').addEventListener('click', (e) => { const btn = e.target.closest('[data-booking]'); if (!btn) return; selectedBookingId = btn.dataset.booking; renderFloor(); });
+      document.getElementById('tableGrid').addEventListener('click', async (e) => { const btn = e.target.closest('[data-table]'); if (!btn || !selectedBookingId) return; try { await api('/api/reservations/' + selectedBookingId, { method:'PATCH', headers:{ Authorization:'Bearer ' + token() }, body:JSON.stringify({ table:btn.dataset.table }) }); toast('Table assigned'); selectedBookingId = ''; load(); } catch (err) { toast(err.message, 'error'); } });
+      document.getElementById('guestSearch').addEventListener('input', renderGuests); document.getElementById('guestList').addEventListener('click', (e) => { const btn = e.target.closest('[data-guest]'); if (!btn) return; selectedGuestId = btn.dataset.guest; renderGuests(); }); document.getElementById('saveGuest').addEventListener('click', async () => { if (!selectedGuestId) return; try { await api('/api/guests/' + selectedGuestId, { method:'PATCH', headers:{ Authorization:'Bearer ' + token() }, body:JSON.stringify({ preferences:document.getElementById('guestPreferences').value }) }); toast('Guest preferences saved'); load(); } catch (err) { toast(err.message, 'error'); } });
+      const reviewBody = document.getElementById('reviewBody');
+      reviewBody.addEventListener('change', async (e) => { const sel = e.target.closest('.review-status'); if (!sel) return; try { await api('/api/reviews/' + sel.dataset.id, { method:'PATCH', headers:{ Authorization:'Bearer ' + token() }, body:JSON.stringify({ status:sel.value }) }); toast('Review status updated'); load(); } catch (err) { toast(err.message, 'error'); } });
+      reviewBody.addEventListener('click', async (e) => { const spamBtn = e.target.closest('.review-spam'); if (spamBtn) { try { await api('/api/reviews/' + spamBtn.dataset.id, { method:'PATCH', headers:{ Authorization:'Bearer ' + token() }, body:JSON.stringify({ spam:Number(spamBtn.dataset.spam) }) }); toast('Review flag updated'); load(); } catch (err) { toast(err.message, 'error'); } return; } const btn = e.target.closest('.save-reply'); if (!btn) return; const textarea = document.querySelector('.review-reply[data-id="' + btn.dataset.id + '"]'); try { await api('/api/reviews/' + btn.dataset.id, { method:'PATCH', headers:{ Authorization:'Bearer ' + token() }, body:JSON.stringify({ reply:textarea.value.trim() }) }); toast('Reply saved'); load(); } catch (err) { toast(err.message, 'error'); } });
+      if (token()) showDash(); else loginView.style.display = 'block';
+      initAddBookingForm();
+      setInterval(() => { if (token() && dashView.style.display !== 'none') lightRefresh(); }, 30000);
     })();
   </script>
 </body>

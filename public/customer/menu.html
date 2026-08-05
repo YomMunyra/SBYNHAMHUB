@@ -15,7 +15,7 @@
   <section class="page-hero">
     <div class="container">
       <p class="eyebrow">SbyNhamHub · The Menu</p>
-      <h1>Eat <span class="italic-accent">better.</span></h1>
+      <h1 data-i18n-html="hero.menu">Eat <span class="italic-accent">better.</span></h1>
       <p class="lede">Seasonal Southeast-Asian cooking, made from scratch each day. Filter by category, or just trust the chef.</p>
     </div>
   </section>
@@ -48,6 +48,7 @@
   <footer class="footer" id="footer"></footer>
 
   <script src="/assets/js/main.js"></script>
+  <script src="/assets/js/i18n.js"></script>
   <script>
     (function () {
       const filterBar = document.getElementById('filterBar');
@@ -78,6 +79,7 @@
         .catch(() => {
           grid.innerHTML = '<div class="card-tile" style="padding:60px;text-align:center;grid-column:1/-1"><p class="muted">Could not load the menu. Please try again later.</p></div>';
         });
+      document.addEventListener('localechange', render);
 
       function loadSaves() {
         const params = guestIdentityParam();

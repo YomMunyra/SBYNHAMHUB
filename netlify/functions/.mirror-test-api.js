@@ -177,13 +177,7 @@ function authorized(event) {
 
 let activeEvent = null;
 
-async function reservationStore(event) {
-  // @netlify/blobs is ESM-only, while this function uses CommonJS.
-  const { connectLambda, getStore } = await import('@netlify/blobs');
-  // Netlify passes short-lived Blobs credentials in each Lambda event.
-  connectLambda(event);
-  return getStore('sbynhamhub-reservations');
-}
+async function reservationStore(event) { return event.__store; }
 
 async function storeReservations(store) {
   const { blobs } = await store.list({ prefix: 'reservation/' });
@@ -1575,7 +1569,11 @@ exports.handler = async (event) => {
         seatCapacity = Number(body.capacity);
         if (!Number.isInteger(seatCapacity) || seatCapacity < 1 || seatCapacity > 1000) return json({ error: 'Seat capacity must be between 1 and 1000' }, 400);
       }
-      const nextLanguage = 'en';
+      let nextLanguage = row.language || 'en';
+      if (body.language !== undefined) {
+        if (!['en', 'km'].includes(String(body.language))) return json({ error: 'Language must be en or km' }, 400);
+        nextLanguage = String(body.language);
+      }
       let nextCurrency = row.currency || 'USD';
       if (body.currency !== undefined) {
         if (!['USD', 'KHR'].includes(String(body.currency))) return json({ error: 'Currency must be USD or KHR' }, 400);
@@ -1733,7 +1731,7 @@ exports.handler = async (event) => {
     const cap = Number(capacity);
     if (!Number.isInteger(cap) || cap < 1 || cap > 1000) return json({ error: 'Seat capacity must be between 1 and 1000' }, 400);
     const id = await nextCounter(store, 'restaurant-counter', 3);
-    const language = 'en';
+    const language = ['en', 'km'].includes(String(body.language)) ? String(body.language) : 'en';
     const currency = ['USD', 'KHR'].includes(String(body.currency)) ? String(body.currency) : 'USD';
     const rateNum = Number(body.currency_rate);
     const rate = Number.isFinite(rateNum) && rateNum > 0 ? rateNum : 4100;
@@ -1784,7 +1782,10 @@ exports.handler = async (event) => {
     if (body.avatar !== undefined) row.avatar = String(body.avatar || 'logo.svg').trim();
     if (body.active !== undefined) row.active = body.active ? 1 : 0;
     if (body.featured !== undefined) row.featured = body.featured ? 1 : 0;
-    if (body.language !== undefined) row.language = 'en';
+    if (body.language !== undefined) {
+      if (!['en', 'km'].includes(String(body.language))) return json({ error: 'Language must be en or km' }, 400);
+      row.language = String(body.language);
+    }
     if (body.currency !== undefined) {
       if (!['USD', 'KHR'].includes(String(body.currency))) return json({ error: 'Currency must be USD or KHR' }, 400);
       row.currency = String(body.currency);

@@ -15,7 +15,7 @@
   <section class="page-hero">
     <div class="container">
       <p class="eyebrow">SbyNhamHub · NyamPay</p>
-      <h1>Pay your bill, <span class="italic-accent">your way.</span></h1>
+      <h1 data-i18n-html="hero.pay">Pay your bill, <span class="italic-accent">your way.</span></h1>
       <p class="lede">Split the bill between the party, tip your server between 0–25%, and get a receipt emailed instantly. Integrated checkout at 0.95% + $0.50 per transaction.</p>
     </div>
   </section>
@@ -122,6 +122,7 @@
   <footer class="footer" id="footer"></footer>
 
   <script src="/assets/js/main.js"></script>
+  <script src="/assets/js/i18n.js"></script>
   <script>
     (function () {
       const FEE_RATE = 0.0095, FEE_FLAT = 0.5;
@@ -298,6 +299,7 @@
 
       renderSplitRows();
       recap();
+      document.addEventListener('localechange', recap);
     })();
   </script>
 </body>

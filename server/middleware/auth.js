@@ -16,8 +16,12 @@ function sign(value, role) {
   return crypto.createHmac('sha256', secret(role)).update(value).digest('base64url');
 }
 
-function createToken(role = 'manager') {
-  const payload = Buffer.from(JSON.stringify({ role, exp: Date.now() + TOKEN_TTL_MS })).toString('base64url');
+function createToken(role = 'manager', restaurant_id) {
+  const payload = Buffer.from(JSON.stringify({
+    role,
+    exp: Date.now() + TOKEN_TTL_MS,
+    ...(restaurant_id !== undefined && restaurant_id !== null && restaurant_id !== '' ? { restaurant_id: Number(restaurant_id) } : {})
+  })).toString('base64url');
   return `${payload}.${sign(payload, role)}`;
 }
 
@@ -37,26 +41,31 @@ function verifyToken(token) {
   const expBuf = Buffer.from(expected);
   if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) return null;
   if (decoded.exp <= Date.now()) return null;
-  return decoded.role;
+  return decoded;
 }
 
 function tokenFrom(req) {
   return String(req.get('authorization') || '').replace(/^Bearer\s+/i, '');
 }
 
+function attachAuth(req, decoded) {
+  req.role = decoded.role;
+  if (decoded.restaurant_id) req.restaurant_id = Number(decoded.restaurant_id);
+}
+
 function requireAuth(req, res, next) {
-  const role = verifyToken(tokenFrom(req));
-  if (!role) return res.status(401).json({ error: 'Unauthorized' });
-  req.role = role;
+  const decoded = verifyToken(tokenFrom(req));
+  if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
+  attachAuth(req, decoded);
   next();
 }
 
 function requireAdmin(req, res, next) {
-  const role = verifyToken(tokenFrom(req));
-  if (!role) return res.status(401).json({ error: 'Unauthorized' });
-  if (role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
-  req.role = role;
+  const decoded = verifyToken(tokenFrom(req));
+  if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
+  if (decoded.role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
+  attachAuth(req, decoded);
   next();
 }
 
-module.exports = { ADMIN_PASSWORD, MANAGER_PASSWORD, createToken, verifyToken, requireAuth, requireAdmin };
+module.exports = { ADMIN_PASSWORD, MANAGER_PASSWORD, createToken, verifyToken, tokenFrom, requireAuth, requireAdmin };

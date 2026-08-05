@@ -18,7 +18,7 @@
       <div class="hero-grid">
         <div>
           <p class="eyebrow">SbyNhamHub · Taste · Book · Enjoy</p>
-          <h1>Every meal out, as effortless as <span class="italic-accent">ordering in.</span></h1>
+          <h1 data-i18n-html="hero.index">Every meal out, as effortless as <span class="italic-accent">ordering in.</span></h1>
           <p class="hero-sub">
             Discover a modern Southeast-Asian table, book in seconds, and earn rewards on
             every visit. No phone calls, no waiting — just great food, beautifully served.
@@ -390,6 +390,7 @@
   <footer class="footer" id="footer"></footer>
 
   <script src="/assets/js/main.js"></script>
+  <script src="/assets/js/i18n.js"></script>
   <script>
     (function () {
       const today = new Date();
@@ -411,9 +412,10 @@
       });
 
       const wrap = document.getElementById('featuredDishes');
-      fetch('/api/menu?featured=1')
-        .then((r) => r.json())
-        .then((items) => {
+      async function renderChefPicks() {
+        try {
+          const res = await fetch('/api/menu?featured=1');
+          const items = await res.json();
           if (!items.length) { wrap.innerHTML = ''; return; }
           wrap.innerHTML = items.map((d) => `
             <article class="dish">
@@ -431,10 +433,12 @@
               </div>
             </article>
           `).join('');
-        })
-        .catch(() => {
+        } catch (e) {
           wrap.innerHTML = '<div class="card-tile" style="padding:40px;text-align:center;grid-column:1/-1"><p class="muted">Menu unavailable. Please try again later.</p></div>';
-        });
+        }
+      }
+      renderChefPicks();
+      document.addEventListener('localechange', renderChefPicks);
 
       const hours = ['Monday – Thursday','Friday – Saturday','Sunday'];
       const dayIdx = (new Date().getDay() + 6) % 7;
@@ -550,6 +554,7 @@
           `).join('');
         })
         .catch(() => {});
+      document.addEventListener('localechange', loadPersonalised);
     })();
   </script>
 </body>

@@ -28,12 +28,18 @@ function publicRestaurant(row) {
     avatar: row.avatar,
     rating: count ? Math.round(avg * 10) / 10 : null,
     reviews_count: count,
-    menu_count: menuCount
+    menu_count: menuCount,
+    featured: Number(row.featured || 0),
+    promoted: Number(row.featured || 0) === 1,
+    status: row.status || 'approved',
+    language: row.language || 'en',
+    currency: row.currency || 'USD',
+    currency_rate: Number(row.currency_rate || 4100)
   };
 }
 
 function allRestaurants() {
-  return db.prepare('SELECT * FROM restaurants WHERE active = 1 ORDER BY id ASC').all().map(publicRestaurant);
+  return db.prepare("SELECT * FROM restaurants WHERE active = 1 AND status = 'approved' ORDER BY featured DESC, id ASC").all().map(publicRestaurant);
 }
 
 function getRestaurant(value) {
@@ -46,9 +52,12 @@ function getRestaurant(value) {
 
 function restaurantId(req) {
   const raw = req && (req.query.restaurant ?? req.query.restaurant_id);
-  if (raw === undefined || raw === null || raw === '') return 1;
-  const row = getRestaurant(raw);
-  return row ? Number(row.id) : 1;
+  if (raw !== undefined && raw !== null && raw !== '') {
+    const row = getRestaurant(raw);
+    if (row) return Number(row.id);
+  }
+  if (req && req.restaurant_id) return Number(req.restaurant_id);
+  return 1;
 }
 
 function restaurantWhere(alias, rid) {
@@ -58,6 +67,7 @@ function restaurantWhere(alias, rid) {
 
 function settingsOf(rid) {
   const row = db.prepare('SELECT * FROM settings WHERE id = 1').get();
+  const rest = db.prepare('SELECT language, currency, currency_rate FROM restaurants WHERE id = ?').get(rid) || {};
   return {
     name: row?.name || 'SbyNhamHub',
     phone: row?.phone || '',
@@ -67,7 +77,10 @@ function settingsOf(rid) {
     avg_cover: Number(row?.avg_cover || 15),
     fee_rate: Number(row?.fee_rate ?? 0.0095),
     fee_flat: Number(row?.fee_flat ?? 0.5),
-    capacity: Number(row?.capacity || 48)
+    capacity: Number(row?.capacity || 48),
+    language: rest.language || 'en',
+    currency: rest.currency || 'USD',
+    currency_rate: Number(rest.currency_rate || 4100)
   };
 }
 

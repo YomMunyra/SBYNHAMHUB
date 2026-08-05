@@ -143,6 +143,35 @@ the menu save favourites; `/taste` shows the learned categories, lets the guest
 correct or delete recommendations and reset their profile. Shared logic in
 `server/lib/personalize.js` (and the Netlify mirror).
 
+### Restaurant applications & approval queue (F-07)
+New venues are created with `status = pending` and stay hidden until an admin
+approves them. The admin dashboard shows a **Pending applications** queue with
+one-click **Approve** (venue goes live) or **Reject** (venue deactivated). Statuses
+are `pending | approved | rejected`; marketplace and restaurant detail endpoints
+only ever return `approved` venues.
+
+### Promoted listings (F-03)
+Admins mark any venue as **Promoted** (`featured = 1`) from the restaurants view or
+the new-restaurant form. Promoted venues sort to the top of the marketplace and are
+tagged with a **Promoted** badge on `/discover` (`promoted: true` in the API
+payload). Unpromote removes the boost at any time.
+
+### Admin support mode — impersonation (F-05)
+From the admin restaurants list, **Support** opens a session as that venue's
+manager: `POST /api/auth/impersonate` returns a manager-scoped token
+(`restaurant_id` embedded), so every manager action (settings, menu, tables,
+bookings, stats) is automatically scoped to that venue. The manager dashboard shows
+a **Support mode** banner and **Exit impersonation** returns to `/admin`.
+
+### Localisation (i18n)
+Venues carry a default `language` (`en` | `km`) and currency (`USD` | `KHR` with a
+per-venue `currency_rate`, default 4100) — set in the manager/admin **Settings** or
+on the restaurant form. `/api/settings` returns these and `PATCH` persists them
+(scoped to the venue/token). The customer site ships a language switcher (EN / ខ្មែរ)
+in the header; `money()` in `public/assets/js/i18n.js` formats prices as
+`$12.34` (USD) or `៛50,000` (KHR, rounded to 100 riels) from the venue settings.
+Translated chrome (nav, footer, hero headings) uses `data-i18n` attributes.
+
 ### Menu & photos
 The menu is seeded with 25 dishes across 5 categories, each with a real food photo in
 `public/assets/img/*.jpg` (4:3). The frontend renders `/assets/img/${d.image}`, so a
@@ -156,6 +185,7 @@ blob store on first run.
 |---|---|---|---|
 | GET | `/api/health` | — | Health check |
 | POST | `/api/auth` | — | Exchange password for role token |
+| POST | `/api/auth/impersonate` | Bearer (admin) | Issue a manager token scoped to `restaurant_id` (support mode) |
 | GET | `/api/categories` | — | Menu categories |
 | GET | `/api/menu?category=&featured=` | — | Menu items |
 | POST | `/api/categories` | Bearer | Create category |
@@ -164,11 +194,11 @@ blob store on first run.
 | PATCH | `/api/menu/:id` | Bearer | Update dish (incl. image) |
 | DELETE | `/api/menu/:id` | Bearer | Delete dish |
 | GET | `/api/discover` | — | Discovery feed with live availability |
-| GET | `/api/marketplace` | — | Multi-venue marketplace (filter by `city`, `cuisine`, `max_price`, `min_rating`, `date`, `guests`, `occasion`) |
+| GET | `/api/marketplace` | — | Multi-venue marketplace (filter by `city`, `cuisine`, `max_price`, `min_rating`, `date`, `guests`, `occasion`); only `approved` venues, promoted first |
 | GET | `/api/restaurants/:slug` | — | Restaurant detail (menu by category, promos, tables, availability) |
-| GET | `/api/restaurants` | Bearer (admin) | List restaurants |
-| POST | `/api/restaurants` | Bearer (admin) | Create a restaurant |
-| PATCH | `/api/restaurants/:id` | Bearer (admin) | Update a restaurant (incl. activate/deactivate) |
+| GET | `/api/restaurants` | Bearer (admin) | List restaurants (incl. `active`, `status`, `featured`) |
+| POST | `/api/restaurants` | Bearer (admin) | Create a restaurant (created as `status=pending`; accepts `language`, `currency`, `currency_rate`) |
+| PATCH | `/api/restaurants/:id` | Bearer (admin) | Update a restaurant (activate/deactivate, `status` approve/reject, `featured` promote, locale fields) |
 | DELETE | `/api/restaurants/:id` | Bearer (admin) | Deactivate a restaurant (id 1 is protected) |
 | GET | `/api/reviews/summary` | — | Review aggregates |
 | GET | `/api/reviews` | — | Published reviews |
@@ -203,8 +233,8 @@ blob store on first run.
 | GET | `/api/guests` | Bearer | Guest list with history & points |
 | PATCH | `/api/guests/:id` | Bearer | Update guest |
 | POST | `/api/reminders` | Bearer | Run a reminder pass |
-| GET | `/api/settings` | — | Venue settings & payment fees |
-| PATCH | `/api/settings` | Bearer | Update venue settings |
+| GET | `/api/settings` | — | Venue settings, payment fees & locale (`language`, `currency`, `currency_rate`); honors a scoped token |
+| PATCH | `/api/settings` | Bearer | Update venue settings (incl. locale fields) |
 | GET | `/api/admin/summary` | Bearer (admin) | Platform summary |
 | GET | `/api/admin/platform` | Bearer (admin) | Per-venue totals (reservations, covers, menu, tables) |
 | GET | `/api/payments` | Bearer | Payment history |
@@ -232,7 +262,8 @@ blob store on first run.
 Multi-venue note: since Phase 5 every venue-scoped resource (menu, promos, yield
 rules, tables, reservations, reviews, waitlist, guests, analytics, settings) accepts
 `?restaurant=` or `?restaurant_id=` (slug or id) and defaults to venue 1 (SbyNhamHub,
-Phnom Penh). Reservations carry `restaurant_id`; promo codes are unique per venue.
+Phnom Penh) — or to the venue embedded in a scoped manager token (impersonation).
+Reservations carry `restaurant_id`; promo codes are unique per venue.
 
 ## Data
 

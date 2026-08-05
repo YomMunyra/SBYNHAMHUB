@@ -15,7 +15,7 @@
   <section class="page-hero">
     <div class="container">
       <p class="eyebrow">SbyNhamHub · Discover</p>
-      <h1>Find your <span class="italic-accent">table.</span></h1>
+      <h1 data-i18n-html="hero.discover">Find your <span class="italic-accent">table.</span></h1>
       <p class="lede">Filter by cuisine, price, rating and occasion — then pick a slot with live availability. Real-time, verified, booked in seconds.</p>
     </div>
   </section>
@@ -136,6 +136,7 @@
   <footer class="footer" id="footer"></footer>
 
   <script src="/assets/js/main.js"></script>
+  <script src="/assets/js/i18n.js"></script>
   <script>
     (function () {
       const dateInput = document.getElementById('sDate');
@@ -223,6 +224,7 @@
                   <div class="restaurant-title-row">
                     <h2 class="restaurant-name">${escapeHTML(r.name)}</h2>
                     <span class="badge badge-verified">Verified</span>
+                    ${r.promoted ? '<span class="badge badge-gold">Promoted</span>' : ''}
                     ${r.rating ? `<span class="badge badge-brand">${Number(r.rating).toFixed(1)}★</span>` : ''}
                   </div>
                   <p class="restaurant-meta">${escapeHTML(r.city)} · ${escapeHTML(r.price_band)} · ${escapeHTML(r.address)}</p>
@@ -293,6 +295,7 @@
             <div>
               <div class="restaurant-title-row">
                 <h2 class="restaurant-name">${escapeHTML(r.name)}</h2>
+                ${r.promoted ? '<span class="badge badge-gold">Promoted</span>' : ''}
                 ${data.promos.length ? '<span class="badge badge-brand">Promoted</span>' : ''}
                 <span class="badge badge-verified">Verified</span>
               </div>
@@ -387,6 +390,7 @@
         load();
       });
       [sRestaurant, sCuisine, sGuests, sOccasion, sCity, dateInput].forEach((el) => el.addEventListener('change', load));
+      document.addEventListener('localechange', load);
 
       seedSelects().then(load);
     })();

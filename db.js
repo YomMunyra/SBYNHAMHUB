@@ -221,6 +221,11 @@ CREATE TABLE IF NOT EXISTS restaurants (
   tagline TEXT NOT NULL DEFAULT '',
   avatar TEXT NOT NULL DEFAULT 'logo.svg',
   active INTEGER NOT NULL DEFAULT 1,
+  featured INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'approved',
+  language TEXT NOT NULL DEFAULT 'en',
+  currency TEXT NOT NULL DEFAULT 'USD',
+  currency_rate REAL NOT NULL DEFAULT 4100,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 `;
@@ -268,6 +273,13 @@ try { db.exec("ALTER TABLE yield_rules ADD COLUMN restaurant_id INTEGER NOT NULL
 try { db.exec("ALTER TABLE tables ADD COLUMN restaurant_id INTEGER NOT NULL DEFAULT 1"); } catch { /* Existing local databases already have this column. */ }
 try { db.exec("ALTER TABLE reviews ADD COLUMN restaurant_id INTEGER NOT NULL DEFAULT 1"); } catch { /* Existing local databases already have this column. */ }
 try { db.exec("ALTER TABLE waitlist ADD COLUMN restaurant_id INTEGER NOT NULL DEFAULT 1"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE restaurants ADD COLUMN featured INTEGER NOT NULL DEFAULT 0"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE restaurants ADD COLUMN status TEXT NOT NULL DEFAULT 'approved'"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE restaurants ADD COLUMN language TEXT NOT NULL DEFAULT 'en'"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE restaurants ADD COLUMN currency TEXT NOT NULL DEFAULT 'USD'"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE restaurants ADD COLUMN currency_rate REAL NOT NULL DEFAULT 4100"); } catch { /* Existing local databases already have this column. */ }
+db.exec("UPDATE restaurants SET status = 'approved' WHERE status IS NULL OR status = ''");
+db.exec("UPDATE restaurants SET language = 'en' WHERE language != 'en'");
 db.exec("UPDATE points_ledger SET remaining = delta, expires_at = datetime(created_at, '+18 months') WHERE reason = 'earned' AND remaining IS NULL");
 
 function seedSettings() {

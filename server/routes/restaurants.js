@@ -111,7 +111,7 @@ router.get('/marketplace', (req, res) => {
 
 router.get('/restaurants/:slug', (req, res) => {
   const row = getRestaurant(req.params.slug);
-  if (!row) return res.status(404).json({ error: 'Restaurant not found' });
+  if (!row || Number(row.active) !== 1 || (row.status || 'approved') !== 'approved') return res.status(404).json({ error: 'Restaurant not found' });
   const { date = '', guests = '' } = req.query;
   const party = Number(guests);
   const validParty = Number.isInteger(party) && party > 0 && party <= 20;
@@ -159,7 +159,7 @@ router.get('/restaurants/:slug', (req, res) => {
 
 router.get('/restaurants', requireAdmin, (req, res) => {
   const rows = db.prepare('SELECT * FROM restaurants ORDER BY id ASC').all();
-  res.json(rows.map((row) => ({ ...publicRestaurant(row), active: Number(row.active), slug: row.slug })));
+  res.json(rows.map((row) => ({ ...publicRestaurant(row), active: Number(row.active), slug: row.slug, status: row.status || 'approved', featured: Number(row.featured || 0) })));
 });
 
 router.post('/restaurants', requireAdmin, (req, res) => {
@@ -176,11 +176,15 @@ router.post('/restaurants', requireAdmin, (req, res) => {
   const cap = Number(capacity);
   if (!Number.isInteger(cap) || cap < 1 || cap > 1000) return res.status(400).json({ error: 'Seat capacity must be between 1 and 1000' });
   const hoursJson = JSON.stringify(Array.isArray(hours) ? hours.slice(0, 12) : []);
+  const language = 'en';
+  const currency = ['USD', 'KHR'].includes(String(req.body?.currency)) ? String(req.body.currency) : 'USD';
+  const currencyRate = Number(req.body?.currency_rate);
+  const rate = Number.isFinite(currencyRate) && currencyRate > 0 ? currencyRate : 4100;
   const id = Number(db.prepare(
-    `INSERT INTO restaurants (slug, name, city, address, phone, hours, avg_cover, capacity, tagline, avatar, active)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`
-  ).run(slug, String(name).trim(), String(city).trim(), String(address).trim(), String(phone).trim(), hoursJson, avg, cap, String(tagline || '').trim(), String(avatar || 'logo.svg').trim()).lastInsertRowid);
-  res.status(201).json({ ok: true, restaurant: publicRestaurant(db.prepare('SELECT * FROM restaurants WHERE id = ?').get(id)) });
+    `INSERT INTO restaurants (slug, name, city, address, phone, hours, avg_cover, capacity, tagline, avatar, active, status, language, currency, currency_rate)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'pending', ?, ?, ?)`
+  ).run(slug, String(name).trim(), String(city).trim(), String(address).trim(), String(phone).trim(), hoursJson, avg, cap, String(tagline || '').trim(), String(avatar || 'logo.svg').trim(), language, currency, rate).lastInsertRowid);
+  res.status(201).json({ ok: true, restaurant: { ...publicRestaurant(db.prepare('SELECT * FROM restaurants WHERE id = ?').get(id)), active: 1, status: 'pending' } });
 });
 
 router.patch('/restaurants/:id', requireAdmin, (req, res) => {
@@ -216,10 +220,27 @@ router.patch('/restaurants/:id', requireAdmin, (req, res) => {
   if (body.tagline !== undefined) patch.tagline = String(body.tagline).trim();
   if (body.avatar !== undefined) patch.avatar = String(body.avatar || 'logo.svg').trim();
   if (body.active !== undefined) patch.active = body.active ? 1 : 0;
+  if (body.featured !== undefined) patch.featured = body.featured ? 1 : 0;
+  if (body.language !== undefined) patch.language = 'en';
+  if (body.currency !== undefined) {
+    if (!['USD', 'KHR'].includes(String(body.currency))) return res.status(400).json({ error: 'Currency must be USD or KHR' });
+    patch.currency = String(body.currency);
+  }
+  if (body.currency_rate !== undefined) {
+    const rate = Number(body.currency_rate);
+    if (!Number.isFinite(rate) || rate <= 0) return res.status(400).json({ error: 'Currency rate must be greater than 0' });
+    patch.currency_rate = rate;
+  }
+  if (body.status !== undefined) {
+    if (!['pending', 'approved', 'rejected'].includes(String(body.status))) return res.status(400).json({ error: 'Status must be pending, approved or rejected' });
+    patch.status = String(body.status);
+    if (patch.status === 'approved') patch.active = 1;
+    if (patch.status === 'rejected') patch.active = 0;
+  }
   const sets = Object.keys(patch).map((key) => `${key} = ?`);
   if (sets.length) db.prepare(`UPDATE restaurants SET ${sets.join(', ')} WHERE id = ?`).run(...Object.values(patch), id);
   const row = db.prepare('SELECT * FROM restaurants WHERE id = ?').get(id);
-  res.json({ ok: true, restaurant: { ...publicRestaurant(row), active: Number(row.active), slug: row.slug } });
+  res.json({ ok: true, restaurant: { ...publicRestaurant(row), active: Number(row.active), slug: row.slug, status: row.status || 'approved', featured: Number(row.featured || 0) } });
 });
 
 router.delete('/restaurants/:id', requireAdmin, (req, res) => {

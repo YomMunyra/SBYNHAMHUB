@@ -76,7 +76,11 @@
       </div>
 
       <div id="restaurantsView" style="display:none">
-        <div class="manager-date-row"><div><p class="eyebrow">Marketplace venues</p><h2>Restaurants</h2><span>Every venue on the platform, with live booking totals. Create, edit or deactivate venues.</span></div><button class="btn btn-secondary btn-sm" id="newRestaurantBtn">+ Add restaurant</button></div>
+        <div class="manager-date-row"><div><p class="eyebrow">Marketplace venues</p><h2>Restaurants</h2><span>Every venue on the platform, with live booking totals. Approve applications, curate promoted listings, edit or deactivate venues.</span></div><button class="btn btn-secondary btn-sm" id="newRestaurantBtn">+ Add restaurant</button></div>
+        <section class="manager-panel" id="applicationsPanel" style="display:none;margin:0 0 16px">
+          <div class="manager-panel-head"><div><p class="eyebrow">Pending applications</p><h2>Approve or reject new venues</h2></div></div>
+          <div class="table-wrap"><table class="data"><thead><tr><th>Venue</th><th>City</th><th>Contact</th><th>Added</th><th></th></tr></thead><tbody id="applicationBody"><tr><td colspan="5" style="text-align:center;color:#888780">Loading applications...</td></tr></tbody></table></div>
+        </section>
         <section class="manager-panel manager-table-panel">
           <div class="form-card" id="restaurantForm" style="display:none;margin:0 0 16px;border:1px dashed var(--brand)">
             <span class="eyebrow" id="restaurantFormLabel">New restaurant</span>
@@ -93,12 +97,16 @@
                 <div class="field"><label>Average cover ($)</label><input class="input" id="rAvgCover" type="number" step="1" min="0" value="15"></div>
                 <div class="field"><label>Seat capacity</label><input class="input" id="rCapacity" type="number" min="1" max="1000" value="48"></div>
               </div>
+              <div class="form-grid">
+                <div class="field"><label>Default currency</label><select class="select" id="rCurrency"><option value="USD">USD ($)</option><option value="KHR">KHR (៛)</option></select></div>
+              </div>
               <div class="field"><label>Opening hours <span class="muted">(one per line: Label | 11:00 - 22:00)</span></label><textarea class="textarea" id="rHours" rows="4"></textarea></div>
               <div class="field"><label>Tagline</label><input class="input" id="rTagline"></div>
+              <div class="field flex" style="gap:8px"><label class="check"><input type="checkbox" id="rFeatured"> <b>Promoted listing</b> <span class="muted">— boosts this venue to the top of search with a &ldquo;Promoted&rdquo; badge</span></label></div>
               <div class="flex" style="gap:10px"><button class="btn btn-primary" id="saveRestaurantBtn">Save restaurant</button><button class="btn btn-ghost" id="cancelRestaurantBtn">Cancel</button></div>
             </div>
           </div>
-          <div class="table-wrap"><table class="data"><thead><tr><th>Venue</th><th>City</th><th>Bookings</th><th>Today</th><th>Covers today</th><th>Menu</th><th>Tables</th><th>Status</th><th></th></tr></thead><tbody id="restaurantBody"><tr><td colspan="9" style="text-align:center;color:#888780">Loading restaurants...</td></tr></tbody></table></div>
+          <div class="table-wrap"><table class="data"><thead><tr><th>Venue</th><th>City</th><th>Bookings</th><th>Today</th><th>Covers today</th><th>Menu</th><th>Tables</th><th>Status</th><th>Listing</th><th></th></tr></thead><tbody id="restaurantBody"><tr><td colspan="10" style="text-align:center;color:#888780">Loading restaurants...</td></tr></tbody></table></div>
         </section>
       </div>
 
@@ -272,7 +280,7 @@
         </section>
       </div>
       <div id="reviewsView" style="display:none"><div class="manager-date-row"><div><p class="eyebrow">Guest feedback</p><h2>Reviews & moderation</h2><span>Check what guests are saying, reply on behalf of the restaurant, and publish what goes live.</span></div><a class="btn btn-primary btn-sm" href="/reviews">View public page</a></div><section class="manager-panel manager-table-panel"><div class="table-wrap"><table class="data"><thead><tr><th>Guest</th><th>Booking</th><th>Rating</th><th>Review</th><th>Status</th><th>Reply</th><th></th></tr></thead><tbody id="reviewBody"><tr><td colspan="7" style="text-align:center;color:#888780">Loading...</td></tr></tbody></table></div></section></div>
-      <div id="settingsView" style="display:none"><div class="manager-date-row"><div><p class="eyebrow">Restaurant setup</p><h2>Restaurant profile</h2><span>Saved settings appear on the public site.</span></div></div><section class="manager-panel"><div class="form"><div class="form-grid"><div class="field"><label>Restaurant name</label><input class="input" id="setName"></div><div class="field"><label>Phone</label><input class="input" id="setPhone"></div></div><div class="field"><label>Address</label><input class="input" id="setAddress"></div><div class="field"><label>Opening hours <span class="muted">(one per line: Label | 11:00 - 22:00)</span></label><textarea class="textarea" id="setHours" rows="5"></textarea></div><div class="form-grid"><div class="field"><label>NyamPay fee rate (%)</label><input class="input" id="setFeeRate" type="number" step="0.01" min="0" max="10"></div><div class="field"><label>NyamPay flat fee ($)</label><input class="input" id="setFeeFlat" type="number" step="0.05" min="0"></div></div><button class="btn btn-primary" id="saveSettings">Save settings</button></div></section></div>
+      <div id="settingsView" style="display:none"><div class="manager-date-row"><div><p class="eyebrow">Restaurant setup</p><h2>Restaurant profile</h2><span>Saved settings appear on the public site.</span></div></div><section class="manager-panel"><div class="form"><div class="form-grid"><div class="field"><label>Restaurant name</label><input class="input" id="setName"></div><div class="field"><label>Phone</label><input class="input" id="setPhone"></div></div><div class="field"><label>Address</label><input class="input" id="setAddress"></div><div class="field"><label>Opening hours <span class="muted">(one per line: Label | 11:00 - 22:00)</span></label><textarea class="textarea" id="setHours" rows="5"></textarea></div><div class="form-grid"><div class="field"><label>Default currency</label><select class="select" id="setCurrency"><option value="USD">USD ($)</option><option value="KHR">KHR (៛)</option></select></div></div><div class="form-grid"><div class="field"><label>Currency rate <span class="muted">(KHR per USD, used for display)</span></label><input class="input" id="setCurrencyRate" type="number" step="1" min="1"></div><div class="field"><label>NyamPay fee rate (%)</label><input class="input" id="setFeeRate" type="number" step="0.01" min="0" max="10"></div><div class="field"><label>NyamPay flat fee ($)</label><input class="input" id="setFeeFlat" type="number" step="0.05" min="0"></div></div><button class="btn btn-primary" id="saveSettings">Save settings</button></div></section></div>
     </main>
   </section>
 
@@ -490,8 +498,12 @@
       }
       function renderRestaurants() {
         const body = document.getElementById('restaurantBody');
-        if (!restaurantItems.length) { body.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#888780">No restaurants yet — add your first venue.</td></tr>'; return; }
-        body.innerHTML = restaurantItems.map((r) => `
+        if (!restaurantItems.length) { body.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#888780">No restaurants yet — add your first venue.</td></tr>'; return; }
+        body.innerHTML = restaurantItems.map((r) => {
+          const statusBadge = r.status === 'pending' ? '<span class="badge badge-gold">Pending</span>' : r.status === 'rejected' ? '<span class="badge badge-neutral">Rejected</span>' : '<span class="badge badge-green">Approved</span>';
+          const listing = Number(r.featured) ? '<span class="badge badge-brand">Promoted ★</span>' : '<span class="badge badge-neutral">Standard</span>';
+          const promoteBtn = Number(r.featured) ? `<button class="btn btn-sm btn-ghost unfeature" data-id="${r.id}">Unpromote</button>` : `<button class="btn btn-sm btn-ghost feature" data-id="${r.id}">Promote ★</button>`;
+          return `
           <tr data-id="${r.id}">
             <td><strong>${escapeHTML(r.name)}</strong><div class="muted" style="font-size:12px">${escapeHTML(r.slug)} · ${r.rating ? r.rating + '★' : 'No reviews'}</div></td>
             <td>${escapeHTML(r.city)}</td>
@@ -500,8 +512,26 @@
             <td>${r.covers_today}</td>
             <td>${r.menu_count}</td>
             <td>${r.table_count}</td>
-            <td>${r.active ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-neutral">Deactivated</span>'}</td>
-            <td class="flex" style="gap:6px"><button class="btn btn-sm btn-ghost edit" data-id="${r.id}">Edit</button>${r.active ? `<button class="btn btn-sm btn-ghost del" data-id="${r.id}">Deactivate</button>` : `<button class="btn btn-sm btn-ghost reactivate" data-id="${r.id}">Activate</button>`}</td>
+            <td>${r.active ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-neutral">Deactivated</span>'} ${statusBadge}</td>
+            <td>${listing}</td>
+            <td class="flex" style="gap:6px"><button class="btn btn-sm btn-ghost edit" data-id="${r.id}">Edit</button>${promoteBtn}<button class="btn btn-sm btn-ghost support" data-id="${r.id}" title="Enter support mode as this venue's manager">Support</button>${r.active ? `<button class="btn btn-sm btn-ghost del" data-id="${r.id}">Deactivate</button>` : `<button class="btn btn-sm btn-ghost reactivate" data-id="${r.id}">Activate</button>`}</td>
+          </tr>`;
+        }).join('');
+        renderApplications();
+      }
+      function renderApplications() {
+        const pending = restaurantItems.filter((r) => r.status === 'pending');
+        const panel = document.getElementById('applicationsPanel');
+        const body = document.getElementById('applicationBody');
+        panel.style.display = pending.length ? 'block' : 'none';
+        if (!pending.length) return;
+        body.innerHTML = pending.map((r) => `
+          <tr data-id="${r.id}">
+            <td><strong>${escapeHTML(r.name)}</strong><div class="muted" style="font-size:12px">${escapeHTML(r.tagline || '')}</div></td>
+            <td>${escapeHTML(r.city)}</td>
+            <td>${escapeHTML(r.phone || '—')}</td>
+            <td class="muted">${new Date(r.created_at).toLocaleDateString()}</td>
+            <td class="flex" style="gap:6px"><button class="btn btn-sm btn-primary approve" data-id="${r.id}">Approve</button><button class="btn btn-sm btn-ghost reject" data-id="${r.id}">Reject</button></td>
           </tr>`).join('');
       }
       function openRestaurantForm(r) {
@@ -515,6 +545,8 @@
         document.getElementById('rCapacity').value = r ? r.capacity : 48;
         document.getElementById('rHours').value = (r && r.hours || []).map((h) => `${h.day} | ${h.hours}`).join('\n');
         document.getElementById('rTagline').value = r ? (r.tagline || '') : '';
+        document.getElementById('rCurrency').value = r ? (r.currency || 'USD') : 'USD';
+        document.getElementById('rFeatured').checked = r ? Number(r.featured) : false;
         const form = document.getElementById('restaurantForm');
         form.style.display = 'block';
         form.scrollIntoView({ block: 'nearest' });
@@ -528,7 +560,9 @@
           avg_cover: Number(document.getElementById('rAvgCover').value),
           capacity: Number(document.getElementById('rCapacity').value),
           hours: document.getElementById('rHours').value.split('\n').map((line) => line.trim()).filter(Boolean).map((line) => { const [day, ...rest] = line.split('|'); return { day: (day || '').trim(), hours: (rest.join('|') || '').trim() }; }),
-          tagline: document.getElementById('rTagline').value.trim()
+          tagline: document.getElementById('rTagline').value.trim(),
+          currency: document.getElementById('rCurrency').value,
+          featured: document.getElementById('rFeatured').checked
         };
         if (!payload.name) { toast('Restaurant name is required.', 'error'); return; }
         try {
@@ -540,6 +574,37 @@
           editingRestaurantId = '';
           await loadRestaurants();
           load();
+        } catch (err) { toast(err.message, 'error'); }
+      }
+      async function setRestaurantStatus(id, status) {
+        const r = restaurantItems.find((x) => String(x.id) === String(id));
+        if (!r) return;
+        try {
+          await api('/api/restaurants/' + id, { method: 'PATCH', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify({ status }) });
+          toast(status === 'approved' ? `${r.name} approved — live on the marketplace` : `${r.name} rejected`);
+          await loadRestaurants();
+          load();
+        } catch (err) { toast(err.message, 'error'); }
+      }
+      async function toggleRestaurantFeatured(id) {
+        const r = restaurantItems.find((x) => String(x.id) === String(id));
+        if (!r) return;
+        try {
+          await api('/api/restaurants/' + id, { method: 'PATCH', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify({ featured: Number(r.featured) ? 0 : 1 }) });
+          toast(Number(r.featured) ? 'Promoted listing removed' : `${r.name} promoted — now boosted to the top of search`);
+          await loadRestaurants();
+          load();
+        } catch (err) { toast(err.message, 'error'); }
+      }
+      async function impersonateRestaurant(id) {
+        const r = restaurantItems.find((x) => String(x.id) === String(id));
+        if (!r) return;
+        if (!confirm('Enter support mode as manager of "' + r.name + '"?\n\nAll manager actions (menu, settings, bookings) will be scoped to this venue. Use Exit impersonation in the manager dashboard to return.')) return;
+        try {
+          const data = await api('/api/auth/impersonate', { method: 'POST', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify({ restaurant_id: id }) });
+          localStorage.setItem(TOKEN_KEY, data.token);
+          localStorage.setItem('sbynham_impersonating', JSON.stringify({ restaurant_id: data.restaurant_id, name: data.name }));
+          location.href = '/manager';
         } catch (err) { toast(err.message, 'error'); }
       }
       async function toggleRestaurantActive(id) {
@@ -735,6 +800,8 @@
           document.getElementById('setHours').value = (s.hours || []).map((h) => `${h.day} | ${h.hours}`).join('\n');
           document.getElementById('setFeeRate').value = s.fee_rate !== undefined ? Number(s.fee_rate * 100) : 0.95;
           document.getElementById('setFeeFlat').value = s.fee_flat !== undefined ? Number(s.fee_flat) : 0.5;
+          document.getElementById('setCurrency').value = s.currency || 'USD';
+          document.getElementById('setCurrencyRate').value = s.currency_rate !== undefined ? Number(s.currency_rate) : 4100;
         } catch (e) { /* settings are optional on first load */ }
       }
 
@@ -802,7 +869,9 @@
             address: document.getElementById('setAddress').value.trim(),
             hours,
             fee_rate: Number(document.getElementById('setFeeRate').value) / 100,
-            fee_flat: Number(document.getElementById('setFeeFlat').value)
+            fee_flat: Number(document.getElementById('setFeeFlat').value),
+            currency: document.getElementById('setCurrency').value,
+            currency_rate: Number(document.getElementById('setCurrencyRate').value)
           }) });
           toast('Settings saved');
         } catch (err) { toast(err.message, 'error'); }
@@ -878,10 +947,20 @@
       document.getElementById('cancelRestaurantBtn').addEventListener('click', () => { document.getElementById('restaurantForm').style.display = 'none'; editingRestaurantId = ''; });
       document.getElementById('saveRestaurantBtn').addEventListener('click', saveRestaurant);
       document.getElementById('restaurantBody').addEventListener('click', (e) => {
-        const btn = e.target.closest('.edit, .del, .reactivate');
+        const btn = e.target.closest('.edit, .del, .reactivate, .feature, .unfeature, .support');
         if (!btn) return;
-        if (btn.classList.contains('edit')) { openRestaurantForm(restaurantItems.find((r) => String(r.id) === String(btn.dataset.id))); return; }
-        toggleRestaurantActive(btn.dataset.id);
+        const id = btn.dataset.id;
+        if (btn.classList.contains('edit')) { openRestaurantForm(restaurantItems.find((r) => String(r.id) === String(id))); return; }
+        if (btn.classList.contains('feature') || btn.classList.contains('unfeature')) { toggleRestaurantFeatured(id); return; }
+        if (btn.classList.contains('support')) { impersonateRestaurant(id); return; }
+        toggleRestaurantActive(id);
+      });
+      document.getElementById('applicationBody').addEventListener('click', (e) => {
+        const btn = e.target.closest('.approve, .reject');
+        if (!btn) return;
+        const id = btn.dataset.id;
+        if (btn.classList.contains('reject') && !confirm('Reject this application? The venue will be deactivated.')) return;
+        setRestaurantStatus(id, btn.classList.contains('approve') ? 'approved' : 'rejected');
       });
       document.getElementById('addBookingBtn').addEventListener('click', () => { const form = document.getElementById('addBookingForm'); form.style.display = form.style.display === 'none' ? 'block' : 'none'; document.getElementById('addBookingBtn').textContent = form.style.display === 'none' ? '+ Add booking' : 'Close form'; });
       document.getElementById('abCancel').addEventListener('click', resetAddBookingForm);

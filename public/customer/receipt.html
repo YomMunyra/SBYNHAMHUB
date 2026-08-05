@@ -22,7 +22,7 @@
   <section class="page-hero">
     <div class="container">
       <p class="eyebrow">SbyNhamHub · NyamPay</p>
-      <h1>Your <span class="italic-accent">receipt.</span></h1>
+      <h1 data-i18n-html="hero.receipt">Your <span class="italic-accent">receipt.</span></h1>
       <p class="lede">Every NyamPay transaction gets its own reference. Enter it below to pull up the receipt anytime.</p>
     </div>
   </section>
@@ -43,6 +43,7 @@
   <footer class="footer" id="footer"></footer>
 
   <script src="/assets/js/main.js"></script>
+  <script src="/assets/js/i18n.js"></script>
   <script>
     (function () {
       const ref = document.getElementById('recRef');
@@ -93,6 +94,7 @@
 
       document.getElementById('recLookup').addEventListener('click', lookup);
       ref.addEventListener('keydown', (e) => { if (e.key === 'Enter') lookup(); });
+      document.addEventListener('localechange', () => { if (wrap.style.display === 'block') lookup(); });
       const q = new URLSearchParams(window.location.search).get('ref');
       if (q) { ref.value = q; lookup(); }
     })();

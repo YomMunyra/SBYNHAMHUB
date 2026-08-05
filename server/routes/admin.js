@@ -31,6 +31,8 @@ router.get('/admin/platform', requireAdmin, (req, res) => {
     return {
       ...publicRestaurant(row),
       active: Number(row.active),
+      featured: Number(row.featured || 0),
+      status: row.status || 'approved',
       total_reservations: total,
       today_reservations: todayCount,
       covers_today: covers,

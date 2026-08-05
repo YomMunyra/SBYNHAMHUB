@@ -6,7 +6,6 @@ const { requireAuth } = require('../middleware/auth');
 const {
   VALID_STATUS,
   VALID_OCCASIONS,
-  VALID_TABLES,
   VALID_SOURCES,
   POINTS_PER_COVER,
   POINTS_UNIT,
@@ -16,8 +15,25 @@ const { guestId } = require('../format');
 const { sendBookingConfirmation } = require('../lib/mailer');
 const { resolvePromo, redeemPromo } = require('../lib/promos');
 const { computeBalance, redeemPoints, syncBalance } = require('../lib/points');
+const { offerFor } = require('../lib/yield');
+const { sendSms } = require('../lib/notify');
+const { sendPushToMatches } = require('../lib/push');
+const { restaurantId, getRestaurant } = require('../lib/restaurants');
 
 const router = express.Router();
+
+async function fireBookingWebhook(booking) {
+  try {
+    const raw = db.prepare('SELECT integrations FROM settings WHERE id = 1').get()?.integrations;
+    const config = JSON.parse(raw || '{}');
+    if (!config.webhook_url) return;
+    await fetch(config.webhook_url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ event: 'booking.created', booking })
+    });
+  } catch { /* webhooks are best-effort */ }
+}
 
 function awardPoints(reservation) {
   if (Number(reservation.points_awarded)) return null;
@@ -48,13 +64,17 @@ function awardPoints(reservation) {
 
 router.get('/reservations', requireAuth, (req, res) => {
   const { date } = req.query;
+  const rid = restaurantId(req);
   let sql = 'SELECT * FROM reservations';
   const params = [];
+  const where = [];
+  where.push('restaurant_id = ?');
+  params.push(rid);
   if (date) {
-    sql += ' WHERE date = ?';
+    where.push('date = ?');
     params.push(date);
   }
-  sql += ' ORDER BY date ASC, time ASC, id DESC';
+  sql += ' WHERE ' + where.join(' AND ') + ' ORDER BY date ASC, time ASC, id DESC';
   res.json(db.prepare(sql).all(...params));
 });
 
@@ -70,8 +90,13 @@ router.post('/reservations', (req, res) => {
     notes = '',
     redeem_points = '',
     promo_code = '',
-    source = 'online'
+    source = 'online',
+    sms_opt_in = false
   } = req.body;
+
+  const rid = Number(req.body.restaurant_id) || (req.body.restaurant ? (getRestaurant(req.body.restaurant)?.id || 1) : restaurantId(req));
+  const restaurant = getRestaurant(rid);
+  if (!restaurant) return res.status(400).json({ error: 'That restaurant was not found.' });
 
   const errs = [];
   if (!String(name).trim()) errs.push('name');
@@ -111,12 +136,12 @@ router.post('/reservations', (req, res) => {
     points_redeemed = rp;
   }
 
-  const avgCover = db.prepare('SELECT avg_cover FROM settings WHERE id = 1').get()?.avg_cover || 15;
+  const avgCover = Number(restaurant.avg_cover) || 15;
   let promo_id = 0;
   let promo_name = '';
   let promo_discount = 0;
   if (String(promo_code).trim()) {
-    const resolved = resolvePromo({ code: promo_code, date, time, guests: n, avgCover });
+    const resolved = resolvePromo({ code: promo_code, date, time, guests: n, avgCover, restaurantId: rid });
     if (resolved.error) return res.status(400).json({ error: resolved.error });
     promo_id = resolved.promo.id;
     promo_name = resolved.promo.name;
@@ -124,10 +149,23 @@ router.post('/reservations', (req, res) => {
     discount += promo_discount;
   }
 
+  let yield_rule_id = 0;
+  let yield_label = '';
+  let yield_discount = 0;
+  if (!promo_id) {
+    const offer = offerFor({ date, time, guests: n, restaurantId: rid });
+    if (offer) {
+      yield_rule_id = offer.rule.id;
+      yield_label = offer.label;
+      yield_discount = offer.discount;
+      discount += yield_discount;
+    }
+  }
+
   const result = db
     .prepare(
-      `INSERT INTO reservations (name, email, phone, date, time, guests, occasion, notes, points_redeemed, discount, promo_id, promo_name, promo_discount, source)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO reservations (name, email, phone, date, time, guests, occasion, notes, points_redeemed, discount, promo_id, promo_name, promo_discount, yield_rule_id, yield_label, yield_discount, source, sms_opt_in, restaurant_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       String(name).trim(),
@@ -143,7 +181,12 @@ router.post('/reservations', (req, res) => {
       promo_id,
       promo_name,
       promo_discount,
-      String(source)
+      yield_rule_id,
+      yield_label,
+      yield_discount,
+      String(source),
+      sms_opt_in ? 1 : 0,
+      rid
     );
 
   const id = Number(result.lastInsertRowid);
@@ -160,16 +203,22 @@ router.post('/reservations', (req, res) => {
 
   const row = db.prepare('SELECT * FROM reservations WHERE id = ?').get(id);
   sendBookingConfirmation(row).catch(() => {});
+  if (Number(row.sms_opt_in)) sendSms(row.phone, `${restaurant.name}: table confirmed for ${row.date} at ${row.time}. Party of ${row.guests}. Ref #${row.id}`).catch(() => {});
+  sendPushToMatches({ email: row.email, phone: row.phone }, { title: 'Your table is confirmed', body: `${restaurant.name} · ${row.date} at ${row.time} · Party of ${row.guests}`, tag: `confirmed-${row.id}` }).catch(() => {});
+  fireBookingWebhook(row);
   res.status(201).json({ ok: true, reservation: row });
 });
 
 router.patch('/reservations/:id', requireAuth, (req, res) => {
   const id = Number(req.params.id);
   const { status, table } = req.body;
-  if (status !== undefined && !VALID_STATUS.includes(status)) return res.status(400).json({ error: 'Invalid status' });
-  if (table !== undefined && table !== '' && !VALID_TABLES.includes(table)) return res.status(400).json({ error: 'Invalid table' });
   const existing = db.prepare('SELECT * FROM reservations WHERE id = ?').get(id);
   if (!existing) return res.status(404).json({ error: 'Reservation not found' });
+  if (table !== undefined && table !== '') {
+    const valid = db.prepare('SELECT name FROM tables WHERE active = 1 AND restaurant_id = ?').all(existing.restaurant_id || 1).map((t) => t.name);
+    if (!valid.includes(String(table))) return res.status(400).json({ error: 'Invalid table' });
+  }
+  if (status !== undefined && !VALID_STATUS.includes(status)) return res.status(400).json({ error: 'Invalid status' });
   db.prepare('UPDATE reservations SET status = COALESCE(?, status), table_name = COALESCE(?, table_name) WHERE id = ?').run(status ?? null, table ?? null, id);
   const row = db.prepare('SELECT * FROM reservations WHERE id = ?').get(id);
   const points = row.status === 'arrived' ? awardPoints(row) : null;
@@ -187,19 +236,20 @@ router.delete('/reservations/:id', requireAuth, (req, res) => {
 
 router.get('/stats', requireAuth, (req, res) => {
   const today = new Date().toISOString().slice(0, 10);
-  const all = db.prepare('SELECT COUNT(*) AS n FROM reservations').get().n;
+  const rid = restaurantId(req);
+  const all = db.prepare('SELECT COUNT(*) AS n FROM reservations WHERE restaurant_id = ?').get(rid).n;
   const todayCount = db
-    .prepare('SELECT COUNT(*) AS n FROM reservations WHERE date = ?')
-    .get(today).n;
+    .prepare('SELECT COUNT(*) AS n FROM reservations WHERE restaurant_id = ? AND date = ?')
+    .get(rid, today).n;
   const covers = db
-    .prepare('SELECT COALESCE(SUM(guests), 0) AS n FROM reservations WHERE date = ?')
-    .get(today).n;
+    .prepare('SELECT COALESCE(SUM(guests), 0) AS n FROM reservations WHERE restaurant_id = ? AND date = ?')
+    .get(rid, today).n;
   const confirmed = db
-    .prepare("SELECT COUNT(*) AS n FROM reservations WHERE status = 'confirmed'")
-    .get().n;
+    .prepare("SELECT COUNT(*) AS n FROM reservations WHERE restaurant_id = ? AND status = 'confirmed'")
+    .get(rid).n;
   const byStatus = db
-    .prepare('SELECT status, COUNT(*) AS n FROM reservations GROUP BY status')
-    .all();
+    .prepare('SELECT status, COUNT(*) AS n FROM reservations WHERE restaurant_id = ? GROUP BY status')
+    .all(rid);
   res.json({ total: all, today: todayCount, covers_today: covers, confirmed, by_status: byStatus });
 });
 

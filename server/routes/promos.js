@@ -4,6 +4,7 @@ const express = require('express');
 const { db } = require('../../db');
 const { requireAuth } = require('../middleware/auth');
 const { publicPromo, promoApplicable } = require('../lib/promos');
+const { restaurantId } = require('../lib/restaurants');
 
 const router = express.Router();
 
@@ -26,7 +27,8 @@ function validatePromo(body) {
     max_uses = 0,
     featured = 0,
     active = 1,
-    auto_end = 0
+    auto_end = 0,
+    occasions = []
   } = body;
 
   if (!String(name).trim()) return { error: 'Promotion name is required' };
@@ -39,7 +41,7 @@ function validatePromo(body) {
   if (String(code).trim()) {
     cleanCode = String(code).trim().toUpperCase();
     if (!/^[A-Z0-9_-]{2,20}$/.test(cleanCode)) return { error: 'Promo code must be 2-20 characters (letters, numbers, _ or -)' };
-    if (db.prepare('SELECT id FROM promos WHERE code = ?').get(cleanCode)) return { error: 'That promo code is already in use' };
+    if (db.prepare('SELECT id FROM promos WHERE code = ? AND restaurant_id = ?').get(cleanCode, Number(body.restaurant_id || 1))) return { error: 'That promo code is already in use' };
   }
 
   if (start_date && !DATES.test(String(start_date))) return { error: 'Invalid start date' };
@@ -57,6 +59,8 @@ function validatePromo(body) {
   if (!Number.isInteger(covers) || covers < 0) return { error: 'Minimum covers must be 0 or more' };
   const uses = Number(max_uses);
   if (!Number.isInteger(uses) || uses < 0) return { error: 'Usage limit must be 0 (unlimited) or more' };
+  const occasionList = Array.isArray(occasions) ? occasions.map(String).filter(Boolean).map((o) => o.trim()).filter(Boolean) : [];
+  if (occasionList.length > 10) return { error: 'Too many occasion tags (max 10)' };
 
   return {
     data: {
@@ -73,7 +77,8 @@ function validatePromo(body) {
       max_uses: uses,
       featured: featured ? 1 : 0,
       active: active ? 1 : 0,
-      auto_end: auto_end ? 1 : 0
+      auto_end: auto_end ? 1 : 0,
+      occasions: JSON.stringify(occasionList)
     }
   };
 }
@@ -97,12 +102,14 @@ function toRow(row) {
     featured: Number(row.featured),
     active: Number(row.active),
     auto_end: Number(row.auto_end),
+    occasions: (() => { try { return JSON.parse(row.occasions); } catch { return []; } })(),
     created_at: row.created_at
   };
 }
 
 function allPromos(req, res) {
-  res.json(db.prepare('SELECT * FROM promos ORDER BY id DESC').all().map(toRow));
+  const rid = restaurantId(req);
+  res.json(db.prepare('SELECT * FROM promos WHERE restaurant_id = ? ORDER BY id DESC').all(rid).map(toRow));
 }
 
 router.get('/promos', (req, res, next) => {
@@ -111,8 +118,9 @@ router.get('/promos', (req, res, next) => {
 });
 
 router.get('/promos', (req, res) => {
+  const rid = restaurantId(req);
   const today = new Date().toISOString().slice(0, 10);
-  const rows = db.prepare('SELECT * FROM promos ORDER BY id DESC').all();
+  const rows = db.prepare('SELECT * FROM promos WHERE restaurant_id = ? ORDER BY id DESC').all(rid);
   const applicable = (row) => {
     if (!Number(row.active) || !Number(row.featured)) return false;
     if (row.max_uses > 0 && Number(row.used) >= Number(row.max_uses)) return false;
@@ -125,7 +133,8 @@ router.get('/promos', (req, res) => {
 
 router.get('/promos/offers', (req, res) => {
   const { date = '', time = '', guests = 1 } = req.query;
-  const rows = db.prepare('SELECT * FROM promos ORDER BY id DESC').all();
+  const rid = restaurantId(req);
+  const rows = db.prepare('SELECT * FROM promos WHERE restaurant_id = ? ORDER BY id DESC').all(rid);
   const offers = rows
     .filter((row) => promoApplicable(row, { date, time, guests: Number(guests) }))
     .map(publicPromo);
@@ -133,20 +142,23 @@ router.get('/promos/offers', (req, res) => {
 });
 
 router.post('/promos', requireAuth, (req, res) => {
-  const { data, error } = validatePromo(req.body);
+  const rid = restaurantId(req);
+  const data = { ...(req.body || {}), restaurant_id: rid };
+  const { data: clean, error } = validatePromo(data);
   if (error) return res.status(400).json({ error });
   const id = Number(
     db.prepare(
-      `INSERT INTO promos (name, code, type, value, start_date, end_date, days, start_time, end_time, min_covers, max_uses, featured, active, auto_end)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(data.name, data.code, data.type, data.value, data.start_date, data.end_date, data.days, data.start_time, data.end_time, data.min_covers, data.max_uses, data.featured, data.active, data.auto_end).lastInsertRowid
+      `INSERT INTO promos (name, code, type, value, start_date, end_date, days, start_time, end_time, min_covers, max_uses, featured, active, auto_end, occasions, restaurant_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(clean.name, clean.code, clean.type, clean.value, clean.start_date, clean.end_date, clean.days, clean.start_time, clean.end_time, clean.min_covers, clean.max_uses, clean.featured, clean.active, clean.auto_end, clean.occasions, rid).lastInsertRowid
   );
   res.status(201).json({ ok: true, promo: toRow(db.prepare('SELECT * FROM promos WHERE id = ?').get(id)) });
 });
 
 router.patch('/promos/:id', requireAuth, (req, res) => {
   const id = Number(req.params.id);
-  const existing = db.prepare('SELECT * FROM promos WHERE id = ?').get(id);
+  const rid = restaurantId(req);
+  const existing = db.prepare('SELECT * FROM promos WHERE id = ? AND restaurant_id = ?').get(id, rid);
   if (!existing) return res.status(404).json({ error: 'Promotion not found' });
 
   const body = req.body;
@@ -168,7 +180,7 @@ router.patch('/promos/:id', requireAuth, (req, res) => {
   }
   if (body.code !== undefined) {
     if (nextCode && !/^[A-Z0-9_-]{2,20}$/.test(nextCode)) return res.status(400).json({ error: 'Promo code must be 2-20 characters (letters, numbers, _ or -)' });
-    const clash = nextCode ? db.prepare('SELECT id FROM promos WHERE code = ? AND id != ?').get(nextCode, id) : null;
+    const clash = nextCode ? db.prepare('SELECT id FROM promos WHERE code = ? AND restaurant_id = ? AND id != ?').get(nextCode, rid, id) : null;
     if (clash) return res.status(400).json({ error: 'That promo code is already in use' });
     patch.code = nextCode || null;
   }
@@ -214,6 +226,11 @@ router.patch('/promos/:id', requireAuth, (req, res) => {
   if (body.featured !== undefined) patch.featured = body.featured ? 1 : 0;
   if (body.active !== undefined) patch.active = body.active ? 1 : 0;
   if (body.auto_end !== undefined) patch.auto_end = body.auto_end ? 1 : 0;
+  if (body.occasions !== undefined) {
+    const occasionList = Array.isArray(body.occasions) ? body.occasions.map(String).filter(Boolean).map((o) => o.trim()).filter(Boolean) : [];
+    if (occasionList.length > 10) return res.status(400).json({ error: 'Too many occasion tags (max 10)' });
+    patch.occasions = JSON.stringify(occasionList);
+  }
 
   const sets = Object.keys(patch).map((key) => `${key} = ?`);
   if (sets.length) db.prepare(`UPDATE promos SET ${sets.join(', ')} WHERE id = ?`).run(...Object.values(patch), id);
@@ -221,7 +238,8 @@ router.patch('/promos/:id', requireAuth, (req, res) => {
 });
 
 router.delete('/promos/:id', requireAuth, (req, res) => {
-  const result = db.prepare('DELETE FROM promos WHERE id = ?').run(Number(req.params.id));
+  const rid = restaurantId(req);
+  const result = db.prepare('DELETE FROM promos WHERE id = ? AND restaurant_id = ?').run(Number(req.params.id), rid);
   if (!result.changes) return res.status(404).json({ error: 'Promotion not found' });
   res.json({ ok: true });
 });

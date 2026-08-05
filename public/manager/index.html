@@ -37,10 +37,12 @@
         <button class="manager-nav-link" data-view="waitlist"><span class="manager-icon">&#9775;</span>Waitlist <span class="manager-nav-badge" id="waitlistBadge" style="display:none">0</span></button>
         <button class="manager-nav-link" data-view="menu"><span class="manager-icon">&#9776;</span>Menu</button>
         <button class="manager-nav-link" data-view="promotions"><span class="manager-icon">&#37;</span>Promotions</button>
+        <button class="manager-nav-link" data-view="yield"><span class="manager-icon">&#37;</span>Yield</button>
         <button class="manager-nav-link" data-view="embed"><span class="manager-icon">&lt;/&gt;</span>Embed &amp; share</button>
         <button class="manager-nav-link" data-view="payments"><span class="manager-icon">&#36;</span>Payments</button>
         <button class="manager-nav-link" data-view="reviews"><span class="manager-icon">&#9734;</span>Reviews <span class="manager-nav-badge" id="reviewBadge" style="display:none">0</span></button>
         <button class="manager-nav-link" data-view="settings"><span class="manager-icon">&#9881;</span>Restaurant settings</button>
+        <button class="manager-nav-link" data-view="integrations"><span class="manager-icon">&#8596;</span>Integrations</button>
       </nav>
       <div class="manager-role-switch">
         <p class="manager-label">Quick switch</p>
@@ -118,10 +120,38 @@
         </div>
       </div>
       <div id="floorView" style="display:none">
-        <div class="manager-date-row"><div><p class="eyebrow">Floor management</p><h2>Today's table plan</h2><span>Assign confirmed guests to a table before service.</span></div></div>
-        <div class="floor-layout"><section class="manager-panel"><div class="floor-legend"><span><i class="table-free"></i>Available</span><span><i class="table-booked"></i>Reserved</span><span><i class="table-arrived"></i>Seated</span></div><div class="floor-zone"><span>Window seats</span><div class="table-grid" id="tableGrid"></div></div></section><section class="manager-panel assignment-panel"><p class="eyebrow">Assign a table</p><h2 id="selectedGuest">Select a booking</h2><p id="selectedGuestInfo">Choose a reservation from today's list, then choose an available table.</p><div id="unassignedBookings" class="unassigned-list"></div></section></div>
+        <div class="manager-date-row"><div><p class="eyebrow">Floor management</p><h2>Today's table plan</h2><span>Drag a booking onto a table to seat it, or drag tables to rearrange the room.</span></div><button class="btn btn-secondary btn-sm" id="addTableBtn">+ Add table</button></div>
+        <div class="floor-layout">
+          <section class="manager-panel">
+            <div class="floor-legend"><span><i class="table-free"></i>Available</span><span><i class="table-booked"></i>Reserved</span><span><i class="table-arrived"></i>Seated</span><span><i class="table-suggested"></i>Suggested fit</span></div>
+            <div class="floor-canvas" id="floorCanvas">
+              <div class="floor-grid-bg"></div>
+              <div id="floorTables"></div>
+              <div class="floor-hint" id="floorHint">Drag a booking from the right onto a highlighted table.</div>
+            </div>
+          </section>
+          <section class="manager-panel assignment-panel">
+            <p class="eyebrow">Assign a table</p>
+            <h2 id="selectedGuest">Select a booking</h2>
+            <p id="selectedGuestInfo">Choose a reservation from today's list, then choose an available table.</p>
+            <div id="suggestHint" class="floor-suggest" style="display:none"></div>
+            <div id="unassignedBookings" class="unassigned-list"></div>
+          </section>
+        </div>
       </div>
-      <div id="guestsView" style="display:none"><div class="manager-date-row"><div><p class="eyebrow">Guest CRM</p><h2>Guest profiles</h2><span>Remember preferences, track visits and Nyam Points for repeat guests.</span></div><input class="input" id="guestSearch" placeholder="Search name, email or phone" style="max-width:300px"></div><div class="guest-layout"><section class="manager-panel"><div id="guestList" class="guest-list"><p class="muted">Loading guests...</p></div></section><section class="manager-panel guest-detail"><p class="eyebrow">Guest details</p><h2 id="guestName">Select a guest</h2><p id="guestContact" class="muted">Their booking history will appear here.</p><div id="guestHistory" class="guest-history"></div><div id="guestPoints" class="guest-points"></div><div class="field"><label for="guestPreferences">Service notes and preferences</label><textarea class="textarea" id="guestPreferences" placeholder="Favourite table, allergies, celebrations..." disabled></textarea></div><button class="btn btn-primary" id="saveGuest" disabled>Save preferences</button></section></div></div>
+      <div id="guestsView" style="display:none"><div class="manager-date-row"><div><p class="eyebrow">Guest CRM</p><h2>Guest profiles</h2><span>Remember preferences, dietary needs, favourite tables, occasions and VIPs for repeat guests.</span></div><input class="input" id="guestSearch" placeholder="Search name, email or phone" style="max-width:300px"></div><div class="guest-layout"><section class="manager-panel"><div id="guestList" class="guest-list"><p class="muted">Loading guests...</p></div></section><section class="manager-panel guest-detail"><p class="eyebrow">Guest details</p><h2 id="guestName">Select a guest</h2><p id="guestContact" class="muted">Their booking history will appear here.</p><div id="guestHistory" class="guest-history"></div><div id="guestPoints" class="guest-points"></div>
+          <div class="form-grid" style="grid-template-columns:1fr 1fr">
+            <div class="field"><label for="gDietary">Dietary requirements <span class="muted">(comma separated)</span></label><input class="input" id="gDietary" placeholder="Vegetarian, Vegan, Gluten-free" disabled></div>
+            <div class="field"><label for="gAllergies">Allergies</label><input class="input" id="gAllergies" placeholder="Peanuts, Shellfish, Lactose" disabled></div>
+          </div>
+          <div class="form-grid" style="grid-template-columns:1fr 1fr">
+            <div class="field"><label for="gFavTable">Favourite table</label><select class="select" id="gFavTable" disabled><option value="">Any table</option></select></div>
+            <div class="field"><label for="gOccasions">Celebrated occasions</label><input class="input" id="gOccasions" placeholder="Birthday, Anniversary" disabled></div>
+          </div>
+          <div class="field flex"><label class="check"><input type="checkbox" id="gVip" disabled> VIP — mark for priority seating &amp; special attention</label></div>
+          <div class="field"><label for="guestPreferences">Service notes and preferences</label><textarea class="textarea" id="guestPreferences" placeholder="Favourite table, allergies, celebrations..." disabled></textarea></div>
+          <button class="btn btn-primary" id="saveGuest" disabled>Save preferences</button>
+        </section></div></div>
       <div id="waitlistView" style="display:none"><div class="manager-date-row"><div><p class="eyebrow">Standby list</p><h2>Waitlist</h2><span>Guests who couldn't find a table — call them when space opens up.</span></div><div class="flex"><input class="input" type="date" id="waitlistDate" style="max-width:180px"><button class="btn btn-ghost btn-sm" id="clearWaitlist">All dates</button></div></div><section class="manager-panel manager-table-panel"><div class="table-wrap"><table class="data"><thead><tr><th>Name</th><th>Contact</th><th>Party</th><th>Preferred</th><th>Notes</th><th>Status</th><th></th></tr></thead><tbody id="waitlistBody"><tr><td colspan="7" style="text-align:center;color:#888780">Loading...</td></tr></tbody></table></div></section></div>
       <div id="menuView" style="display:none">
         <div class="manager-date-row"><div><p class="eyebrow">Restaurant menu</p><h2>Menu management</h2><span>Add, edit, price and de-list dishes. Changes go live instantly.</span></div><a class="btn btn-primary btn-sm" href="/menu">View public menu</a></div>
@@ -193,6 +223,32 @@
           <div class="table-wrap"><table class="data"><thead><tr><th>Promotion</th><th>Code</th><th>Discount</th><th>Window</th><th>Limits</th><th>Usage</th><th>Flags</th><th></th></tr></thead><tbody id="promoBody"><tr><td colspan="8" style="text-align:center;color:#888780">Loading promotions...</td></tr></tbody></table></div>
         </section>
       </div>
+      <div id="yieldView" style="display:none">
+        <div class="manager-date-row"><div><p class="eyebrow">Demand-based pricing</p><h2>Yield management</h2><span>Auto-apply a percentage discount to reservations that fall inside a time window. Promo codes always replace yield offers for a booking.</span></div><button class="btn btn-secondary btn-sm" id="newYieldBtn">+ New yield rule</button></div>
+        <section class="manager-panel manager-table-panel">
+          <div class="form-card" id="yieldForm" style="display:none;margin:0 0 16px;border:1px dashed var(--brand)">
+            <span class="eyebrow" id="yieldFormLabel">New yield rule</span>
+            <div class="form">
+              <div class="form-grid">
+                <div class="field"><label>Rule name <span class="req">*</span></label><input class="input" id="yName" placeholder="e.g. Early-bird lunch"></div>
+                <div class="field"><label>Day of week</label><select class="select" id="yDow"><option value="-1">Every day</option><option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option></select></div>
+              </div>
+              <div class="form-grid">
+                <div class="field"><label>Window start time</label><input class="input" id="yStartTime" type="time"></div>
+                <div class="field"><label>Window end time</label><input class="input" id="yEndTime" type="time"></div>
+              </div>
+              <div class="form-grid">
+                <div class="field"><label>Discount % <span class="req">*</span></label><input class="input" id="yPct" type="number" step="1" min="1" max="50" placeholder="15"></div>
+                <div class="field"><label>Minimum covers</label><input class="input" id="yMinCovers" type="number" min="0" placeholder="0 = any party"></div>
+              </div>
+              <div class="field"><label>Label shown to guests</label><input class="input" id="yLabel" placeholder="e.g. Early-bird lunch"></div>
+              <div class="field flex"><label class="check"><input type="checkbox" id="yActive" checked> Active</label></div>
+              <div class="flex" style="gap:10px"><button class="btn btn-primary" id="saveYieldBtn">Save rule</button><button class="btn btn-ghost" id="cancelYieldBtn">Cancel</button></div>
+            </div>
+          </div>
+          <div class="table-wrap"><table class="data"><thead><tr><th>Rule</th><th>Day</th><th>Window</th><th>Min covers</th><th>Discount</th><th>Guest label</th><th>Active</th><th></th></tr></thead><tbody id="yieldBody"><tr><td colspan="8" style="text-align:center;color:#888780">Loading yield rules...</td></tr></tbody></table></div>
+        </section>
+      </div>
       <div id="embedView" style="display:none">
         <div class="manager-date-row"><div><p class="eyebrow">Booking widget</p><h2>Embed &amp; share</h2><span>Drop the SbyNhamHub booking widget on any website with one line of code. Customise it, watch it live, then copy the snippet.</span></div></div>
         <div class="embed-layout">
@@ -227,6 +283,29 @@
       </div>
       <div id="reviewsView" style="display:none"><div class="manager-date-row"><div><p class="eyebrow">Guest feedback</p><h2>Reviews & moderation</h2><span>Check what guests are saying, reply on behalf of the restaurant, and publish what goes live.</span></div><a class="btn btn-primary btn-sm" href="/reviews">View public page</a></div><section class="manager-panel manager-table-panel"><div class="table-wrap"><table class="data"><thead><tr><th>Guest</th><th>Booking</th><th>Rating</th><th>Review</th><th>Status</th><th>Reply</th><th></th></tr></thead><tbody id="reviewBody"><tr><td colspan="7" style="text-align:center;color:#888780">Loading...</td></tr></tbody></table></div></section></div>
       <div id="settingsView" style="display:none"><div class="manager-date-row"><div><p class="eyebrow">Restaurant setup</p><h2>Restaurant profile</h2><span>Saved settings appear on the public site.</span></div></div><section class="manager-panel"><div class="form"><div class="form-grid"><div class="field"><label>Restaurant name</label><input class="input" id="setName"></div><div class="field"><label>Phone</label><input class="input" id="setPhone"></div></div><div class="field"><label>Address</label><input class="input" id="setAddress"></div><div class="field"><label>Opening hours <span class="muted">(one per line: Label | 11:00 - 22:00)</span></label><textarea class="textarea" id="setHours" rows="5"></textarea></div><div class="form-grid"><div class="field"><label>NyamPay fee rate (%)</label><input class="input" id="setFeeRate" type="number" step="0.01" min="0" max="10"></div><div class="field"><label>NyamPay flat fee ($)</label><input class="input" id="setFeeFlat" type="number" step="0.05" min="0"></div></div><button class="btn btn-primary" id="saveSettings">Save settings</button></div></section></div>
+      <div id="integrationsView" style="display:none">
+        <div class="manager-date-row"><div><p class="eyebrow">Notifications & webhooks</p><h2>Integrations</h2><span>Reminders reach guests by email, SMS and push. Connect a webhook URL to stream every new booking to your own systems.</span></div></div>
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr;align-items:start;gap:18px">
+          <section class="manager-panel"><div class="form">
+            <p class="eyebrow">Reminder channels</p>
+            <div class="field flex"><label class="check"><input type="checkbox" id="intSmsEnabled" checked> Enable SMS reminders</label></div>
+            <div class="field flex"><label class="check"><input type="checkbox" id="intPushEnabled" checked> Enable push notifications</label></div>
+            <div class="field"><label>SMS webhook URL <span class="muted">(receives POST {phone, message})</span></label><input class="input" id="intWebhookUrl" placeholder="https://your-sms-gateway.example/send"></div>
+            <div class="flex" style="gap:10px"><button class="btn btn-primary" id="saveIntegrations">Save integrations</button></div>
+            <div class="form-divider"></div>
+            <p class="eyebrow">Test channels</p>
+            <div class="flex" style="gap:10px;flex-wrap:wrap">
+              <input class="input" id="intTestPhone" placeholder="+855... for SMS test" style="max-width:220px">
+              <button class="btn btn-ghost btn-sm" id="smsTestBtn">Send test SMS</button>
+              <button class="btn btn-ghost btn-sm" id="pushTestBtn">Send test push</button>
+              <button class="btn btn-ghost btn-sm" id="webhookTestBtn">Test webhook</button>
+            </div>
+          </div></section>
+          <section class="manager-panel"><p class="eyebrow">Push setup</p>
+            <div id="pushSetup" class="guest-history"><p class="muted">Loading push status...</p></div>
+          </section>
+        </div>
+      </div>
     </main>
   </section>
 
@@ -243,8 +322,8 @@
       document.getElementById('todayLabel').textContent = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date(today + 'T12:00:00'));
 
       function statusBadge(status) { const map = { pending:'badge-gold', confirmed:'badge-brand', arrived:'badge-green', cancelled:'badge-neutral', 'no-show':'badge-red' }; return `<span class="badge ${map[status] || 'badge-neutral'}">${escapeHTML(status)}</span>`; }
-      let floorBookings = [], selectedBookingId = '', guestItems = [], selectedGuestId = '', reviewItems = [], menuItems = [], categories = [], waitlistItems = [], analyticsData = null, promoItems = [], editingPromoId = '', paymentItems = [], renderedReservations = [];
-      function showView(view) { ['overview','analytics','bookings','floor','guests','waitlist','menu','promotions','embed','payments','reviews','settings'].forEach((name) => document.getElementById(name + 'View').style.display = view === name ? 'block' : 'none'); document.getElementById('viewTitle').textContent = view === 'settings' ? 'Restaurant settings' : view === 'bookings' ? 'Reservation desk' : view === 'floor' ? 'Floor plan' : view === 'guests' ? 'Guest profiles' : view === 'waitlist' ? 'Waitlist' : view === 'menu' ? 'Menu management' : view === 'promotions' ? 'Promotions' : view === 'embed' ? 'Embed & share' : view === 'payments' ? 'Payments' : view === 'reviews' ? 'Reviews & moderation' : view === 'analytics' ? 'Analytics' : 'Good day, manager'; document.querySelectorAll('[data-view]').forEach((el) => el.classList.toggle('active', el.dataset.view === view && el.classList.contains('manager-nav-link'))); if (view === 'embed') renderEmbed(); }
+      let floorBookings = [], selectedBookingId = '', guestItems = [], selectedGuestId = '', reviewItems = [], menuItems = [], categories = [], waitlistItems = [], analyticsData = null, promoItems = [], editingPromoId = '', paymentItems = [], renderedReservations = [], yieldItems = [], editingYieldId = '', tableItems = [];
+      function showView(view) { ['overview','analytics','bookings','floor','guests','waitlist','menu','promotions','yield','embed','payments','reviews','settings','integrations'].forEach((name) => document.getElementById(name + 'View').style.display = view === name ? 'block' : 'none'); document.getElementById('viewTitle').textContent = view === 'settings' ? 'Restaurant settings' : view === 'integrations' ? 'Integrations' : view === 'bookings' ? 'Reservation desk' : view === 'floor' ? 'Floor plan' : view === 'guests' ? 'Guest profiles' : view === 'waitlist' ? 'Waitlist' : view === 'menu' ? 'Menu management' : view === 'promotions' ? 'Promotions' : view === 'yield' ? 'Yield management' : view === 'embed' ? 'Embed & share' : view === 'payments' ? 'Payments' : view === 'reviews' ? 'Reviews & moderation' : view === 'analytics' ? 'Analytics' : 'Good day, manager'; document.querySelectorAll('[data-view]').forEach((el) => el.classList.toggle('active', el.dataset.view === view && el.classList.contains('manager-nav-link'))); if (view === 'embed') renderEmbed(); if (view === 'integrations') loadIntegrations(); }
       function renderReviews() {
         const rows = document.getElementById('reviewBody');
         if (!reviewItems.length) { rows.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888780">No reviews yet. Guest reviews will appear here once submitted.</td></tr>'; return; }
@@ -257,7 +336,6 @@
       function renderGuests() {
         const q = document.getElementById('guestSearch').value.toLowerCase();
         const items = guestItems.filter((g) => `${g.name} ${g.email} ${g.phone}`.toLowerCase().includes(q));
-        document.getElementById('guestList').innerHTML = items.length ? items.map((g) => `<button class="guest-row ${g.id === selectedGuestId ? 'selected' : ''}" data-guest="${g.id}"><b>${escapeHTML(g.name)}</b><span>${g.total_bookings} booking${g.total_bookings === 1 ? '' : 's'}${g.points ? ' - ' + g.points + ' pts' : ''}${g.preferences ? ' - notes saved' : ''}</span></button>`).join('') : '<p class="muted">No guests found.</p>';
         const g = guestItems.find((item) => item.id === selectedGuestId);
         document.getElementById('guestName').textContent = g ? g.name : 'Select a guest';
         document.getElementById('guestContact').textContent = g ? `${g.email || 'No email'} - ${g.phone}` : 'Their booking history will appear here.';
@@ -274,7 +352,15 @@
         }
         const notes = document.getElementById('guestPreferences');
         notes.disabled = !g; notes.value = g?.preferences || '';
+        const favTable = document.getElementById('gFavTable');
+        favTable.innerHTML = '<option value="">Any table</option>' + tableItems.map((t) => `<option value="${escapeHTML(t.name)}">${escapeHTML(t.name)}</option>`).join('');
+        favTable.disabled = !g; favTable.value = g?.favourite_table || '';
+        document.getElementById('gDietary').disabled = !g; document.getElementById('gDietary').value = JSON.parse(g?.dietary || '[]').join(', ');
+        document.getElementById('gAllergies').disabled = !g; document.getElementById('gAllergies').value = JSON.parse(g?.allergies || '[]').join(', ');
+        document.getElementById('gOccasions').disabled = !g; document.getElementById('gOccasions').value = JSON.parse(g?.occasions || '[]').join(', ');
+        document.getElementById('gVip').disabled = !g; document.getElementById('gVip').checked = !!Number(g?.vip);
         document.getElementById('saveGuest').disabled = !g;
+        document.getElementById('guestList').innerHTML = items.length ? items.map((g) => `<button class="guest-row ${g.id === selectedGuestId ? 'selected' : ''}" data-guest="${g.id}"><b>${escapeHTML(g.name)}${Number(g.vip) ? ' <span class="badge badge-gold" style="padding:1px 6px">VIP</span>' : ''}</b><span>${g.total_bookings} booking${g.total_bookings === 1 ? '' : 's'}${g.points ? ' - ' + g.points + ' pts' : ''}${g.preferences ? ' - notes saved' : ''}</span></button>`).join('') : '<p class="muted">No guests found.</p>';
       }
       function showBookingGuest(reservation) {
         const panel = document.getElementById('bookingGuestPanel');
@@ -293,7 +379,41 @@
         panel.style.display = 'block';
       }
       function tableOf(r) { return r.table || r.table_name || ''; }
-      function renderFloor() { const active = floorBookings.filter((r) => !['cancelled','no-show'].includes(r.status)); const selected = active.find((r) => r.id === selectedBookingId); document.getElementById('selectedGuest').textContent = selected ? selected.name : 'Select a booking'; document.getElementById('selectedGuestInfo').textContent = selected ? `${selected.guests} guests at ${selected.time}. Pick an available table.` : 'Choose a reservation from today\'s list, then choose an available table.'; document.getElementById('tableGrid').innerHTML = Array.from({length:12}, (_, i) => { const name = `T${i + 1}`, guest = active.find((r) => tableOf(r) === name), state = guest ? (guest.status === 'arrived' ? 'arrived' : 'booked') : 'free'; return `<button class="floor-table ${state}" data-table="${name}" ${!selected || guest ? 'disabled' : ''}><b>${name}</b><span>${guest ? escapeHTML(guest.name) : 'Available'}</span></button>`; }).join(''); document.getElementById('unassignedBookings').innerHTML = active.filter((r) => !tableOf(r)).length ? active.filter((r) => !tableOf(r)).map((r) => `<button class="unassigned-booking ${r.id === selectedBookingId ? 'selected' : ''}" data-booking="${r.id}"><b>${escapeHTML(r.time)} - ${escapeHTML(r.name)}</b><span>${r.guests} guests</span></button>`).join('') : '<p class="muted">All active bookings have a table.</p>'; }
+      let dragBookingId = '';
+      function suggestFor(party, active) {
+        const free = tableItems.filter((t) => Number(t.active) !== 0 && !active.some((r) => tableOf(r) === t.name));
+        const fits = free.filter((t) => Number(t.seats) >= Number(party)).sort((a, b) => Number(a.seats) - Number(b.seats) || String(a.zone).localeCompare(String(b.zone)) || String(a.name).localeCompare(String(b.name)));
+        const best = fits[0];
+        return { fits, best };
+      }
+      function renderFloor() {
+        const active = floorBookings.filter((r) => !['cancelled','no-show'].includes(r.status));
+        const selected = active.find((r) => r.id === selectedBookingId);
+        document.getElementById('selectedGuest').textContent = selected ? selected.name : 'Select a booking';
+        document.getElementById('selectedGuestInfo').textContent = selected ? `${selected.guests} guests at ${selected.time}. Drag onto a table or tap a suggested one.` : 'Choose a reservation from today\'s list, then choose an available table.';
+        const suggestion = selected ? suggestFor(selected.guests, active) : null;
+        const hint = document.getElementById('suggestHint');
+        if (suggestion && suggestion.best) {
+          hint.style.display = 'block';
+          hint.innerHTML = `<strong>Best fit:</strong> <span class="badge badge-brand">${escapeHTML(suggestion.best.name)}</span> seats ${suggestion.best.seats}${suggestion.fits.length > 1 ? ` · ${suggestion.fits.length} tables fit your party` : ''}`;
+        } else if (suggestion) {
+          hint.style.display = 'block';
+          hint.innerHTML = '<span class="muted">No free table fits this party size right now — consider a waitlist or split party.</span>';
+        } else {
+          hint.style.display = 'none';
+        }
+        const canvas = document.getElementById('floorTables');
+        canvas.innerHTML = tableItems.filter((t) => Number(t.active) !== 0).map((t) => {
+          const guest = active.find((r) => tableOf(r) === t.name);
+          const state = guest ? (guest.status === 'arrived' ? 'arrived' : 'booked') : 'free';
+          const suggested = suggestion && !guest && suggestion.fits.some((f) => f.name === t.name) ? ' suggested' : '';
+          return `<div class="floor-table floor-table-abs ${state}${suggested}" data-table="${escapeHTML(t.name)}" draggable="true" style="left:${Number(t.x)}%;top:${Number(t.y)}%;transform:rotate(${Number(t.rotation) || 0}deg)" title="Seats ${t.seats} - ${escapeHTML(t.zone)}">
+            <b>${escapeHTML(t.name)}</b><span>${guest ? escapeHTML(guest.name) : t.seats + ' seats'}</span>${guest ? `<small>${guest.guests} guests${guest.status === 'arrived' ? ' · seated' : ''}</small>` : ''}
+          </div>`;
+        }).join('');
+        if (selected && dragBookingId) dragBookingId = '';
+        document.getElementById('unassignedBookings').innerHTML = active.filter((r) => !tableOf(r)).length ? active.filter((r) => !tableOf(r)).map((r) => `<button class="unassigned-booking ${r.id === selectedBookingId ? 'selected' : ''}" data-booking="${r.id}" draggable="true"><b>${escapeHTML(r.time)} - ${escapeHTML(r.name)}</b><span>${r.guests} guests${suggestFor(r.guests, active).best ? ' · suggested ' + escapeHTML(suggestFor(r.guests, active).best.name) : ''}</span></button>`).join('') : '<p class="muted">All active bookings have a table.</p>';
+      }
       function showDash() { loginView.style.display = 'none'; dashView.style.display = 'flex'; load(); }
 
       function renderTable(items) {
@@ -353,7 +473,7 @@
           paymentItems = await api('/api/payments', { headers }); renderPayments();
           await loadSettings();
           reviewItems = await api('/api/reviews?all=1', { headers }); renderReviews();
-          promoItems = await api('/api/promos?all=1', { headers }); renderPromos();          const pendingCount = reviewItems.filter((r) => r.status === 'pending').length;
+          promoItems = await api('/api/promos?all=1', { headers }); renderPromos();          yieldItems = await api('/api/yield/rules', { headers }); renderYield();          tableItems = await api('/api/tables', { headers }); renderFloor();          const pendingCount = reviewItems.filter((r) => r.status === 'pending').length;
           const badge = document.getElementById('reviewBadge');
           if (pendingCount) { badge.textContent = pendingCount; badge.style.display = 'inline-flex'; } else { badge.style.display = 'none'; }
           document.getElementById('todayBookings').innerHTML = active.length ? active.map((r) => `<div class="timeline-booking"><strong>${escapeHTML(r.time)}</strong><div><b>${escapeHTML(r.name)}</b><span>${r.guests} guest${r.guests === 1 ? '' : 's'}${r.occasion ? ' - ' + escapeHTML(r.occasion) : ''}</span></div>${statusBadge(r.status)}</div>`).join('') : '<div class="empty-service"><strong>No bookings yet</strong><span>New reservations will appear here.</span></div>';
@@ -473,6 +593,52 @@
           featured: document.getElementById('pFeatured').checked,
           active: document.getElementById('pActive').checked,
           auto_end: document.getElementById('pAutoEnd').checked
+        };
+      }
+      function yieldDayName(d) {
+        const names = { '-1': 'Every day', '0': 'Sunday', '1': 'Monday', '2': 'Tuesday', '3': 'Wednesday', '4': 'Thursday', '5': 'Friday', '6': 'Saturday' };
+        return names[String(d)] || 'Every day';
+      }
+      function renderYield() {
+        const body = document.getElementById('yieldBody');
+        if (!yieldItems.length) { body.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888780">No yield rules yet - create your first rule.</td></tr>'; return; }
+        body.innerHTML = yieldItems.map((r) => `
+          <tr data-id="${r.id}">
+            <td><strong>${escapeHTML(r.name)}</strong></td>
+            <td>${yieldDayName(r.day_of_week)}</td>
+            <td style="font-size:13px">${r.start_time || r.end_time ? `${escapeHTML(r.start_time || '')}${r.start_time && r.end_time ? ' - ' : ''}${escapeHTML(r.end_time || '')}` : '<span class="muted">All day</span>'}</td>
+            <td style="font-size:13px">${r.min_covers ? `Min ${r.min_covers} cover${r.min_covers === 1 ? '' : 's'}` : 'Any party'}</td>
+            <td><b>${Number(r.discount_pct)}% off</b></td>
+            <td>${r.label ? `<span class="badge badge-brand">${escapeHTML(r.label)}</span>` : '-'}</td>
+            <td class="flex" style="gap:8px"><label class="check"><input type="checkbox" data-id="${r.id}" data-field="active" ${r.active ? 'checked' : ''}> On</label></td>
+            <td class="flex" style="gap:6px"><button class="btn btn-sm btn-ghost edit" data-id="${r.id}">Edit</button><button class="btn btn-sm btn-ghost del" data-id="${r.id}">Delete</button></td>
+          </tr>`).join('');
+      }
+      function openYieldForm(r) {
+        editingYieldId = r ? r.id : '';
+        document.getElementById('yieldFormLabel').textContent = r ? 'Edit yield rule' : 'New yield rule';
+        document.getElementById('yName').value = r ? r.name : '';
+        document.getElementById('yDow').value = r ? String(r.day_of_week) : '-1';
+        document.getElementById('yStartTime').value = r ? (r.start_time || '') : '';
+        document.getElementById('yEndTime').value = r ? (r.end_time || '') : '';
+        document.getElementById('yPct').value = r ? r.discount_pct : '';
+        document.getElementById('yMinCovers').value = r ? r.min_covers : 0;
+        document.getElementById('yLabel').value = r ? (r.label || '') : '';
+        document.getElementById('yActive').checked = r ? !!r.active : true;
+        const form = document.getElementById('yieldForm');
+        form.style.display = 'block';
+        form.scrollIntoView({ block: 'nearest' });
+      }
+      function collectYieldForm() {
+        return {
+          name: document.getElementById('yName').value.trim(),
+          day_of_week: Number(document.getElementById('yDow').value),
+          start_time: document.getElementById('yStartTime').value,
+          end_time: document.getElementById('yEndTime').value,
+          min_covers: Number(document.getElementById('yMinCovers').value) || 0,
+          discount_pct: Number(document.getElementById('yPct').value),
+          label: document.getElementById('yLabel').value.trim(),
+          active: document.getElementById('yActive').checked
         };
       }
       function barRow(label, value, max, color) {
@@ -657,6 +823,61 @@
         if (!box) return;
         try { await api('/api/promos/' + box.dataset.id, { method: 'PATCH', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify({ [box.dataset.field]: box.checked }) }); toast('Promotion updated'); load(); } catch (err) { toast(err.message, 'error'); }
       });
+      document.getElementById('newYieldBtn').addEventListener('click', () => openYieldForm(null));
+      document.getElementById('cancelYieldBtn').addEventListener('click', () => { document.getElementById('yieldForm').style.display = 'none'; editingYieldId = ''; });
+      document.getElementById('saveYieldBtn').addEventListener('click', async () => {
+        const payload = collectYieldForm();
+        if (!payload.name || !payload.discount_pct) { toast('Rule name and discount are required', 'error'); return; }
+        try {
+          if (editingYieldId) await api('/api/yield/rules/' + editingYieldId, { method: 'PATCH', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify(payload) });
+          else await api('/api/yield/rules', { method: 'POST', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify(payload) });
+          toast('Yield rule saved'); document.getElementById('yieldForm').style.display = 'none'; editingYieldId = ''; load();
+        } catch (err) { toast(err.message, 'error'); }
+      });
+      document.getElementById('yieldBody').addEventListener('click', async (e) => {
+        const btn = e.target.closest('.edit, .del');
+        if (!btn) return;
+        const id = btn.dataset.id;
+        if (btn.classList.contains('edit')) { openYieldForm(yieldItems.find((r) => String(r.id) === id)); return; }
+        if (!confirm('Delete this yield rule?')) return;
+        try { await api('/api/yield/rules/' + id, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token() } }); toast('Yield rule deleted'); load(); } catch (err) { toast(err.message, 'error'); }
+      });
+      document.getElementById('yieldBody').addEventListener('change', async (e) => {
+        const box = e.target.closest('input[data-field]');
+        if (!box) return;
+        try { await api('/api/yield/rules/' + box.dataset.id, { method: 'PATCH', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify({ [box.dataset.field]: box.checked }) }); toast('Yield rule updated'); load(); } catch (err) { toast(err.message, 'error'); }
+      });
+
+      async function loadIntegrations() {
+        const setup = document.getElementById('pushSetup');
+        setup.innerHTML = '<p class="muted">Loading push status...</p>';
+        try {
+          const data = await api('/api/integrations', { headers: { Authorization: 'Bearer ' + token() } });
+          document.getElementById('intWebhookUrl').value = data.webhook_url || '';
+          document.getElementById('intSmsEnabled').checked = !!data.sms_enabled;
+          document.getElementById('intPushEnabled').checked = !!data.push_enabled;
+          const rows = (data.subscriptions || []).map((s) => `<div class="guest-history-row"><span style="font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#888780">${escapeHTML(s.endpoint)}</span><span class="muted" style="font-size:12px">${escapeHTML(s.email || '')} ${escapeHTML(s.phone || '')}</span></div>`).join('');
+          setup.innerHTML = `<div class="guest-history-row"><b>Push engine</b><span>${data.push_supported ? '<span class="badge badge-brand">available</span>' : '<span class="badge" style="background:#F6E7E0;color:#B8431A">not installed</span>'}</span></div><div class="guest-history-row"><b>Subscribed devices</b><span>${data.subscription_count}</span></div>${data.vapid_public_key ? `<div class="guest-history-row"><b>VAPID key</b><span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;word-break:break-all;color:#888780">${escapeHTML(data.vapid_public_key)}</span></div>` : ''}<div class="guest-history">${rows || '<p class="muted">No devices subscribed yet. Guests opt in from the header "Booking reminders" toggle.</p>'}</div>`;
+        } catch (err) { setup.innerHTML = '<p class="muted">' + escapeHTML(err.message) + '</p>'; }
+      }
+      document.getElementById('saveIntegrations').addEventListener('click', async () => {
+        try {
+          await api('/api/integrations', { method: 'PATCH', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify({ webhook_url: document.getElementById('intWebhookUrl').value.trim(), sms_enabled: document.getElementById('intSmsEnabled').checked, push_enabled: document.getElementById('intPushEnabled').checked }) });
+          toast('Integrations saved'); loadIntegrations();
+        } catch (err) { toast(err.message, 'error'); }
+      });
+      document.getElementById('smsTestBtn').addEventListener('click', async () => {
+        const phone = document.getElementById('intTestPhone').value.trim();
+        if (!phone) { toast('Enter a phone number for the SMS test', 'error'); return; }
+        try { await api('/api/sms/test', { method: 'POST', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify({ phone }) }); toast('Test SMS sent'); } catch (err) { toast(err.message, 'error'); }
+      });
+      document.getElementById('pushTestBtn').addEventListener('click', async () => {
+        try { const r = await api('/api/push/test', { method: 'POST', headers: { Authorization: 'Bearer ' + token() } }); toast('Test push sent to ' + r.sent + ' device(s)'); } catch (err) { toast(err.message, 'error'); }
+      });
+      document.getElementById('webhookTestBtn').addEventListener('click', async () => {
+        try { const r = await api('/api/webhook/test', { method: 'POST', headers: { Authorization: 'Bearer ' + token() } }); toast(r.ok ? 'Webhook delivered (HTTP ' + r.status + ')' : 'Webhook failed: ' + r.error, r.ok ? 'success' : 'error'); } catch (err) { toast(err.message, 'error'); }
+      });
+
       document.getElementById('paymentBody').addEventListener('click', async (e) => {
         const btn = e.target.closest('.refund-pay');
         if (!btn || !confirm('Refund this NyamPay transaction?')) return;
@@ -703,8 +924,82 @@
       resBody.addEventListener('click', async (e) => { const btn = e.target.closest('.del'); if (!btn || !confirm('Delete this reservation?')) return; try { await api('/api/reservations/' + btn.dataset.id, { method:'DELETE', headers:{ Authorization:'Bearer ' + token() } }); toast('Reservation deleted'); load(); } catch (err) { toast(err.message, 'error'); } });
       resBody.addEventListener('click', (e) => { const btn = e.target.closest('.guest'); if (!btn) return; const found = renderedReservations.find((r) => String(r.id) === String(btn.dataset.id)); showBookingGuest(found); });
       document.getElementById('unassignedBookings').addEventListener('click', (e) => { const btn = e.target.closest('[data-booking]'); if (!btn) return; selectedBookingId = btn.dataset.booking; renderFloor(); });
-      document.getElementById('tableGrid').addEventListener('click', async (e) => { const btn = e.target.closest('[data-table]'); if (!btn || !selectedBookingId) return; try { await api('/api/reservations/' + selectedBookingId, { method:'PATCH', headers:{ Authorization:'Bearer ' + token() }, body:JSON.stringify({ table:btn.dataset.table }) }); toast('Table assigned'); selectedBookingId = ''; load(); } catch (err) { toast(err.message, 'error'); } });
-      document.getElementById('guestSearch').addEventListener('input', renderGuests); document.getElementById('guestList').addEventListener('click', (e) => { const btn = e.target.closest('[data-guest]'); if (!btn) return; selectedGuestId = btn.dataset.guest; renderGuests(); }); document.getElementById('saveGuest').addEventListener('click', async () => { if (!selectedGuestId) return; try { await api('/api/guests/' + selectedGuestId, { method:'PATCH', headers:{ Authorization:'Bearer ' + token() }, body:JSON.stringify({ preferences:document.getElementById('guestPreferences').value }) }); toast('Guest preferences saved'); load(); } catch (err) { toast(err.message, 'error'); } });
+      async function assignBookingToTable(bookingId, tableName) {
+        try {
+          await api('/api/reservations/' + bookingId, { method: 'PATCH', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify({ table: tableName }) });
+          toast('Table assigned'); selectedBookingId = ''; load();
+        } catch (err) { toast(err.message, 'error'); }
+      }
+      async function moveTable(tableName, x, y) {
+        const t = tableItems.find((t) => t.name === tableName);
+        if (!t) return;
+        try {
+          await api('/api/tables/' + t.id, { method: 'PATCH', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify({ x, y }) });
+          t.x = x; t.y = y;
+          renderFloor();
+        } catch (err) { toast(err.message, 'error'); }
+      }
+      document.getElementById('unassignedBookings').addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-booking]');
+        if (!btn) return;
+        selectedBookingId = btn.dataset.booking;
+        renderFloor();
+      });
+      document.getElementById('unassignedBookings').addEventListener('dragstart', (e) => {
+        const btn = e.target.closest('[data-booking]');
+        if (!btn) return;
+        dragBookingId = btn.dataset.booking;
+        e.dataTransfer.setData('text/plain', 'booking:' + btn.dataset.booking);
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      document.getElementById('floorTables').addEventListener('dragstart', (e) => {
+        const el = e.target.closest('[data-table]');
+        if (!el) return;
+        e.dataTransfer.setData('text/plain', 'table:' + el.dataset.table);
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      const floorCanvas = document.getElementById('floorCanvas');
+      floorCanvas.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+      floorCanvas.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        const data = e.dataTransfer.getData('text/plain');
+        const rect = floorCanvas.getBoundingClientRect();
+        const x = Math.max(2, Math.min(88, Math.round(((e.clientX - rect.left) / rect.width) * 100)));
+        const y = Math.max(2, Math.min(88, Math.round(((e.clientY - rect.top) / rect.height) * 100)));
+        if (data.startsWith('booking:')) {
+          const bookingId = data.slice(8);
+          const tableEl = e.target.closest('[data-table]');
+          if (tableEl) return assignBookingToTable(bookingId, tableEl.dataset.table);
+          const active = floorBookings.filter((r) => !['cancelled','no-show'].includes(r.status));
+          const booking = active.find((r) => r.id === bookingId);
+          const suggestion = booking ? suggestFor(booking.guests, active) : null;
+          if (suggestion && suggestion.best) return assignBookingToTable(bookingId, suggestion.best.name);
+          toast('No free table fits this party — assign one manually.', 'error');
+          return;
+        }
+        if (data.startsWith('table:')) moveTable(data.slice(6), x, y);
+      });
+      document.getElementById('floorTables').addEventListener('click', async (e) => {
+        const btn = e.target.closest('[data-table]');
+        if (!btn || !selectedBookingId) return;
+        const guest = floorBookings.filter((r) => !['cancelled','no-show'].includes(r.status)).find((r) => tableOf(r) === btn.dataset.table);
+        if (guest) return;
+        assignBookingToTable(selectedBookingId, btn.dataset.table);
+      });
+      document.getElementById('addTableBtn').addEventListener('click', () => {
+        const name = prompt('Table name (e.g. T13):');
+        if (!name) return;
+        const seats = Number(prompt('Seats (1-20):', '4'));
+        if (!Number.isInteger(seats) || seats < 1 || seats > 20) { toast('Invalid seat count', 'error'); return; }
+        const zone = prompt('Zone (window/main/patio):', 'main') || 'main';
+        (async () => {
+          try {
+            await api('/api/tables', { method: 'POST', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify({ name, seats, zone, x: 45, y: 45 }) });
+            toast('Table added'); load();
+          } catch (err) { toast(err.message, 'error'); }
+        })();
+      });
+      document.getElementById('guestSearch').addEventListener('input', renderGuests); document.getElementById('guestList').addEventListener('click', (e) => { const btn = e.target.closest('[data-guest]'); if (!btn) return; selectedGuestId = btn.dataset.guest; renderGuests(); }); document.getElementById('saveGuest').addEventListener('click', async () => { if (!selectedGuestId) return; const splitList = (v) => String(v || '').split(',').map((s) => s.trim()).filter(Boolean); try { await api('/api/guests/' + selectedGuestId, { method:'PATCH', headers:{ Authorization:'Bearer ' + token() }, body:JSON.stringify({ preferences:document.getElementById('guestPreferences').value, dietary:splitList(document.getElementById('gDietary').value), allergies:splitList(document.getElementById('gAllergies').value), favourite_table:document.getElementById('gFavTable').value, occasions:splitList(document.getElementById('gOccasions').value), vip:document.getElementById('gVip').checked }) }); toast('Guest profile saved'); load(); } catch (err) { toast(err.message, 'error'); } });
       const reviewBody = document.getElementById('reviewBody');
       reviewBody.addEventListener('change', async (e) => { const sel = e.target.closest('.review-status'); if (!sel) return; try { await api('/api/reviews/' + sel.dataset.id, { method:'PATCH', headers:{ Authorization:'Bearer ' + token() }, body:JSON.stringify({ status:sel.value }) }); toast('Review status updated'); load(); } catch (err) { toast(err.message, 'error'); } });
       reviewBody.addEventListener('click', async (e) => { const spamBtn = e.target.closest('.review-spam'); if (spamBtn) { try { await api('/api/reviews/' + spamBtn.dataset.id, { method:'PATCH', headers:{ Authorization:'Bearer ' + token() }, body:JSON.stringify({ spam:Number(spamBtn.dataset.spam) }) }); toast('Review flag updated'); load(); } catch (err) { toast(err.message, 'error'); } return; } const btn = e.target.closest('.save-reply'); if (!btn) return; const textarea = document.querySelector('.review-reply[data-id="' + btn.dataset.id + '"]'); try { await api('/api/reviews/' + btn.dataset.id, { method:'PATCH', headers:{ Authorization:'Bearer ' + token() }, body:JSON.stringify({ reply:textarea.value.trim() }) }); toast('Reply saved'); load(); } catch (err) { toast(err.message, 'error'); } });

@@ -7,11 +7,13 @@ const { VALID_REVIEW_STATUS } = require('../constants');
 const { publicReview } = require('../format');
 const { detectSpam } = require('../lib/spam');
 const { guestId } = require('../format');
+const { restaurantId } = require('../lib/restaurants');
 
 const router = express.Router();
 
 router.get('/reviews/summary', (req, res) => {
-  const rows = db.prepare("SELECT * FROM reviews WHERE status = 'published'").all();
+  const rid = restaurantId(req);
+  const rows = db.prepare("SELECT * FROM reviews WHERE status = 'published' AND restaurant_id = ?").all(rid);
   const count = rows.length;
   const avg = count ? rows.reduce((sum, row) => sum + Math.round((row.rating_food + row.rating_service + row.rating_ambience + row.rating_value) / 4), 0) / count : 0;
   const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
@@ -23,13 +25,14 @@ router.get('/reviews/summary', (req, res) => {
 });
 
 router.get('/reviews', (req, res) => {
+  const rid = restaurantId(req);
   if (req.query.all === '1') {
     return requireAuth(req, res, () => {
-      const rows = db.prepare('SELECT * FROM reviews ORDER BY id DESC').all();
+      const rows = db.prepare('SELECT * FROM reviews WHERE restaurant_id = ? ORDER BY id DESC').all(rid);
       res.json(rows);
     });
   }
-  const rows = db.prepare("SELECT * FROM reviews WHERE status = 'published' ORDER BY id DESC").all();
+  const rows = db.prepare("SELECT * FROM reviews WHERE status = 'published' AND restaurant_id = ? ORDER BY id DESC").all(rid);
   res.json(rows.map(publicReview));
 });
 
@@ -95,8 +98,8 @@ router.post('/reviews', (req, res) => {
 
   const result = db
     .prepare(
-      `INSERT INTO reviews (reservation_id, name, email, phone, rating_food, rating_service, rating_ambience, rating_value, comment, status, spam, spam_reason)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`
+      `INSERT INTO reviews (reservation_id, name, email, phone, rating_food, rating_service, rating_ambience, rating_value, comment, status, spam, spam_reason, restaurant_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`
     )
     .run(
       rid,
@@ -109,7 +112,8 @@ router.post('/reviews', (req, res) => {
       ratings[3],
       text,
       spamFlag,
-      spamReason || ''
+      spamReason || '',
+      Number(reservation.restaurant_id || 1)
     );
 
   const row = db.prepare('SELECT * FROM reviews WHERE id = ?').get(result.lastInsertRowid);
@@ -118,6 +122,7 @@ router.post('/reviews', (req, res) => {
 
 router.patch('/reviews/:id', requireAuth, (req, res) => {
   const id = Number(req.params.id);
+  const rid = restaurantId(req);
   const { status, reply, spam, spam_reason } = req.body;
   if (status !== undefined && !VALID_REVIEW_STATUS.includes(status)) {
     return res.status(400).json({ error: 'Invalid status' });
@@ -128,7 +133,7 @@ router.patch('/reviews/:id', requireAuth, (req, res) => {
   if (spam !== undefined && ![0, 1].includes(Number(spam))) {
     return res.status(400).json({ error: 'Invalid spam flag' });
   }
-  const row0 = db.prepare('SELECT * FROM reviews WHERE id = ?').get(id);
+  const row0 = db.prepare('SELECT * FROM reviews WHERE id = ? AND restaurant_id = ?').get(id, rid);
   if (!row0) {
     return res.status(404).json({ error: 'Review not found' });
   }

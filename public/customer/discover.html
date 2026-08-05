@@ -25,6 +25,10 @@
       <div class="search-bar card-tile">
         <div class="search-grid">
           <div class="field">
+            <label for="sRestaurant">Restaurant</label>
+            <select class="select" id="sRestaurant"><option value="">All restaurants</option></select>
+          </div>
+          <div class="field">
             <label for="sCuisine">Cuisine</label>
             <select class="select" id="sCuisine"><option value="">All cuisines</option></select>
           </div>
@@ -49,6 +53,10 @@
           <div class="field">
             <label for="sOccasion">Occasion</label>
             <select class="select" id="sOccasion"><option value="">Just dinner</option></select>
+          </div>
+          <div class="field">
+            <label for="sCity">City</label>
+            <select class="select" id="sCity"><option value="">Anywhere</option></select>
           </div>
         </div>
         <div class="filter-row">
@@ -136,9 +144,11 @@
       dateInput.min = iso;
       dateInput.value = iso;
 
+      const sRestaurant = document.getElementById('sRestaurant');
       const sCuisine = document.getElementById('sCuisine');
       const sGuests = document.getElementById('sGuests');
       const sOccasion = document.getElementById('sOccasion');
+      const sCity = document.getElementById('sCity');
       const priceBar = document.getElementById('priceBar');
       const ratingBar = document.getElementById('ratingBar');
       let price = '', rating = '';
@@ -148,39 +158,136 @@
       function filters() {
         const p = document.querySelector('#priceBar .filter-chip.active').dataset.price;
         return {
+          restaurant: sRestaurant.value,
           cuisine: sCuisine.value,
           guests: sGuests.value,
           date: dateInput.value,
           occasion: sOccasion.value,
+          city: sCity.value,
           max_price: p
         };
       }
 
+      async function seedSelects() {
+        if (sRestaurant.dataset.seeded) return;
+        try {
+          const m = await api('/api/marketplace?date=' + encodeURIComponent(dateInput.value));
+          const options = m.restaurants.map((r) => `<option value="${r.slug}">${escapeHTML(r.name)}${r.city !== 'Phnom Penh' ? ' · ' + escapeHTML(r.city) : ''}</option>`).join('');
+          sRestaurant.innerHTML = '<option value="">All restaurants</option>' + options;
+          sRestaurant.dataset.seeded = '1';
+        } catch (e) { /* marketplace optional on first paint */ }
+      }
+
       async function load() {
         const f = filters();
+        const q = new URLSearchParams();
+        if (f.cuisine) q.set('cuisine', f.cuisine);
+        if (f.max_price) q.set('max_price', f.max_price);
+        if (rating) q.set('min_rating', rating);
+        if (f.date) q.set('date', f.date);
+        if (f.guests) q.set('guests', f.guests);
+        if (f.occasion) q.set('occasion', f.occasion);
+        if (f.city) q.set('city', f.city);
+        if (f.restaurant) q.set('restaurant', f.restaurant);
         try {
-          const q = new URLSearchParams();
-          if (f.cuisine) q.set('cuisine', f.cuisine);
-          if (f.max_price) q.set('max_price', f.max_price);
-          if (rating) q.set('min_rating', rating);
-          if (f.date) q.set('date', f.date);
-          if (f.guests) q.set('guests', f.guests);
-          data = await api('/api/discover?' + q.toString());
+          data = await api('/api/' + (f.restaurant ? 'discover' : 'marketplace') + '?' + q.toString());
           if (!sCuisine.dataset.seeded) {
             sCuisine.dataset.seeded = '1';
-            sCuisine.innerHTML = '<option value="">All cuisines</option>' + data.categories.map((c) => `<option value="${escapeHTML(c.slug)}">${escapeHTML(c.name)}</option>`).join('');
+            const cats = f.restaurant ? (data.categories || []) : [];
+            sCuisine.innerHTML = '<option value="">All cuisines</option>' + cats.map((c) => `<option value="${escapeHTML(c.slug)}">${escapeHTML(c.name)}</option>`).join('');
             occasions = data.occasions || [];
             sOccasion.innerHTML = '<option value="">Just dinner</option>' + occasions.map((o) => `<option>${escapeHTML(o)}</option>`).join('');
+            const cities = data.cities || [];
+            sCity.innerHTML = '<option value="">Anywhere</option>' + cities.map((c) => `<option${f.restaurant && c === data.restaurant.city ? ' selected' : ''}>${escapeHTML(c)}</option>`).join('');
           }
-          render();
+          if (f.restaurant) render();
+          else renderMarketplace();
         } catch (err) {
           document.getElementById('restaurantCard').innerHTML = '<div class="card-tile" style="padding:40px;text-align:center;grid-column:1/-1"><p class="muted">Could not load results. Please try again later.</p></div>';
         }
       }
 
+      function renderMarketplace() {
+        const card = document.getElementById('restaurantCard');
+        const dishMatched = (data.filters && data.filters.dish_matched_restaurant_ids) || [];
+        const priceChip = document.querySelector('#priceBar .filter-chip.active').dataset.price;
+        const hasDishFilter = sCuisine.value || (priceChip && priceChip !== '999');
+        const list = (data.restaurants || []).filter((r) => r.matched && (!hasDishFilter || dishMatched.includes(String(r.id))));
+        if (!list.length) {
+          card.innerHTML = '<div class="card-tile" style="padding:40px;text-align:center;grid-column:1/-1"><p class="muted">No restaurants match those filters yet — try widening them.</p></div>';
+        } else {
+          card.innerHTML = list.map((r) => `
+            <article class="restaurant-card">
+              <div class="restaurant-head">
+                <div>
+                  <div class="restaurant-title-row">
+                    <h2 class="restaurant-name">${escapeHTML(r.name)}</h2>
+                    <span class="badge badge-verified">Verified</span>
+                    ${r.rating ? `<span class="badge badge-brand">${Number(r.rating).toFixed(1)}★</span>` : ''}
+                  </div>
+                  <p class="restaurant-meta">${escapeHTML(r.city)} · ${escapeHTML(r.price_band)} · ${escapeHTML(r.address)}</p>
+                  <p class="muted" style="font-size:13px;margin:4px 0 0">${escapeHTML(r.tagline || '')}</p>
+                </div>
+                <div class="restaurant-rating">
+                  <span class="stars">${stars(r.rating || 0)}</span>
+                  <b>${r.rating ? Number(r.rating).toFixed(1) : 'New'}</b>
+                  <span class="muted">(${r.reviews_count} verified review${r.reviews_count === 1 ? '' : 's'})</span>
+                </div>
+              </div>
+              <div class="restaurant-footer">
+                <span class="muted" style="font-size:13px">${r.menu_count} dishes · ${r.capacity} seats</span>
+                <a class="btn btn-primary btn-sm" href="/book?restaurant=${encodeURIComponent(r.slug)}">Book a table</a>
+              </div>
+            </article>`).join('');
+        }
+
+        const title = document.getElementById('availTitle');
+        title.textContent = data.date ? `${sGuests.value} guests · ${dateInput.value}` : 'Tonight on SbyNhamHub';
+        const grid = document.getElementById('slotGrid');
+        const featured = (data.promos || []).slice(0, 3);
+        if (!featured.length) {
+          grid.innerHTML = '<p class="muted" style="grid-column:1/-1;text-align:center;padding:10px">Pick a restaurant above to see live availability.</p>';
+        } else {
+          grid.innerHTML = featured.map((o) => `
+            <div class="slot-chip slot-open" style="cursor:default">
+              <span class="slot-time">${escapeHTML(o.name)}</span>
+              <span class="slot-state">${escapeHTML(o.discount_label)}</span>
+              ${o.code ? `<span class="slot-yield">Code ${escapeHTML(o.code)}</span>` : ''}
+            </div>`).join('');
+        }
+
+        const offers = document.getElementById('offersGrid');
+        if (!data.promos.length) {
+          offers.innerHTML = '<div class="card-tile" style="padding:28px;grid-column:1/-1"><p class="muted" style="margin:0">No featured offers on this date — new deals drop all the time.</p></div>';
+        } else {
+          offers.innerHTML = data.promos.map((o) => {
+            const venue = (data.restaurants || []).find((r) => String(r.id) === String(o.restaurant_id));
+            return `
+              <div class="card-tile" style="padding:24px">
+                <div class="offer-row">
+                  <div><strong>${escapeHTML(o.name)}</strong><div class="muted" style="font-size:12.5px">${escapeHTML(o.discount_label)}${o.min_covers ? ` · for parties of ${o.min_covers}+` : ''}${venue ? ' · ' + escapeHTML(venue.name) : ''}</div></div>
+                  ${o.code ? `<span class="offer-code" data-code="${escapeHTML(o.code)}">${escapeHTML(o.code)}</span>` : ''}
+                </div>
+                <a class="btn btn-primary btn-sm" href="/book?date=${encodeURIComponent(dateInput.value)}&guests=${sGuests.value}${venue ? '&restaurant=' + encodeURIComponent(venue.slug) : ''}">Book with this offer</a>
+              </div>`;
+          }).join('');
+        }
+        offers.querySelectorAll('.offer-code').forEach((chip) => {
+          chip.addEventListener('click', () => {
+            navigator.clipboard && navigator.clipboard.writeText(chip.dataset.code);
+            toast('Code ' + chip.dataset.code + ' copied — add it at booking.');
+          });
+        });
+
+        const dishes = document.getElementById('dishesGrid');
+        document.getElementById('dishesTitle').textContent = 'Dishes worth the trip';
+        dishes.innerHTML = '<div class="card-tile" style="padding:60px;text-align:center;grid-column:1/-1"><p class="muted">Pick a restaurant above to browse its menu, or open a venue to see every dish.</p></div>';
+      }
+
       function render() {
         const r = data.restaurant, ratingInfo = data.rating;
         const belowRating = rating && ratingInfo.avg < Number(rating);
+        const cityMismatch = sCity.value && sCity.value !== r.city;
         document.getElementById('restaurantCard').innerHTML = `
           <div class="restaurant-head">
             <div>
@@ -198,6 +305,7 @@
             </div>
           </div>
           ${belowRating ? `<p class="hint" style="color:#C4471A;margin-top:10px">Below your ${escapeHTML(rating)}★ filter — our diners currently rate us ${ratingInfo.avg.toFixed(1)}★. Availability is unchanged.</p>` : ''}
+          ${cityMismatch ? `<p class="hint" style="color:#C4471A;margin-top:10px">We don't have a table in ${escapeHTML(sCity.value)} yet — try Phnom Penh.</p>` : ''}
         `;
 
         const title = document.getElementById('availTitle');
@@ -212,9 +320,10 @@
           grid.innerHTML = data.availability.map((s) => {
             const state = s.state;
             const occ = sOccasion.value ? '&occasion=' + encodeURIComponent(sOccasion.value) : '';
-            return `<a class="slot-chip slot-${state}" href="/book?date=${encodeURIComponent(dateInput.value)}&time=${s.time}&guests=${sGuests.value}${occ}">
+            return `<a class="slot-chip slot-${state}" href="/book?date=${encodeURIComponent(dateInput.value)}&time=${s.time}&guests=${sGuests.value}&restaurant=${encodeURIComponent(r.slug)}${occ}">
               <span class="slot-time">${s.time}</span>
               <span class="slot-state">${state === 'open' ? 'Open' : state === 'limited' ? 'Limited' : 'Full'}</span>
+              ${s.yield ? `<span class="slot-yield">${escapeHTML(s.yield.label)}</span>` : ''}
             </a>`;
           }).join('');
         }
@@ -229,7 +338,7 @@
                 <div><strong>${escapeHTML(o.name)}</strong><div class="muted" style="font-size:12.5px">${escapeHTML(o.discount_label)}${o.min_covers ? ` · for parties of ${o.min_covers}+` : ''}</div></div>
                 ${o.code ? `<span class="offer-code" data-code="${escapeHTML(o.code)}">${escapeHTML(o.code)}</span>` : ''}
               </div>
-              <a class="btn btn-primary btn-sm" href="/book?date=${encodeURIComponent(dateInput.value)}&guests=${sGuests.value}">Book with this offer</a>
+              <a class="btn btn-primary btn-sm" href="/book?date=${encodeURIComponent(dateInput.value)}&guests=${sGuests.value}&restaurant=${encodeURIComponent(r.slug)}">Book with this offer</a>
             </div>`).join('');
         }
         offers.querySelectorAll('.offer-code').forEach((chip) => {
@@ -277,9 +386,9 @@
         ratingBar.querySelectorAll('.filter-chip').forEach((c) => c.classList.toggle('active', c === chip));
         load();
       });
-      [sCuisine, sGuests, sOccasion, dateInput].forEach((el) => el.addEventListener('change', load));
+      [sRestaurant, sCuisine, sGuests, sOccasion, sCity, dateInput].forEach((el) => el.addEventListener('change', load));
 
-      load();
+      seedSelects().then(load);
     })();
   </script>
 </body>

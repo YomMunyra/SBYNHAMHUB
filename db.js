@@ -126,6 +126,7 @@ CREATE TABLE IF NOT EXISTS settings (
   name TEXT NOT NULL DEFAULT 'SbyNhamHub',
   phone TEXT NOT NULL DEFAULT '+855 12 345 678',
   address TEXT NOT NULL DEFAULT '123 Riverside Walk, Phnom Penh',
+  city TEXT NOT NULL DEFAULT 'Phnom Penh',
   hours TEXT NOT NULL DEFAULT '{}',
   avg_cover REAL NOT NULL DEFAULT 15,
   updated_at TEXT
@@ -148,6 +149,7 @@ CREATE TABLE IF NOT EXISTS promos (
   featured INTEGER NOT NULL DEFAULT 0,
   active INTEGER NOT NULL DEFAULT 1,
   auto_end INTEGER NOT NULL DEFAULT 0,
+  occasions TEXT NOT NULL DEFAULT '[]',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -170,6 +172,57 @@ CREATE TABLE IF NOT EXISTS payments (
   status TEXT NOT NULL DEFAULT 'paid',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS yield_rules (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  day_of_week INTEGER NOT NULL DEFAULT -1,
+  start_time TEXT,
+  end_time TEXT,
+  min_covers INTEGER NOT NULL DEFAULT 0,
+  discount_pct REAL NOT NULL,
+  label TEXT NOT NULL DEFAULT '',
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS tables (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  seats INTEGER NOT NULL DEFAULT 4,
+  zone TEXT NOT NULL DEFAULT 'main',
+  shape TEXT NOT NULL DEFAULT 'round',
+  x REAL NOT NULL DEFAULT 0,
+  y REAL NOT NULL DEFAULT 0,
+  rotation REAL NOT NULL DEFAULT 0,
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  endpoint TEXT NOT NULL UNIQUE,
+  keys TEXT NOT NULL DEFAULT '{}',
+  email TEXT NOT NULL DEFAULT '',
+  phone TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS restaurants (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  city TEXT NOT NULL DEFAULT 'Phnom Penh',
+  address TEXT NOT NULL DEFAULT '',
+  phone TEXT NOT NULL DEFAULT '',
+  hours TEXT NOT NULL DEFAULT '[]',
+  avg_cover REAL NOT NULL DEFAULT 15,
+  capacity INTEGER NOT NULL DEFAULT 48,
+  tagline TEXT NOT NULL DEFAULT '',
+  avatar TEXT NOT NULL DEFAULT 'logo.svg',
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `;
 
 db.exec(SCHEMA);
@@ -186,15 +239,35 @@ try { db.exec("ALTER TABLE reservations ADD COLUMN promo_id INTEGER NOT NULL DEF
 try { db.exec("ALTER TABLE reservations ADD COLUMN promo_name TEXT NOT NULL DEFAULT ''"); } catch { /* Existing local databases already have this column. */ }
 try { db.exec("ALTER TABLE reservations ADD COLUMN promo_discount REAL NOT NULL DEFAULT 0"); } catch { /* Existing local databases already have this column. */ }
 try { db.exec("ALTER TABLE reservations ADD COLUMN source TEXT NOT NULL DEFAULT 'online'"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE reservations ADD COLUMN sms_opt_in INTEGER NOT NULL DEFAULT 0"); } catch { /* Existing local databases already have this column. */ }
 try { db.exec("ALTER TABLE settings ADD COLUMN avg_cover REAL NOT NULL DEFAULT 15"); } catch { /* Existing local databases already have this column. */ }
 try { db.exec("ALTER TABLE settings ADD COLUMN fee_rate REAL NOT NULL DEFAULT 0.0095"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE settings ADD COLUMN integrations TEXT NOT NULL DEFAULT '{}'"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE settings ADD COLUMN vapid_keys TEXT NOT NULL DEFAULT '{}'"); } catch { /* Existing local databases already have this column. */ }
 try { db.exec("ALTER TABLE settings ADD COLUMN fee_flat REAL NOT NULL DEFAULT 0.50"); } catch { /* Existing local databases already have this column. */ }
 try { db.exec("ALTER TABLE settings ADD COLUMN capacity INTEGER NOT NULL DEFAULT 48"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE settings ADD COLUMN city TEXT NOT NULL DEFAULT 'Phnom Penh'"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE promos ADD COLUMN occasions TEXT NOT NULL DEFAULT '[]'"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE reservations ADD COLUMN yield_rule_id INTEGER NOT NULL DEFAULT 0"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE reservations ADD COLUMN yield_label TEXT NOT NULL DEFAULT ''"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE reservations ADD COLUMN yield_discount REAL NOT NULL DEFAULT 0"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE guest_profiles ADD COLUMN dietary TEXT NOT NULL DEFAULT '[]'"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE guest_profiles ADD COLUMN allergies TEXT NOT NULL DEFAULT '[]'"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE guest_profiles ADD COLUMN favourite_table TEXT NOT NULL DEFAULT ''"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE guest_profiles ADD COLUMN occasions TEXT NOT NULL DEFAULT '[]'"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE guest_profiles ADD COLUMN vip INTEGER NOT NULL DEFAULT 0"); } catch { /* Existing local databases already have this column. */ }
 try { db.exec("ALTER TABLE reviews ADD COLUMN spam INTEGER NOT NULL DEFAULT 0"); } catch { /* Existing local databases already have this column. */ }
 try { db.exec("ALTER TABLE reviews ADD COLUMN spam_reason TEXT NOT NULL DEFAULT ''"); } catch { /* Existing local databases already have this column. */ }
 try { db.exec("ALTER TABLE points_ledger ADD COLUMN expires_at TEXT"); } catch { /* Existing local databases already have this column. */ }
 try { db.exec("ALTER TABLE points_ledger ADD COLUMN remaining INTEGER"); } catch { /* Existing local databases already have this column. */ }
 try { db.exec("ALTER TABLE promos ADD COLUMN auto_end INTEGER NOT NULL DEFAULT 0"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE menu_items ADD COLUMN restaurant_id INTEGER NOT NULL DEFAULT 1"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE reservations ADD COLUMN restaurant_id INTEGER NOT NULL DEFAULT 1"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE promos ADD COLUMN restaurant_id INTEGER NOT NULL DEFAULT 1"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE yield_rules ADD COLUMN restaurant_id INTEGER NOT NULL DEFAULT 1"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE tables ADD COLUMN restaurant_id INTEGER NOT NULL DEFAULT 1"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE reviews ADD COLUMN restaurant_id INTEGER NOT NULL DEFAULT 1"); } catch { /* Existing local databases already have this column. */ }
+try { db.exec("ALTER TABLE waitlist ADD COLUMN restaurant_id INTEGER NOT NULL DEFAULT 1"); } catch { /* Existing local databases already have this column. */ }
 db.exec("UPDATE points_ledger SET remaining = delta, expires_at = datetime(created_at, '+18 months') WHERE reason = 'earned' AND remaining IS NULL");
 
 function seedSettings() {
@@ -210,6 +283,20 @@ function seedSettings() {
       { day: 'Sunday', hours: '11:00 – 21:00' }
     ])
   );
+}
+
+function seedYieldRules() {
+  const count = db.prepare('SELECT COUNT(*) AS n FROM yield_rules').get().n;
+  if (count > 0) return false;
+  const addRule = db.prepare(
+    `INSERT INTO yield_rules (name, day_of_week, start_time, end_time, min_covers, discount_pct, label, active)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 1)`
+  );
+  addRule.run('Early-bird lunch', -1, '11:00', '13:00', 0, 15, 'Early-bird lunch');
+  addRule.run('Weekday slow starter', -1, '17:30', '18:30', 0, 10, 'Weekday happy hour');
+  addRule.run('Late-night wind-down', -1, '20:30', '21:30', 0, 12, 'Late-night wind-down');
+  addRule.run('Sunday supper club', 0, '17:30', '21:00', 4, 20, 'Sunday supper club');
+  return true;
 }
 
 function seed() {
@@ -298,8 +385,194 @@ function seedReviews() {
   return true;
 }
 
+function seedTables() {
+  const count = db.prepare('SELECT COUNT(*) AS n FROM tables').get().n;
+  if (count > 0) return false;
+  const addTable = db.prepare(
+    `INSERT INTO tables (name, seats, zone, shape, x, y, rotation, active)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 1)`
+  );
+  const layout = [
+    ['T1', 2, 'window', 'square', 5, 8, 0], ['T2', 2, 'window', 'square', 16, 8, 0],
+    ['T3', 4, 'window', 'round', 8, 34, 0], ['T4', 4, 'window', 'round', 20, 34, 0],
+    ['T5', 6, 'main', 'rectangle', 38, 6, 0], ['T6', 4, 'main', 'round', 52, 6, 0],
+    ['T7', 4, 'main', 'round', 38, 30, 0], ['T8', 4, 'main', 'round', 52, 30, 0],
+    ['T9', 8, 'main', 'rectangle', 40, 55, 0], ['T10', 4, 'patio', 'round', 72, 10, 0],
+    ['T11', 2, 'patio', 'square', 82, 10, 0], ['T12', 6, 'patio', 'round', 74, 40, 0]
+  ];
+  for (const t of layout) addTable.run(...t);
+  return true;
+}
+
+function seedRestaurants() {
+  const count = db.prepare('SELECT COUNT(*) AS n FROM restaurants').get().n;
+  if (count > 0) return;
+  const settings = db.prepare('SELECT * FROM settings WHERE id = 1').get() || {};
+  const add = db.prepare(
+    `INSERT INTO restaurants (slug, name, city, address, phone, hours, avg_cover, capacity, tagline, avatar, active)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`
+  );
+  add.run(
+    'sbynhamhub',
+    settings.name || 'SbyNhamHub',
+    settings.city || 'Phnom Penh',
+    settings.address || '123 Riverside Walk, Phnom Penh',
+    settings.phone || '+855 12 345 678',
+    settings.hours || JSON.stringify([
+      { day: 'Monday – Thursday', hours: '11:00 – 22:00' },
+      { day: 'Friday – Saturday', hours: '11:00 – 23:00' },
+      { day: 'Sunday', hours: '11:00 – 21:00' }
+    ]),
+    Number(settings.avg_cover || 15),
+    Number(settings.capacity || 48),
+    'Taste · Book · Enjoy — Southeast Asian flavours, beautifully served.',
+    'logo.svg'
+  );
+  add.run(
+    'wat-phnom-kitchen',
+    'Wat Phnom Kitchen',
+    'Phnom Penh',
+    '88 Norodom Blvd, Phnom Penh',
+    '+855 23 987 654',
+    JSON.stringify([
+      { day: 'Monday – Saturday', hours: '11:00 – 21:00' },
+      { day: 'Sunday', hours: '12:00 – 20:00' }
+    ]),
+    12,
+    32,
+    'Family recipes from the old quarter — generous, honest Khmer cooking.',
+    'curry.svg'
+  );
+  add.run(
+    'templeside-grill',
+    'Templeside Grill',
+    'Siem Reap',
+    '7 Pub Street, Siem Reap',
+    '+855 63 765 432',
+    JSON.stringify([
+      { day: 'Daily', hours: '16:00 – 23:00' }
+    ]),
+    18,
+    40,
+    'Fire-grilled meats and cold craft beer, steps from the temples.',
+    'skewers.svg'
+  );
+}
+
+function seedPartners() {
+  const partner = (slug) => db.prepare('SELECT id FROM restaurants WHERE slug = ?').get(slug);
+  const wp = partner('wat-phnom-kitchen');
+  const ts = partner('templeside-grill');
+  if (!wp || !ts) return;
+
+  const hasPartnerMenu = db.prepare('SELECT COUNT(*) AS n FROM menu_items WHERE restaurant_id = ?').get(wp.id).n;
+  if (!hasPartnerMenu) {
+    const cat = (slug) => db.prepare('SELECT id FROM categories WHERE slug = ?').get(slug);
+    const addItem = db.prepare(
+      `INSERT INTO menu_items (category_id, name, description, price, image, tag, featured, restaurant_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+    const wpItems = [
+      [cat('starters').id, 'Num Pang Croutons', 'Toasted baguette with pâté, pickles and chilli mayo.', 4.5, 'noodle-salad.jpg', 'Classic', 1],
+      [cat('mains').id, 'Amok de Mère', 'The house fish amok, steamed with fresh coconut cream.', 9.5, 'amok.jpg', 'Signature', 1],
+      [cat('mains').id, 'Prahok Ktis', 'Pork belly in fragrant prahok-coconut dip with greens.', 10.0, 'lok-lak.jpg', null, 0],
+      [cat('mains').id, 'Kampot Pepper Crab', 'Whole crab tossed in green Kampot pepper and butter.', 16.0, 'seafood-hotpot.jpg', 'For Two', 1],
+      [cat('grills-seafood').id, 'Honey-Glazed Chicken Wings', 'Charred wings with honey, lemongrass and crushed peanuts.', 7.5, 'lemongrass-chicken.jpg', null, 0],
+      [cat('desserts').id, 'Pandan Crepe Roulade', 'Rolled pandan crepe with young-coconut filling.', 4.5, 'pandan-cake.jpg', 'Classic', 1],
+      [cat('drinks').id, 'Sugar-Cane Juice', 'Pressed sugar cane with a squeeze of lime.', 2.5, 'coconut.jpg', null, 0],
+      [cat('drinks').id, 'Cambodian Iced Coffee', 'Strong espresso over sweetened condensed milk.', 3.0, 'thai-tea.jpg', null, 0]
+    ];
+    for (const item of wpItems) addItem.run(...item, wp.id);
+  }
+
+  const hasTsMenu = db.prepare('SELECT COUNT(*) AS n FROM menu_items WHERE restaurant_id = ?').get(ts.id).n;
+  if (!hasTsMenu) {
+    const cat = (slug) => db.prepare('SELECT id FROM categories WHERE slug = ?').get(slug);
+    const addItem = db.prepare(
+      `INSERT INTO menu_items (category_id, name, description, price, image, tag, featured, restaurant_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+    const tsItems = [
+      [cat('starters').id, 'Charcoal Corn Ribs', 'Smoky grilled corn with lime-chilli butter.', 5.0, 'summer-rolls.jpg', 'New', 0],
+      [cat('grills-seafood').id, 'Tomahawk for Two', 'Wagyu tomahawk, charred over open flame, jungle-spice rub.', 42.0, 'bbq-ribs.jpg', 'Signature', 1],
+      [cat('grills-seafood').id, 'Beef Satay Sticks', 'Overnight-marinated beef skewers with peanut relish.', 9.0, 'satay.jpg', null, 0],
+      [cat('grills-seafood').id, 'Smoked Ribs', '12-hour smoked pork ribs with tamarind barbecue glaze.', 14.5, 'bbq-ribs.jpg', null, 1],
+      [cat('mains').id, 'Chargrilled Sea Bass', 'Whole sea bass with garlic butter and grilled lemon.', 18.0, 'sea-bass.jpg', 'Chef\u2019s Pick', 1],
+      [cat('mains').id, 'Lok Lak Burger', 'Kampot-pepper beef patty, fried egg, cucumber relish.', 11.5, 'smash-burger.jpg', null, 0],
+      [cat('desserts').id, 'Grilled Pineapple', 'Caramelised pineapple with palm-sugar syrup.', 4.0, 'mango-sticky-rice.jpg', 'Veg', 0],
+      [cat('drinks').id, 'Angkor Draught', 'Local pale lager on tap, ice-cold. 330ml.', 3.5, 'craft-beer.jpg', null, 0]
+    ];
+    for (const item of tsItems) addItem.run(...item, ts.id);
+  }
+
+  const hasWpTables = db.prepare('SELECT COUNT(*) AS n FROM tables WHERE restaurant_id = ?').get(wp.id).n;
+  if (!hasWpTables) {
+    const addTable = db.prepare(
+      `INSERT INTO tables (name, seats, zone, shape, x, y, rotation, active, restaurant_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`
+    );
+    const layout = [
+      ['K1', 2, 'window', 'square', 8, 8, 0], ['K2', 2, 'window', 'square', 18, 8, 0],
+      ['K3', 4, 'main', 'round', 30, 8, 0], ['K4', 4, 'main', 'round', 44, 8, 0],
+      ['K5', 6, 'main', 'rectangle', 34, 38, 0], ['K6', 4, 'patio', 'round', 62, 18, 0]
+    ];
+    for (const t of layout) addTable.run(...t, wp.id);
+  }
+
+  const hasTsTables = db.prepare('SELECT COUNT(*) AS n FROM tables WHERE restaurant_id = ?').get(ts.id).n;
+  if (!hasTsTables) {
+    const addTable = db.prepare(
+      `INSERT INTO tables (name, seats, zone, shape, x, y, rotation, active, restaurant_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`
+    );
+    const layout = [
+      ['G1', 2, 'patio', 'square', 6, 6, 0], ['G2', 4, 'patio', 'round', 20, 6, 0],
+      ['G3', 4, 'main', 'round', 36, 6, 0], ['G4', 6, 'main', 'rectangle', 50, 6, 0],
+      ['G5', 8, 'main', 'rectangle', 34, 36, 0], ['G6', 4, 'bar', 'round', 66, 12, 0]
+    ];
+    for (const t of layout) addTable.run(...t, ts.id);
+  }
+
+  const hasWpYield = db.prepare('SELECT COUNT(*) AS n FROM yield_rules WHERE restaurant_id = ?').get(wp.id).n;
+  if (!hasWpYield) {
+    const addRule = db.prepare(
+      `INSERT INTO yield_rules (name, day_of_week, start_time, end_time, min_covers, discount_pct, label, active, restaurant_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`
+    );
+    addRule.run('Lunchtime special', -1, '11:00', '14:00', 0, 10, 'Lunchtime special', wp.id);
+    addRule.run('Sunday family feast', 0, '12:00', '20:00', 4, 15, 'Sunday family feast', wp.id);
+  }
+  const hasTsYield = db.prepare('SELECT COUNT(*) AS n FROM yield_rules WHERE restaurant_id = ?').get(ts.id).n;
+  if (!hasTsYield) {
+    const addRule = db.prepare(
+      `INSERT INTO yield_rules (name, day_of_week, start_time, end_time, min_covers, discount_pct, label, active, restaurant_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`
+    );
+    addRule.run('Twilight grill hour', -1, '16:00', '18:00', 0, 8, 'Twilight grill hour', ts.id);
+  }
+
+  const hasWpPromo = db.prepare('SELECT COUNT(*) AS n FROM promos WHERE restaurant_id = ?').get(wp.id).n;
+  if (!hasWpPromo) {
+    db.prepare(
+      `INSERT INTO promos (name, code, type, value, days, featured, active, occasions, restaurant_id)
+       VALUES (?, ?, 'percent', ?, '[]', 1, 1, '[]', ?)`
+    ).run('Khmer Classics Week', 'KHMER15', 15, wp.id);
+  }
+  const hasTsPromo = db.prepare('SELECT COUNT(*) AS n FROM promos WHERE restaurant_id = ?').get(ts.id).n;
+  if (!hasTsPromo) {
+    db.prepare(
+      `INSERT INTO promos (name, code, type, value, days, featured, active, occasions, restaurant_id)
+       VALUES (?, ?, 'percent', ?, '[]', 1, 1, '[]', ?)`
+    ).run('Grill & Chill', 'EMBERS10', 10, ts.id);
+  }
+}
+
 seed();
 seedReviews();
 seedSettings();
+seedYieldRules();
+seedTables();
+seedRestaurants();
+seedPartners();
 
 module.exports = { db, DB_PATH, seed };

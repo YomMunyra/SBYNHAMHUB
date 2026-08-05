@@ -3,32 +3,49 @@
 const express = require('express');
 const { db } = require('../../db');
 const { requireAuth } = require('../middleware/auth');
+const { restaurantId, settingsOf } = require('../lib/restaurants');
 
 const router = express.Router();
 
-router.get('/settings', (req, res) => {
-  const row = db.prepare('SELECT * FROM settings WHERE id = 1').get();
-  if (!row) return res.json({ name: 'SbyNhamHub', phone: '', address: '', hours: [], avg_cover: 15, fee_rate: 0.0095, fee_flat: 0.5, capacity: 48 });
+function rowToResponse(row, settings) {
   let hours = [];
   try { hours = JSON.parse(row.hours); } catch { hours = []; }
-  res.json({ name: row.name, phone: row.phone, address: row.address, hours, avg_cover: row.avg_cover, fee_rate: row.fee_rate, fee_flat: row.fee_flat, capacity: row.capacity });
+  return {
+    name: row.name,
+    phone: row.phone,
+    address: row.address,
+    city: row.city,
+    hours,
+    avg_cover: Number(row.avg_cover),
+    capacity: Number(row.capacity),
+    fee_rate: Number(settings.fee_rate),
+    fee_flat: Number(settings.fee_flat)
+  };
+}
+
+router.get('/settings', (req, res) => {
+  const rid = restaurantId(req);
+  const row = db.prepare('SELECT * FROM restaurants WHERE id = ?').get(rid);
+  if (!row) return res.status(404).json({ error: 'Restaurant not found' });
+  res.json(rowToResponse(row, settingsOf(rid)));
 });
 
 router.patch('/settings', requireAuth, (req, res) => {
-  const { name, phone, address, hours, avg_cover, fee_rate, fee_flat, capacity } = req.body || {};
-  const current = db.prepare('SELECT * FROM settings WHERE id = 1').get();
-  if (!current) return res.status(404).json({ error: 'Settings not found' });
+  const rid = restaurantId(req);
+  const { name, phone, address, city, hours, avg_cover, fee_rate, fee_flat, capacity } = req.body || {};
+  const current = db.prepare('SELECT * FROM restaurants WHERE id = ?').get(rid);
+  if (!current) return res.status(404).json({ error: 'Restaurant not found' });
   let avgCover = current.avg_cover;
   if (avg_cover !== undefined) {
     avgCover = Number(avg_cover);
     if (!Number.isFinite(avgCover) || avgCover < 0) return res.status(400).json({ error: 'Average cover must be 0 or more' });
   }
-  let feeRate = current.fee_rate;
+  let feeRate = settingsOf(rid).fee_rate;
   if (fee_rate !== undefined) {
     feeRate = Number(fee_rate);
     if (!Number.isFinite(feeRate) || feeRate < 0 || feeRate > 0.1) return res.status(400).json({ error: 'Fee rate must be between 0 and 10%' });
   }
-  let feeFlat = current.fee_flat;
+  let feeFlat = settingsOf(rid).fee_flat;
   if (fee_flat !== undefined) {
     feeFlat = Number(fee_flat);
     if (!Number.isFinite(feeFlat) || feeFlat < 0) return res.status(400).json({ error: 'Flat fee must be 0 or more' });
@@ -42,16 +59,16 @@ router.patch('/settings', requireAuth, (req, res) => {
     name: name !== undefined ? String(name).trim() : current.name,
     phone: phone !== undefined ? String(phone).trim() : current.phone,
     address: address !== undefined ? String(address).trim() : current.address,
+    city: city !== undefined ? String(city).trim() : (current.city || 'Phnom Penh'),
     hours: hours !== undefined ? JSON.stringify(hours) : current.hours
   };
   if (next.hours.length > 10000) return res.status(400).json({ error: 'Hours data is too long' });
-  db.prepare("UPDATE settings SET name = ?, phone = ?, address = ?, hours = ?, avg_cover = ?, fee_rate = ?, fee_flat = ?, capacity = ?, updated_at = datetime('now') WHERE id = 1").run(
-    next.name, next.phone, next.address, next.hours, avgCover, feeRate, feeFlat, seatCapacity
+  db.prepare("UPDATE restaurants SET name = ?, phone = ?, address = ?, city = ?, hours = ?, avg_cover = ?, capacity = ? WHERE id = ?").run(
+    next.name, next.phone, next.address, next.city, next.hours, avgCover, seatCapacity, rid
   );
-  const row = db.prepare('SELECT * FROM settings WHERE id = 1').get();
-  let parsed = [];
-  try { parsed = JSON.parse(row.hours); } catch { parsed = []; }
-  res.json({ ok: true, settings: { name: row.name, phone: row.phone, address: row.address, hours: parsed, avg_cover: row.avg_cover, fee_rate: row.fee_rate, fee_flat: row.fee_flat, capacity: row.capacity } });
+  db.prepare("UPDATE settings SET fee_rate = ?, fee_flat = ?, updated_at = datetime('now') WHERE id = 1").run(feeRate, feeFlat);
+  const row = db.prepare('SELECT * FROM restaurants WHERE id = ?').get(rid);
+  res.json({ ok: true, settings: rowToResponse(row, settingsOf(rid)) });
 });
 
 module.exports = router;

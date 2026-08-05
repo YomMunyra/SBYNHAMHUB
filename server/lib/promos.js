@@ -2,6 +2,7 @@
 
 const { db } = require('../../db');
 const { SEAT_CAPACITY } = require('../constants');
+const { settingsOf } = require('./restaurants');
 
 function parseDays(promo) {
   try {
@@ -12,17 +13,17 @@ function parseDays(promo) {
   }
 }
 
-function slotOccupancy(date, time) {
+function slotOccupancy(date, time, restaurantId = 1) {
   if (!date || !time) return null;
   const seats = db
-    .prepare("SELECT COALESCE(SUM(guests), 0) AS n FROM reservations WHERE date = ? AND time = ? AND status IN ('pending','confirmed','arrived')")
-    .get(String(date), String(time)).n;
-  const capacity = Number(db.prepare('SELECT capacity FROM settings WHERE id = 1').get()?.capacity || SEAT_CAPACITY);
+    .prepare("SELECT COALESCE(SUM(guests), 0) AS n FROM reservations WHERE date = ? AND time = ? AND restaurant_id = ? AND status IN ('pending','confirmed','arrived')")
+    .get(String(date), String(time), Number(restaurantId)).n;
+  const capacity = Number(db.prepare('SELECT capacity FROM restaurants WHERE id = ?').get(Number(restaurantId))?.capacity ?? settingsOf(1).capacity ?? SEAT_CAPACITY);
   return { seats: Number(seats), capacity };
 }
 
-function slotIsFull(date, time) {
-  const occ = slotOccupancy(date, time);
+function slotIsFull(date, time, restaurantId = 1) {
+  const occ = slotOccupancy(date, time, restaurantId);
   return !!occ && occ.seats >= occ.capacity;
 }
 
@@ -30,6 +31,15 @@ function discountLabel(promo) {
   return promo.type === 'percent'
     ? `${Number(promo.value)}% off`
     : `$${Number(promo.value).toFixed(2)} off`;
+}
+
+function parseOccasions(promo) {
+  try {
+    const arr = JSON.parse(promo.occasions);
+    return Array.isArray(arr) ? arr.map(String).filter(Boolean) : [];
+  } catch {
+    return [];
+  }
 }
 
 function publicPromo(row) {
@@ -46,11 +56,12 @@ function publicPromo(row) {
     end_time: row.end_time || '',
     used: row.used,
     max_uses: row.max_uses,
-    auto_end: Number(row.auto_end || 0)
+    auto_end: Number(row.auto_end || 0),
+    occasions: parseOccasions(row)
   };
 }
 
-function promoApplicable(row, { date = '', time = '', guests = 1 } = {}) {
+function promoApplicable(row, { date = '', time = '', guests = 1, occasion = '' } = {}) {
   if (!Number(row.active)) return false;
   if (row.max_uses > 0 && Number(row.used) >= Number(row.max_uses)) return false;
   if (row.start_date && String(row.start_date) > String(date)) return false;
@@ -63,7 +74,11 @@ function promoApplicable(row, { date = '', time = '', guests = 1 } = {}) {
   }
   if (row.start_time && String(time) < String(row.start_time)) return false;
   if (row.end_time && String(time) > String(row.end_time)) return false;
-  if (Number(row.auto_end) && slotIsFull(date, time)) return false;
+  if (Number(row.auto_end) && slotIsFull(date, time, Number(row.restaurant_id || 1))) return false;
+  const occasions = parseOccasions(row);
+  if (occasions.length && occasion) {
+    if (!occasions.includes(String(occasion))) return false;
+  }
   return true;
 }
 
@@ -73,10 +88,10 @@ function discountFor(promo, { guests = 1, avgCover = 15 } = {}) {
   return Math.round(bill * (Number(promo.value) / 100) * 100) / 100;
 }
 
-function findPromoByCode(code) {
+function findPromoByCode(code, restaurantId = 1) {
   const clean = String(code || '').trim().toUpperCase();
   if (!clean) return null;
-  return db.prepare('SELECT * FROM promos WHERE code = ?').get(clean) || null;
+  return db.prepare('SELECT * FROM promos WHERE code = ? AND restaurant_id = ?').get(clean, Number(restaurantId)) || null;
 }
 
 function redeemPromo(id) {
@@ -86,12 +101,12 @@ function redeemPromo(id) {
   return result.changes > 0;
 }
 
-function resolvePromo({ code = '', date = '', time = '', guests = 1, avgCover = 15 } = {}) {
+function resolvePromo({ code = '', date = '', time = '', guests = 1, avgCover = 15, restaurantId = 1 } = {}) {
   const clean = String(code || '').trim().toUpperCase();
   if (!clean) return { promo: null, discount: 0 };
-  const promo = findPromoByCode(clean);
+  const promo = findPromoByCode(clean, restaurantId);
   if (!promo) return { error: 'That promo code is not valid.' };
-  if (Number(promo.auto_end) && slotIsFull(date, time)) {
+  if (Number(promo.auto_end) && slotIsFull(date, time, restaurantId)) {
     return { error: 'That promo has ended — the restaurant is at capacity for this slot.' };
   }
   if (!promoApplicable(promo, { date, time, guests })) {
@@ -103,4 +118,4 @@ function resolvePromo({ code = '', date = '', time = '', guests = 1, avgCover = 
   return { promo, discount: discountFor(promo, { guests, avgCover }), code: clean };
 }
 
-module.exports = { parseDays, discountLabel, publicPromo, promoApplicable, discountFor, findPromoByCode, redeemPromo, resolvePromo, slotOccupancy, slotIsFull };
+module.exports = { parseDays, parseOccasions, discountLabel, publicPromo, promoApplicable, discountFor, findPromoByCode, redeemPromo, resolvePromo, slotOccupancy, slotIsFull };

@@ -72,6 +72,13 @@ function renderHeader(active) {
           ${profileLinks.map(([href, label]) =>
             `<a class="profile-link" href="${href}">${label}</a>`
           ).join('')}
+          <div class="profile-notify" id="profileNotify">
+            <label class="switch">
+              <input type="checkbox" id="notifyToggle">
+              <span class="switch-slider"></span>
+            </label>
+            <span>Booking reminders</span>
+          </div>
         </div>
       </div>
     </div>
@@ -230,8 +237,100 @@ async function ensureGuestIdentity() {
   return guestIdentity();
 }
 
+function pushBrowserSupported() {
+  return 'serviceWorker' in navigator && 'PushManager' in window;
+}
+
+async function pushSubscriptionState() {
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    return await registration.pushManager.getSubscription();
+  } catch {
+    return null;
+  }
+}
+
+async function enablePush() {
+  if (!pushBrowserSupported()) {
+    toast('Push notifications are not supported in this browser.', 'error');
+    return false;
+  }
+  try {
+    if (Notification.permission === 'denied') {
+      toast('Notifications are blocked by the browser. Allow them in site settings.', 'error');
+      return false;
+    }
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      toast('Notification permission was not granted.', 'error');
+      return false;
+    }
+    const registration = await navigator.serviceWorker.register('/sw.js');
+    await navigator.serviceWorker.ready;
+    let subscription = await registration.pushManager.getSubscription();
+    if (!subscription) {
+      const { publicKey } = await api('/api/push/vapid');
+      if (!publicKey) {
+        toast('Push is not configured on this server yet.', 'error');
+        return false;
+      }
+      const base64ToUint8Array = (b64) => {
+        const padding = '='.repeat((4 - (b64.length % 4)) % 4);
+        const raw = atob((b64 + padding).replace(/-/g, '+').replace(/_/g, '/'));
+        return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+      };
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: base64ToUint8Array(publicKey)
+      });
+    }
+    const identity = guestIdentity();
+    await api('/api/push/subscribe', {
+      method: 'POST',
+      body: JSON.stringify({
+        endpoint: subscription.endpoint,
+        keys: subscription.toJSON().keys,
+        email: identity.email || '',
+        phone: identity.phone || ''
+      })
+    });
+    toast('Notifications enabled. You will get booking reminders.');
+    return true;
+  } catch (error) {
+    toast('Could not enable notifications: ' + (error.message || error), 'error');
+    return false;
+  }
+}
+
+async function disablePush() {
+  try {
+    const subscription = await pushSubscriptionState();
+    if (subscription) await subscription.unsubscribe();
+    toast('Notifications disabled.');
+  } catch {
+    toast('Could not disable notifications.', 'error');
+  }
+}
+
+function initPushToggle() {
+  const toggle = document.getElementById('notifyToggle');
+  if (!toggle) return;
+  pushSubscriptionState().then((subscription) => {
+    toggle.checked = !!subscription;
+  });
+  toggle.addEventListener('change', async () => {
+    toggle.disabled = true;
+    if (toggle.checked) await enablePush();
+    else await disablePush();
+    const subscription = await pushSubscriptionState();
+    toggle.checked = !!subscription;
+    toggle.disabled = false;
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const page = document.body.dataset.page;
   renderHeader(page);
   renderFooter();
+  initPushToggle();
 });

@@ -164,6 +164,12 @@ blob store on first run.
 | PATCH | `/api/menu/:id` | Bearer | Update dish (incl. image) |
 | DELETE | `/api/menu/:id` | Bearer | Delete dish |
 | GET | `/api/discover` | — | Discovery feed with live availability |
+| GET | `/api/marketplace` | — | Multi-venue marketplace (filter by `city`, `cuisine`, `max_price`, `min_rating`, `date`, `guests`, `occasion`) |
+| GET | `/api/restaurants/:slug` | — | Restaurant detail (menu by category, promos, tables, availability) |
+| GET | `/api/restaurants` | Bearer (admin) | List restaurants |
+| POST | `/api/restaurants` | Bearer (admin) | Create a restaurant |
+| PATCH | `/api/restaurants/:id` | Bearer (admin) | Update a restaurant (incl. activate/deactivate) |
+| DELETE | `/api/restaurants/:id` | Bearer (admin) | Deactivate a restaurant (id 1 is protected) |
 | GET | `/api/reviews/summary` | — | Review aggregates |
 | GET | `/api/reviews` | — | Published reviews |
 | POST | `/api/reviews` | — | Submit review (spam-filtered) |
@@ -197,13 +203,36 @@ blob store on first run.
 | GET | `/api/guests` | Bearer | Guest list with history & points |
 | PATCH | `/api/guests/:id` | Bearer | Update guest |
 | POST | `/api/reminders` | Bearer | Run a reminder pass |
-| GET | `/api/settings` | — | Site settings & payment fees |
-| PATCH | `/api/settings` | Bearer | Update settings |
+| GET | `/api/settings` | — | Venue settings & payment fees |
+| PATCH | `/api/settings` | Bearer | Update venue settings |
 | GET | `/api/admin/summary` | Bearer (admin) | Platform summary |
+| GET | `/api/admin/platform` | Bearer (admin) | Per-venue totals (reservations, covers, menu, tables) |
 | GET | `/api/payments` | Bearer | Payment history |
 | GET | `/api/payments/receipt/:ref` | — | Payment receipt |
 | POST | `/api/payments/pay` | — | Charge a bill (tip, split, mock card) |
 | POST | `/api/payments/:id/refund` | Bearer | Refund a payment |
+| GET | `/api/yield/offer` | — | Auto-applied yield discount for a date/time/party |
+| GET | `/api/yield/rules` | Bearer | List yield rules |
+| POST | `/api/yield/rules` | Bearer | Create a yield rule |
+| PATCH | `/api/yield/rules/:id` | Bearer | Update a yield rule |
+| DELETE | `/api/yield/rules/:id` | Bearer | Delete a yield rule |
+| GET | `/api/tables` | Bearer | Table layout (seats, zone, position) |
+| POST | `/api/tables` | Bearer | Add a table |
+| PATCH | `/api/tables/:id` | Bearer | Update a table (incl. drag position) |
+| DELETE | `/api/tables/:id` | Bearer | Delete a table |
+| GET | `/api/integrations` | Bearer | SMS/push/webhook config + device list |
+| PATCH | `/api/integrations` | Bearer | Save integrations config |
+| GET | `/api/push/vapid` | — | Public VAPID key for browser subscriptions |
+| POST | `/api/push/subscribe` | — | Save a device push subscription |
+| POST | `/api/push/test` | Bearer | Send a test push to all devices |
+| POST | `/api/sms/test` | Bearer | Send a test SMS (via webhook URL) |
+| POST | `/api/webhook/test` | Bearer | Fire a test webhook event |
+| POST | `/api/webhook/fire` | Bearer | Re-fire a booking webhook event |
+
+Multi-venue note: since Phase 5 every venue-scoped resource (menu, promos, yield
+rules, tables, reservations, reviews, waitlist, guests, analytics, settings) accepts
+`?restaurant=` or `?restaurant_id=` (slug or id) and defaults to venue 1 (SbyNhamHub,
+Phnom Penh). Reservations carry `restaurant_id`; promo codes are unique per venue.
 
 ## Data
 

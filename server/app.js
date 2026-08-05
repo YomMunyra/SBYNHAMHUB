@@ -18,6 +18,10 @@ const adminRoutes = require('./routes/admin');
 const paymentRoutes = require('./routes/payments');
 const discoverRoutes = require('./routes/discover');
 const personaliseRoutes = require('./routes/personalise');
+const yieldRoutes = require('./routes/yield');
+const tableRoutes = require('./routes/tables');
+const integrationRoutes = require('./routes/integrations');
+const restaurantRoutes = require('./routes/restaurants');
 
 function createApp() {
   const app = express();
@@ -48,6 +52,10 @@ function createApp() {
   app.use('/api', paymentRoutes);
   app.use('/api', discoverRoutes);
   app.use('/api', personaliseRoutes);
+  app.use('/api', yieldRoutes);
+  app.use('/api', tableRoutes);
+  app.use('/api', integrationRoutes);
+  app.use('/api', restaurantRoutes);
 
   const publicDir = path.join(__dirname, '..', 'public');
   app.use(express.static(publicDir));

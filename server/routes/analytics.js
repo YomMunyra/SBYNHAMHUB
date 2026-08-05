@@ -4,11 +4,13 @@ const express = require('express');
 const { db } = require('../../db');
 const { requireAuth } = require('../middleware/auth');
 const { reviewOverall } = require('../format');
+const { restaurantId } = require('../lib/restaurants');
 
 const router = express.Router();
 
 router.get('/analytics', requireAuth, (req, res) => {
-  const all = db.prepare('SELECT * FROM reservations').all();
+  const rid = restaurantId(req);
+  const all = db.prepare('SELECT * FROM reservations WHERE restaurant_id = ?').all(rid);
 
   const today = new Date();
   const trend = [];
@@ -44,20 +46,25 @@ router.get('/analytics', requireAuth, (req, res) => {
 
   const pointsEarned = db.prepare('SELECT COALESCE(SUM(lifetime), 0) AS n FROM points_accounts').get().n;
   const pointsRedeemed = db.prepare("SELECT COALESCE(SUM(-delta), 0) AS n FROM points_ledger WHERE reason = 'redeemed'").get().n;
-  const promoDiscount = db.prepare('SELECT COALESCE(SUM(promo_discount), 0) AS n FROM reservations').get().n;
-  const discountTotal = db.prepare('SELECT COALESCE(SUM(discount), 0) AS n FROM reservations').get().n;
-  const promoUses = db.prepare('SELECT COUNT(*) AS n FROM reservations WHERE promo_id != 0').get().n;
+  const promoDiscount = db.prepare('SELECT COALESCE(SUM(promo_discount), 0) AS n FROM reservations WHERE restaurant_id = ?').get(rid).n;
+  const discountTotal = db.prepare('SELECT COALESCE(SUM(discount), 0) AS n FROM reservations WHERE restaurant_id = ?').get(rid).n;
+  const promoUses = db.prepare('SELECT COUNT(*) AS n FROM reservations WHERE restaurant_id = ? AND promo_id != 0').get(rid).n;
   const topPromos = db
     .prepare(
       `SELECT promo_name AS name, COUNT(*) AS uses, SUM(promo_discount) AS discount
-       FROM reservations WHERE promo_id != 0 GROUP BY promo_id ORDER BY uses DESC LIMIT 5`
+       FROM reservations WHERE restaurant_id = ? AND promo_id != 0 GROUP BY promo_id ORDER BY uses DESC LIMIT 5`
     )
-    .all();
+    .all(rid);
 
-  const published = db.prepare("SELECT * FROM reviews WHERE status = 'published'").all();
+  const published = db.prepare("SELECT * FROM reviews WHERE status = 'published' AND restaurant_id = ?").all(rid);
   const reviewAvg = published.length ? published.reduce((sum, r) => sum + reviewOverall(r), 0) / published.length : 0;
 
-  const payRows = db.prepare("SELECT * FROM payments WHERE status = 'paid'").all();
+  const payRows = db
+    .prepare(
+      `SELECT p.* FROM payments p LEFT JOIN reservations r ON r.id = p.reservation_id
+       WHERE p.status = 'paid' AND r.restaurant_id = ?`
+    )
+    .all(rid);
   const payRevenue = payRows.reduce((sum, p) => sum + p.total, 0);
   const payFees = payRows.reduce((sum, p) => sum + p.fee_total, 0);
   const payTips = payRows.reduce((sum, p) => sum + p.tip_amount, 0);

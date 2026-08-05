@@ -10,6 +10,7 @@ const POINTS_PER_COVER = 100;
 const POINTS_UNIT = 100;
 const POINTS_RATE = 0.5;
 const SEAT_CAPACITY = 48;
+const CITIES = ['Phnom Penh', 'Siem Reap', 'Bangkok'];
 const TIME_SLOTS = [
   '11:00', '11:30', '12:00', '12:30', '13:00',
   '17:30', '18:00', '18:30', '19:00', '19:30',
@@ -26,5 +27,6 @@ module.exports = {
   POINTS_UNIT,
   POINTS_RATE,
   SEAT_CAPACITY,
-  TIME_SLOTS
+  TIME_SLOTS,
+  CITIES
 };

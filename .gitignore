@@ -5,3 +5,6 @@ data/
 .DS_Store
 .claude/
 .opencode/
+
+# Local Netlify folder
+.netlify

@@ -37,6 +37,7 @@
 
       <div class="form-card">
         <span class="eyebrow">Reservation details</span>
+        <p class="muted" id="venueLine" style="margin:0 0 6px;font-weight:600;color:var(--orange)"></p>
         <h3 style="margin-bottom:24px">Reserve a table for two, tonight at seven?</h3>
 
         <form id="bookingForm" novalidate>
@@ -55,6 +56,7 @@
               <label for="bEmail">Email <span class="muted" style="font-weight:400">(for the confirmation)</span></label>
               <input class="input" id="bEmail" name="email" type="email" autocomplete="email" placeholder="you@example.com">
             </div>
+            <div class="field flex"><label class="check"><input type="checkbox" id="bSmsOpt" checked> Send me SMS reminders about this booking</label></div>
             <div class="form-grid">
               <div class="field">
                 <label for="bDate">Date <span class="req">*</span></label>
@@ -115,6 +117,7 @@
               <textarea class="textarea" id="bNotes" name="notes" placeholder="Window seat, allergies, a cake on the table…"></textarea>
             </div>
             <div class="promo-box">
+              <div class="callout" id="yieldBanner" style="display:none;margin-bottom:14px"></div>
               <div class="points-card-head">
                 <div class="icon-chip">
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF611F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M12 5v14"/><path d="M7.5 9.5h.01M7.5 14.5h.01M16.5 9.5h.01M16.5 14.5h.01"/></svg>
@@ -258,6 +261,13 @@
       if (qs.get('date')) dateInput.value = qs.get('date');
       if (qs.get('time')) document.getElementById('bTime').value = qs.get('time');
       if (qs.get('guests')) document.getElementById('bGuests').value = qs.get('guests');
+      const restaurantSlug = qs.get('restaurant') || '';
+      if (restaurantSlug) {
+        api(`/api/restaurants/${encodeURIComponent(restaurantSlug)}`).then((r) => {
+          const line = document.getElementById('venueLine');
+          if (r && r.name) { line.textContent = `At ${r.name} — ${r.city || ''}`.trim().replace(/—\s*$/, ''); document.title = `Book at ${r.name} | SbyNhamHub`; }
+        }).catch(() => {});
+      }
 
       const offersPanel = document.getElementById('offersPanel');
       const offersList = document.getElementById('offersList');
@@ -265,7 +275,8 @@
       async function loadOffers() {
         try {
           const date = form.date.value, time = form.time.value, guests = form.guests.value;
-          loadedOffers = await api(`/api/promos/offers?date=${encodeURIComponent(date)}&time=${encodeURIComponent(time)}&guests=${encodeURIComponent(guests)}`);
+          const url = `/api/promos/offers?date=${encodeURIComponent(date)}&time=${encodeURIComponent(time)}&guests=${encodeURIComponent(guests)}${restaurantSlug ? '&restaurant=' + encodeURIComponent(restaurantSlug) : ''}`;
+          loadedOffers = await api(url);
           if (!loadedOffers.length) { offersPanel.style.display = 'none'; offersList.innerHTML = ''; return; }
           offersList.innerHTML = loadedOffers.map((o) => `
             <div class="offer-row">
@@ -275,7 +286,8 @@
           offersPanel.style.display = 'block';
         } catch { loadedOffers = []; }
       }
-      ['bDate', 'bTime', 'bGuests'].forEach((id) => document.getElementById(id).addEventListener('change', () => { loadOffers(); clearPromo(); }));
+      ['bDate', 'bTime', 'bGuests'].forEach((id) => document.getElementById(id).addEventListener('change', () => { loadOffers(); clearPromo(); loadYield(); }));
+      loadYield();
       offersList.addEventListener('click', (e) => {
         const chip = e.target.closest('.offer-code');
         if (!chip) return;
@@ -283,10 +295,25 @@
         applyPromo();
       });
       const promoStatus = document.getElementById('promoStatus');
+      const yieldBanner = document.getElementById('yieldBanner');
       function clearPromo() {
         document.getElementById('bPromo').value = '';
         promoStatus.style.display = 'none';
         promoStatus.className = 'points-status muted';
+      }
+      async function loadYield() {
+        try {
+          const date = form.date.value, time = form.time.value, guests = form.guests.value;
+          const url = `/api/yield/offer?date=${encodeURIComponent(date)}&time=${encodeURIComponent(time)}&guests=${encodeURIComponent(guests)}${restaurantSlug ? '&restaurant=' + encodeURIComponent(restaurantSlug) : ''}`;
+          const offer = await api(url);
+          if (offer && offer.applied) {
+            yieldBanner.className = 'callout callout-offer';
+            yieldBanner.innerHTML = `<strong>${escapeHTML(offer.label)}</strong> — <strong>${offer.discount_pct}% off</strong> auto-applied at this time.<div class="muted" style="font-size:12.5px;margin-top:2px">Estimated ${offer.discount_pct}% off your bill. A promo code replaces this offer if it applies.</div>`;
+            yieldBanner.style.display = 'block';
+          } else {
+            yieldBanner.style.display = 'none';
+          }
+        } catch { yieldBanner.style.display = 'none'; }
       }
       function applyPromo() {
         const code = document.getElementById('bPromo').value.trim().toUpperCase();
@@ -361,8 +388,10 @@
           guests: Number(form.guests.value),
           occasion: form.occasion.value,
           notes: form.notes.value.trim(),
-          redeem_points: Number(pRedeem.value || 0)
+          redeem_points: Number(pRedeem.value || 0),
+          sms_opt_in: document.getElementById('bSmsOpt').checked
         };
+        if (restaurantSlug) payload.restaurant = restaurantSlug;
         if (promoCode && loadedOffers.some((o) => (o.code || '').toUpperCase() === promoCode)) payload.promo_code = promoCode;
 
         try {
@@ -397,6 +426,7 @@
           loadOffers();
           submitBtn.disabled = false;
           submitBtn.textContent = 'Confirm reservation';
+          setGuestIdentity({ email: payload.email, phone: payload.phone });
         } catch (err) {
           toast(err.message, 'error');
           submitBtn.disabled = false;
@@ -416,7 +446,8 @@
               phone: document.getElementById('wPhone').value.trim(),
               preferred_date: wDate.value,
               preferred_time: document.getElementById('wTime').value,
-              party_size: Number(document.getElementById('wParty').value)
+              party_size: Number(document.getElementById('wParty').value),
+              restaurant: restaurantSlug || undefined
             })
           });
           toast('You\'re on the waitlist! We\'ll call when a table frees up.');

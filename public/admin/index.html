@@ -30,6 +30,7 @@
       <p class="manager-label">Platform control</p>
       <nav class="manager-nav" aria-label="Admin navigation">
         <button class="manager-nav-link active" data-view="platform"><span class="manager-icon">&#9672;</span>Platform overview</button>
+        <button class="manager-nav-link" data-view="restaurants"><span class="manager-icon">&#9681;</span>Restaurants</button>
       </nav>
       <p class="manager-label">Restaurant workspace</p>
       <nav class="manager-nav" aria-label="Workspace navigation">
@@ -58,7 +59,7 @@
     </aside>
 
     <main class="manager-main">
-      <header class="manager-topbar"><div><p class="eyebrow">SbyNhamHub Platform</p><h1 id="viewTitle">Platform overview</h1></div><a class="btn btn-ghost btn-sm" href="/manager">Open Manager view</a><a class="btn btn-primary btn-sm" href="/book">+ New booking</a></header>
+      <header class="manager-topbar"><div><p class="eyebrow">SbyNhamHub Platform</p><h1 id="viewTitle">Platform overview</h1></div><select class="select" id="adminRestaurantSelect" title="Active restaurant" style="max-width:220px"><option value="">All restaurants</option></select><a class="btn btn-ghost btn-sm" href="/manager">Open Manager view</a><a class="btn btn-primary btn-sm" href="/book">+ New booking</a></header>
 
       <div id="platformView">
         <div class="manager-date-row"><div><strong>Marketplace health</strong><span>Current activity across your restaurant workspace.</span></div><button class="btn btn-ghost btn-sm" id="platformRefreshBtn">Refresh data</button></div>
@@ -72,6 +73,33 @@
           <section class="manager-panel"><div class="manager-panel-head"><div><p class="eyebrow">Guests</p><h2>Top diners</h2></div></div><div id="platformGuests" class="booking-timeline"><p class="muted">Loading guests...</p></div></section>
           <section class="manager-panel manager-action-panel"><p class="eyebrow">Admin tools</p><h2>Restaurant operations</h2><p>Handle bookings, floor plans, menu, promotions and settings from this dashboard — admin has full access to the workspace.</p><button class="btn btn-primary btn-block" data-view="bookings">Manage bookings</button></section>
         </div>
+      </div>
+
+      <div id="restaurantsView" style="display:none">
+        <div class="manager-date-row"><div><p class="eyebrow">Marketplace venues</p><h2>Restaurants</h2><span>Every venue on the platform, with live booking totals. Create, edit or deactivate venues.</span></div><button class="btn btn-secondary btn-sm" id="newRestaurantBtn">+ Add restaurant</button></div>
+        <section class="manager-panel manager-table-panel">
+          <div class="form-card" id="restaurantForm" style="display:none;margin:0 0 16px;border:1px dashed var(--brand)">
+            <span class="eyebrow" id="restaurantFormLabel">New restaurant</span>
+            <div class="form">
+              <div class="form-grid">
+                <div class="field"><label>Name <span class="req">*</span></label><input class="input" id="rName" placeholder="e.g. Riverside Bistro"></div>
+                <div class="field"><label>City</label><select class="select" id="rCity"><option>Phnom Penh</option><option>Siem Reap</option><option>Bangkok</option></select></div>
+              </div>
+              <div class="form-grid">
+                <div class="field"><label>Address</label><input class="input" id="rAddress"></div>
+                <div class="field"><label>Phone</label><input class="input" id="rPhone"></div>
+              </div>
+              <div class="form-grid">
+                <div class="field"><label>Average cover ($)</label><input class="input" id="rAvgCover" type="number" step="1" min="0" value="15"></div>
+                <div class="field"><label>Seat capacity</label><input class="input" id="rCapacity" type="number" min="1" max="1000" value="48"></div>
+              </div>
+              <div class="field"><label>Opening hours <span class="muted">(one per line: Label | 11:00 - 22:00)</span></label><textarea class="textarea" id="rHours" rows="4"></textarea></div>
+              <div class="field"><label>Tagline</label><input class="input" id="rTagline"></div>
+              <div class="flex" style="gap:10px"><button class="btn btn-primary" id="saveRestaurantBtn">Save restaurant</button><button class="btn btn-ghost" id="cancelRestaurantBtn">Cancel</button></div>
+            </div>
+          </div>
+          <div class="table-wrap"><table class="data"><thead><tr><th>Venue</th><th>City</th><th>Bookings</th><th>Today</th><th>Covers today</th><th>Menu</th><th>Tables</th><th>Status</th><th></th></tr></thead><tbody id="restaurantBody"><tr><td colspan="9" style="text-align:center;color:#888780">Loading restaurants...</td></tr></tbody></table></div>
+        </section>
       </div>
 
       <div id="overviewView">
@@ -262,8 +290,9 @@
       document.getElementById('todayLabel').textContent = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date(today + 'T12:00:00'));
 
       function statusBadge(status) { const map = { pending:'badge-gold', confirmed:'badge-brand', arrived:'badge-green', cancelled:'badge-neutral', 'no-show':'badge-red' }; return `<span class="badge ${map[status] || 'badge-neutral'}">${escapeHTML(status)}</span>`; }
-      let floorBookings = [], selectedBookingId = '', guestItems = [], selectedGuestId = '', reviewItems = [], menuItems = [], categories = [], waitlistItems = [], analyticsData = null, promoItems = [], editingPromoId = '', paymentItems = [], renderedReservations = [], platformSummary = null, statsFallback = null;
-      function showView(view) { ['platform','overview','analytics','bookings','floor','guests','waitlist','menu','promotions','embed','payments','reviews','settings'].forEach((name) => document.getElementById(name + 'View').style.display = view === name ? 'block' : 'none'); document.getElementById('viewTitle').textContent = view === 'platform' ? 'Platform overview' : view === 'settings' ? 'Restaurant settings' : view === 'bookings' ? 'Reservation desk' : view === 'floor' ? 'Floor plan' : view === 'guests' ? 'Guest profiles' : view === 'waitlist' ? 'Waitlist' : view === 'menu' ? 'Menu management' : view === 'promotions' ? 'Promotions' : view === 'embed' ? 'Embed & share' : view === 'payments' ? 'Payments' : view === 'reviews' ? 'Reviews & moderation' : view === 'analytics' ? 'Analytics' : 'Overview'; document.querySelectorAll('[data-view]').forEach((el) => el.classList.toggle('active', el.dataset.view === view && el.classList.contains('manager-nav-link'))); if (view === 'embed') renderEmbed(); }
+      let floorBookings = [], selectedBookingId = '', guestItems = [], selectedGuestId = '', reviewItems = [], menuItems = [], categories = [], waitlistItems = [], analyticsData = null, promoItems = [], editingPromoId = '', paymentItems = [], renderedReservations = [], platformSummary = null, statsFallback = null, currentRestaurant = '', restaurantItems = [], editingRestaurantId = '';
+      function ctx(url) { const sep = url.includes('?') ? '&' : '?'; return url + (currentRestaurant ? `${sep}restaurant=${currentRestaurant}` : ''); }
+      function showView(view) { ['platform','restaurants','overview','analytics','bookings','floor','guests','waitlist','menu','promotions','embed','payments','reviews','settings'].forEach((name) => document.getElementById(name + 'View').style.display = view === name ? 'block' : 'none'); document.getElementById('viewTitle').textContent = view === 'platform' ? 'Platform overview' : view === 'restaurants' ? 'Restaurants' : view === 'settings' ? 'Restaurant settings' : view === 'bookings' ? 'Reservation desk' : view === 'floor' ? 'Floor plan' : view === 'guests' ? 'Guest profiles' : view === 'waitlist' ? 'Waitlist' : view === 'menu' ? 'Menu management' : view === 'promotions' ? 'Promotions' : view === 'embed' ? 'Embed & share' : view === 'payments' ? 'Payments' : view === 'reviews' ? 'Reviews & moderation' : view === 'analytics' ? 'Analytics' : 'Overview'; document.querySelectorAll('[data-view]').forEach((el) => el.classList.toggle('active', el.dataset.view === view && el.classList.contains('manager-nav-link'))); if (view === 'embed') renderEmbed(); }
       function renderReviews() {
         const rows = document.getElementById('reviewBody');
         if (!reviewItems.length) { rows.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888780">No reviews yet. Guest reviews will appear here once submitted.</td></tr>'; return; }
@@ -360,35 +389,36 @@
         try {
           const headers = { Authorization: 'Bearer ' + token() };
           const [stats, todayItems, tableItems] = await Promise.all([
-            api('/api/stats', { headers }), api('/api/reservations?date=' + today, { headers }), api('/api/reservations?date=' + (filterDate.value || ''), { headers })
+            api(ctx('/api/stats'), { headers }), api(ctx('/api/reservations?date=' + today), { headers }), api(ctx('/api/reservations?date=' + (filterDate.value || '')), { headers })
           ]);
           statsFallback = stats;
           statGrid.innerHTML = `<div class="stat-card"><div class="val">${stats.total}</div><div class="lbl">Total bookings</div></div><div class="stat-card"><div class="val">${stats.today}</div><div class="lbl">Bookings today</div></div><div class="stat-card"><div class="val">${stats.covers_today}</div><div class="lbl">Covers today</div></div><div class="stat-card"><div class="val">${stats.confirmed}</div><div class="lbl">Confirmed bookings</div></div>`;
           const active = todayItems.filter((r) => !['cancelled','no-show'].includes(r.status));
           floorBookings = todayItems; renderFloor();
-          guestItems = await api('/api/guests', { headers }); renderGuests();
-          menuItems = await api('/api/menu'); categories = await api('/api/categories'); renderMenu(); renderCategories();
-          waitlistItems = await api('/api/waitlist', { headers }); renderWaitlist();
-          analyticsData = await api('/api/analytics', { headers }); renderAnalytics();
-          paymentItems = await api('/api/payments', { headers }); renderPayments();
+          guestItems = await api(ctx('/api/guests'), { headers }); renderGuests();
+          menuItems = await api(ctx('/api/menu')); categories = await api(ctx('/api/categories')); renderMenu(); renderCategories();
+          waitlistItems = await api(ctx('/api/waitlist'), { headers }); renderWaitlist();
+          analyticsData = await api(ctx('/api/analytics'), { headers }); renderAnalytics();
+          paymentItems = await api(ctx('/api/payments'), { headers }); renderPayments();
           await loadSettings();
-          reviewItems = await api('/api/reviews?all=1', { headers }); renderReviews();
-          promoItems = await api('/api/promos?all=1', { headers }); renderPromos();          const pendingCount = reviewItems.filter((r) => r.status === 'pending').length;
+          reviewItems = await api(ctx('/api/reviews?all=1'), { headers }); renderReviews();
+          promoItems = await api(ctx('/api/promos?all=1'), { headers }); renderPromos();          const pendingCount = reviewItems.filter((r) => r.status === 'pending').length;
           const badge = document.getElementById('reviewBadge');
           if (pendingCount) { badge.textContent = pendingCount; badge.style.display = 'inline-flex'; } else { badge.style.display = 'none'; }
           document.getElementById('todayBookings').innerHTML = active.length ? active.map((r) => `<div class="timeline-booking"><strong>${escapeHTML(r.time)}</strong><div><b>${escapeHTML(r.name)}</b><span>${r.guests} guest${r.guests === 1 ? '' : 's'}${r.occasion ? ' - ' + escapeHTML(r.occasion) : ''}</span></div>${statusBadge(r.status)}</div>`).join('') : '<div class="empty-service"><strong>No bookings yet</strong><span>New reservations will appear here.</span></div>';
           const pending = todayItems.filter((r) => r.status === 'pending').length, confirmed = todayItems.filter((r) => r.status === 'confirmed').length, arrived = todayItems.filter((r) => r.status === 'arrived').length;
           document.getElementById('statusSummary').innerHTML = `<div><b>${pending}</b><span>Pending</span></div><div><b>${confirmed}</b><span>Confirmed</span></div><div><b>${arrived}</b><span>Arrived</span></div>`;
           renderTable(tableItems);
-          try { platformSummary = await api('/api/admin/summary', { headers }); } catch (e) { platformSummary = null; }
+          try { platformSummary = await api(ctx('/api/admin/summary'), { headers }); } catch (e) { platformSummary = null; }
           renderPlatform();
+          await loadRestaurants();
         } catch (err) { if (err.message === 'Unauthorized') { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem('sbynham_admin_token'); loginView.style.display = 'block'; dashView.style.display = 'none'; } toast(err.message, 'error'); }
       }
       async function lightRefresh() {
         try {
           const headers = { Authorization: 'Bearer ' + token() };
           const [stats, todayItems, tableItems] = await Promise.all([
-            api('/api/stats', { headers }), api('/api/reservations?date=' + today, { headers }), api('/api/reservations?date=' + (filterDate.value || ''), { headers })
+            api(ctx('/api/stats'), { headers }), api(ctx('/api/reservations?date=' + today), { headers }), api(ctx('/api/reservations?date=' + (filterDate.value || '')), { headers })
           ]);
           statsFallback = stats;
           statGrid.innerHTML = `<div class="stat-card"><div class="val">${stats.total}</div><div class="lbl">Total bookings</div></div><div class="stat-card"><div class="val">${stats.today}</div><div class="lbl">Bookings today</div></div><div class="stat-card"><div class="val">${stats.covers_today}</div><div class="lbl">Covers today</div></div><div class="stat-card"><div class="val">${stats.confirmed}</div><div class="lbl">Confirmed bookings</div></div>`;
@@ -396,7 +426,7 @@
           const active = todayItems.filter((r) => !['cancelled','no-show'].includes(r.status));
           document.getElementById('todayBookings').innerHTML = active.length ? active.map((r) => `<div class="timeline-booking"><strong>${escapeHTML(r.time)}</strong><div><b>${escapeHTML(r.name)}</b><span>${r.guests} guest${r.guests === 1 ? '' : 's'}${r.occasion ? ' - ' + escapeHTML(r.occasion) : ''}</span></div>${statusBadge(r.status)}</div>`).join('') : '<div class="empty-service"><strong>No bookings yet</strong><span>New reservations will appear here.</span></div>';
           renderTable(tableItems);
-          try { platformSummary = await api('/api/admin/summary', { headers }); } catch (e) { platformSummary = null; }
+          try { platformSummary = await api(ctx('/api/admin/summary'), { headers }); } catch (e) { platformSummary = null; }
           renderPlatform();
         } catch (err) { if (err.message === 'Unauthorized') { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem('sbynham_admin_token'); loginView.style.display = 'block'; dashView.style.display = 'none'; } }
       }
@@ -445,6 +475,82 @@
         document.getElementById('platformGuests').innerHTML = topGuests.length
           ? topGuests.map((g) => `<div class="timeline-booking"><strong>${g.total_bookings}×</strong><div><b>${escapeHTML(g.name || 'Guest')}</b><span>${escapeHTML(g.email || g.phone || 'no contact')}</span></div><span class="badge badge-brand">${g.points} pts</span></div>`).join('')
           : '<p class="muted">No guests yet.</p>';
+      }
+      async function loadRestaurants() {
+        try {
+          const headers = { Authorization: 'Bearer ' + token() };
+          const data = await api('/api/admin/platform', { headers });
+          restaurantItems = data.restaurants || [];
+          const select = document.getElementById('adminRestaurantSelect');
+          const current = select.value;
+          select.innerHTML = '<option value="">All restaurants</option>' + restaurantItems.map((r) => `<option value="${r.id}">${escapeHTML(r.name)}</option>`).join('');
+          select.value = current;
+          renderRestaurants();
+        } catch (err) { toast(err.message, 'error'); }
+      }
+      function renderRestaurants() {
+        const body = document.getElementById('restaurantBody');
+        if (!restaurantItems.length) { body.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#888780">No restaurants yet — add your first venue.</td></tr>'; return; }
+        body.innerHTML = restaurantItems.map((r) => `
+          <tr data-id="${r.id}">
+            <td><strong>${escapeHTML(r.name)}</strong><div class="muted" style="font-size:12px">${escapeHTML(r.slug)} · ${r.rating ? r.rating + '★' : 'No reviews'}</div></td>
+            <td>${escapeHTML(r.city)}</td>
+            <td>${r.total_reservations}</td>
+            <td>${r.today_reservations}</td>
+            <td>${r.covers_today}</td>
+            <td>${r.menu_count}</td>
+            <td>${r.table_count}</td>
+            <td>${r.active ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-neutral">Deactivated</span>'}</td>
+            <td class="flex" style="gap:6px"><button class="btn btn-sm btn-ghost edit" data-id="${r.id}">Edit</button>${r.active ? `<button class="btn btn-sm btn-ghost del" data-id="${r.id}">Deactivate</button>` : `<button class="btn btn-sm btn-ghost reactivate" data-id="${r.id}">Activate</button>`}</td>
+          </tr>`).join('');
+      }
+      function openRestaurantForm(r) {
+        editingRestaurantId = r ? r.id : '';
+        document.getElementById('restaurantFormLabel').textContent = r ? 'Edit restaurant' : 'New restaurant';
+        document.getElementById('rName').value = r ? r.name : '';
+        document.getElementById('rCity').value = r ? (r.city || 'Phnom Penh') : 'Phnom Penh';
+        document.getElementById('rAddress').value = r ? (r.address || '') : '';
+        document.getElementById('rPhone').value = r ? (r.phone || '') : '';
+        document.getElementById('rAvgCover').value = r ? r.avg_cover : 15;
+        document.getElementById('rCapacity').value = r ? r.capacity : 48;
+        document.getElementById('rHours').value = (r && r.hours || []).map((h) => `${h.day} | ${h.hours}`).join('\n');
+        document.getElementById('rTagline').value = r ? (r.tagline || '') : '';
+        const form = document.getElementById('restaurantForm');
+        form.style.display = 'block';
+        form.scrollIntoView({ block: 'nearest' });
+      }
+      async function saveRestaurant() {
+        const payload = {
+          name: document.getElementById('rName').value.trim(),
+          city: document.getElementById('rCity').value,
+          address: document.getElementById('rAddress').value.trim(),
+          phone: document.getElementById('rPhone').value.trim(),
+          avg_cover: Number(document.getElementById('rAvgCover').value),
+          capacity: Number(document.getElementById('rCapacity').value),
+          hours: document.getElementById('rHours').value.split('\n').map((line) => line.trim()).filter(Boolean).map((line) => { const [day, ...rest] = line.split('|'); return { day: (day || '').trim(), hours: (rest.join('|') || '').trim() }; }),
+          tagline: document.getElementById('rTagline').value.trim()
+        };
+        if (!payload.name) { toast('Restaurant name is required.', 'error'); return; }
+        try {
+          const headers = { Authorization: 'Bearer ' + token() };
+          if (editingRestaurantId) await api('/api/restaurants/' + editingRestaurantId, { method: 'PATCH', headers, body: JSON.stringify(payload) });
+          else await api('/api/restaurants', { method: 'POST', headers, body: JSON.stringify(payload) });
+          toast('Restaurant saved');
+          document.getElementById('restaurantForm').style.display = 'none';
+          editingRestaurantId = '';
+          await loadRestaurants();
+          load();
+        } catch (err) { toast(err.message, 'error'); }
+      }
+      async function toggleRestaurantActive(id) {
+        const r = restaurantItems.find((x) => String(x.id) === String(id));
+        if (!r) return;
+        try {
+          await api('/api/restaurants/' + id, { method: 'PATCH', headers: { Authorization: 'Bearer ' + token() }, body: JSON.stringify({ active: r.active ? 0 : 1 }) });
+          toast(r.active ? 'Restaurant deactivated' : 'Restaurant activated');
+          await loadRestaurants();
+          load();
+        } catch (err) { toast(err.message, 'error'); }
       }
       function openDishForm(item) {
         editingDishId = item ? item.id : '';
@@ -622,7 +728,7 @@
       }
       async function loadSettings() {
         try {
-          const s = await api('/api/settings');
+          const s = await api(ctx('/api/settings'));
           document.getElementById('setName').value = s.name || '';
           document.getElementById('setPhone').value = s.phone || '';
           document.getElementById('setAddress').value = s.address || '';
@@ -767,6 +873,16 @@
       document.querySelectorAll('[data-view]').forEach((button) => button.addEventListener('click', () => showView(button.dataset.view)));
       document.getElementById('platformRefreshBtn').addEventListener('click', load);
       document.getElementById('refreshBtn').addEventListener('click', load); filterDate.addEventListener('change', load); document.getElementById('clearFilter').addEventListener('click', () => { filterDate.value = ''; load(); });
+      document.getElementById('adminRestaurantSelect').addEventListener('change', (e) => { currentRestaurant = e.target.value; load(); });
+      document.getElementById('newRestaurantBtn').addEventListener('click', () => openRestaurantForm(null));
+      document.getElementById('cancelRestaurantBtn').addEventListener('click', () => { document.getElementById('restaurantForm').style.display = 'none'; editingRestaurantId = ''; });
+      document.getElementById('saveRestaurantBtn').addEventListener('click', saveRestaurant);
+      document.getElementById('restaurantBody').addEventListener('click', (e) => {
+        const btn = e.target.closest('.edit, .del, .reactivate');
+        if (!btn) return;
+        if (btn.classList.contains('edit')) { openRestaurantForm(restaurantItems.find((r) => String(r.id) === String(btn.dataset.id))); return; }
+        toggleRestaurantActive(btn.dataset.id);
+      });
       document.getElementById('addBookingBtn').addEventListener('click', () => { const form = document.getElementById('addBookingForm'); form.style.display = form.style.display === 'none' ? 'block' : 'none'; document.getElementById('addBookingBtn').textContent = form.style.display === 'none' ? '+ Add booking' : 'Close form'; });
       document.getElementById('abCancel').addEventListener('click', resetAddBookingForm);
       document.getElementById('abSave').addEventListener('click', saveAddBooking);

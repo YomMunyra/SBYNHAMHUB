@@ -4,6 +4,7 @@ const express = require('express');
 const { db } = require('../../db');
 const { requireAuth } = require('../middleware/auth');
 const { publicItem } = require('../format');
+const { restaurantId } = require('../lib/restaurants');
 
 const router = express.Router();
 
@@ -16,13 +17,14 @@ router.get('/categories', (req, res) => {
 
 router.get('/menu', (req, res) => {
   const { category, featured } = req.query;
+  const rid = restaurantId(req);
   let sql = `
     SELECT m.*, c.name AS category, c.slug AS category_slug
     FROM menu_items m
     JOIN categories c ON c.id = m.category_id
   `;
-  const where = [];
-  const params = [];
+  const where = ['m.restaurant_id = ?'];
+  const params = [rid];
   if (category) {
     where.push('c.slug = ?');
     params.push(category);
@@ -30,8 +32,7 @@ router.get('/menu', (req, res) => {
   if (featured === '1') {
     where.push('m.featured = 1');
   }
-  if (where.length) sql += ' WHERE ' + where.join(' AND ');
-  sql += ' ORDER BY c.sort ASC, m.name ASC';
+  sql += ' WHERE ' + where.join(' AND ') + ' ORDER BY c.sort ASC, m.name ASC';
   const rows = db.prepare(sql).all(...params).map(publicItem);
   res.json(rows);
 });
@@ -62,6 +63,7 @@ router.delete('/categories/:id', requireAuth, (req, res) => {
 
 router.post('/menu', requireAuth, (req, res) => {
   const { name = '', category_id = '', price = '', description = '', image = '', tag = '', featured = 0, available = 1 } = req.body;
+  const rid = restaurantId(req);
   const catId = Number(category_id);
   const priceNum = Number(price);
   if (!String(name).trim()) return res.status(400).json({ error: 'Dish name is required' });
@@ -71,8 +73,8 @@ router.post('/menu', requireAuth, (req, res) => {
   if (!Number.isFinite(priceNum) || priceNum < 0) return res.status(400).json({ error: 'Invalid price' });
   const id = Number(
     db.prepare(
-      'INSERT INTO menu_items (category_id, name, description, price, image, tag, featured, available) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(catId, String(name).trim(), String(description || '').trim(), priceNum, String(image || 'plate.svg').trim(), tag ? String(tag).trim() : null, featured ? 1 : 0, available ? 1 : 0).lastInsertRowid
+      'INSERT INTO menu_items (category_id, name, description, price, image, tag, featured, available, restaurant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(catId, String(name).trim(), String(description || '').trim(), priceNum, String(image || 'plate.svg').trim(), tag ? String(tag).trim() : null, featured ? 1 : 0, available ? 1 : 0, rid).lastInsertRowid
   );
   const row = db.prepare(
     `SELECT m.*, c.name AS category, c.slug AS category_slug FROM menu_items m JOIN categories c ON c.id = m.category_id WHERE m.id = ?`
@@ -82,7 +84,8 @@ router.post('/menu', requireAuth, (req, res) => {
 
 router.patch('/menu/:id', requireAuth, (req, res) => {
   const id = Number(req.params.id);
-  const existing = db.prepare('SELECT * FROM menu_items WHERE id = ?').get(id);
+  const rid = restaurantId(req);
+  const existing = db.prepare('SELECT * FROM menu_items WHERE id = ? AND restaurant_id = ?').get(id, rid);
   if (!existing) return res.status(404).json({ error: 'Dish not found' });
   const { name, category_id, price, description, image, tag, featured, available } = req.body;
   const patch = {};
@@ -117,7 +120,8 @@ router.patch('/menu/:id', requireAuth, (req, res) => {
 
 router.delete('/menu/:id', requireAuth, (req, res) => {
   const id = Number(req.params.id);
-  const result = db.prepare('DELETE FROM menu_items WHERE id = ?').run(id);
+  const rid = restaurantId(req);
+  const result = db.prepare('DELETE FROM menu_items WHERE id = ? AND restaurant_id = ?').run(id, rid);
   if (!result.changes) return res.status(404).json({ error: 'Dish not found' });
   res.json({ ok: true });
 });

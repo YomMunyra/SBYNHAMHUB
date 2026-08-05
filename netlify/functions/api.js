@@ -6,7 +6,12 @@ const { sendBookingConfirmation, sendReminder, sendPaymentReceipt } = require('.
 
 const VALID_STATUS = ['pending', 'confirmed', 'arrived', 'cancelled', 'no-show'];
 const VALID_OCCASIONS = ['', 'Birthday', 'Anniversary', 'Date Night', 'Business', 'Family Gathering', 'Other'];
-const VALID_TABLES = Array.from({ length: 12 }, (_, index) => `T${index + 1}`);
+const CITIES = ['Phnom Penh', 'Siem Reap', 'Bangkok'];
+const TIME_SLOTS = [
+  '11:00', '11:30', '12:00', '12:30', '13:00',
+  '17:30', '18:00', '18:30', '19:00', '19:30',
+  '20:00', '20:30', '21:00'
+];
 const TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
 const POINTS_PER_COVER = 100;
 const POINTS_UNIT = 100;
@@ -169,19 +174,26 @@ async function reservationStore(event) {
   return getStore('sbynhamhub-reservations');
 }
 
-async function reservations(event) {
-  const store = await reservationStore(event);
+async function storeReservations(store) {
   const { blobs } = await store.list({ prefix: 'reservation/' });
   const values = await Promise.all(blobs.map(({ key }) => store.get(key, { type: 'json' })));
   return values.filter(Boolean);
+}
+
+async function reservations(event) {
+  return storeReservations(await reservationStore(event));
+}
+
+function belongsTo(item, rid) {
+  return Number((item && item.restaurant_id) ?? 1) === Number(rid);
 }
 
 function guestId(item) {
   return crypto.createHash('sha256').update(`${String(item.email || '').trim().toLowerCase()}|${String(item.phone || '').trim()}`).digest('base64url').slice(0, 18);
 }
 
-async function guests(event) {
-  const items = await reservations(event);
+async function guests(event, rid) {
+  const items = (rid === undefined ? await reservations(event) : (await storeReservations(await reservationStore(event))).filter((r) => belongsTo(r, rid)));
   const store = await reservationStore(event);
   const grouped = new Map();
   for (const item of items) {
@@ -194,6 +206,11 @@ async function guests(event) {
   return Promise.all([...grouped.values()].map(async (guest) => {
     const profile = await store.get(`guest/${guest.id}`, { type: 'json' });
     guest.preferences = profile?.preferences || '';
+    guest.dietary = profile?.dietary || '[]';
+    guest.allergies = profile?.allergies || '[]';
+    guest.favourite_table = profile?.favourite_table || '';
+    guest.occasions = profile?.occasions || '[]';
+    guest.vip = Number(profile?.vip) || 0;
     guest.visits = sortReservations(guest.visits);
     guest.total_bookings = guest.visits.length;
     guest.last_visit = guest.visits.at(-1)?.date || '';
@@ -214,11 +231,14 @@ async function payments(event) {
   return values.filter(Boolean).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
 }
 
-async function reviews(event) {
-  const store = await reservationStore(event);
+async function storeReviews(store) {
   const { blobs } = await store.list({ prefix: 'review/' });
   const values = await Promise.all(blobs.map(({ key }) => store.get(key, { type: 'json' })));
   return values.filter(Boolean);
+}
+
+async function reviews(event) {
+  return storeReviews(await reservationStore(event));
 }
 
 async function blobSaves(store) {
@@ -398,22 +418,203 @@ async function loadCategories(store) {
   return loadCategories(store);
 }
 
-async function loadMenu(store) {
+async function loadMenu(store, rid) {
   const { blobs } = await store.list({ prefix: 'menu/' });
-  if (blobs.length) {
-    const values = await Promise.all(blobs.map(({ key }) => store.get(key, { type: 'json' })));
-    return values.filter(Boolean).sort((a, b) => a.id - b.id);
+  if (!blobs.length) {
+    for (const item of menu) {
+      const category = categories.find((c) => c.slug === item.category_slug);
+      await store.setJSON(`menu/${item.id}`, { ...item, category_id: category ? category.id : 1, available: true, restaurant_id: 1 });
+    }
+    return loadMenu(store, rid);
   }
-  for (const item of menu) {
-    const category = categories.find((c) => c.slug === item.category_slug);
-    await store.setJSON(`menu/${item.id}`, { ...item, category_id: category ? category.id : 1, available: true });
-  }
-  return loadMenu(store);
+  const values = (await Promise.all(blobs.map(({ key }) => store.get(key, { type: 'json' })))).filter(Boolean).sort((a, b) => a.id - b.id);
+  return rid === undefined ? values : values.filter((m) => belongsTo(m, rid));
 }
 
 function contactMatches(reservation, contact) {
   const c = String(contact || '').trim().toLowerCase();
   return c === String(reservation.email || '').trim().toLowerCase() || c === String(reservation.phone || '').trim();
+}
+
+const RESTAURANT_SEEDS = [
+  { slug: 'sbynhamhub', name: 'SbyNhamHub', city: 'Phnom Penh', address: '123 Riverside Walk, Phnom Penh', phone: '+855 12 345 678', hours: DEFAULT_HOURS, avg_cover: 15, capacity: 48, tagline: 'Taste · Book · Enjoy — Southeast Asian flavours, beautifully served.', avatar: 'logo.svg' },
+  { slug: 'wat-phnom-kitchen', name: 'Wat Phnom Kitchen', city: 'Phnom Penh', address: '88 Norodom Blvd, Phnom Penh', phone: '+855 23 987 654', hours: [{ day: 'Monday – Saturday', hours: '11:00 – 21:00' }, { day: 'Sunday', hours: '12:00 – 20:00' }], avg_cover: 12, capacity: 32, tagline: 'Family recipes from the old quarter — generous, honest Khmer cooking.', avatar: 'curry.svg' },
+  { slug: 'templeside-grill', name: 'Templeside Grill', city: 'Siem Reap', address: '7 Pub Street, Siem Reap', phone: '+855 63 765 432', hours: [{ day: 'Daily', hours: '16:00 – 23:00' }], avg_cover: 18, capacity: 40, tagline: 'Fire-grilled meats and cold craft beer, steps from the temples.', avatar: 'skewers.svg' }
+];
+
+const PARTNER_TABLES = {
+  2: [
+    ['K1', 2, 'window', 'square', 8, 8, 0], ['K2', 2, 'window', 'square', 18, 8, 0],
+    ['K3', 4, 'main', 'round', 30, 8, 0], ['K4', 4, 'main', 'round', 44, 8, 0],
+    ['K5', 6, 'main', 'rectangle', 34, 38, 0], ['K6', 4, 'patio', 'round', 62, 18, 0]
+  ],
+  3: [
+    ['G1', 2, 'patio', 'square', 6, 6, 0], ['G2', 4, 'patio', 'round', 20, 6, 0],
+    ['G3', 4, 'main', 'round', 36, 6, 0], ['G4', 6, 'main', 'rectangle', 50, 6, 0],
+    ['G5', 8, 'main', 'rectangle', 34, 36, 0], ['G6', 4, 'bar', 'round', 66, 12, 0]
+  ]
+};
+
+const PARTNER_YIELD = {
+  2: [
+    { name: 'Lunchtime special', day_of_week: -1, start_time: '11:00', end_time: '14:00', min_covers: 0, discount_pct: 10, label: 'Lunchtime special' },
+    { name: 'Sunday family feast', day_of_week: 0, start_time: '12:00', end_time: '20:00', min_covers: 4, discount_pct: 15, label: 'Sunday family feast' }
+  ],
+  3: [
+    { name: 'Twilight grill hour', day_of_week: -1, start_time: '16:00', end_time: '18:00', min_covers: 0, discount_pct: 8, label: 'Twilight grill hour' }
+  ]
+};
+
+const PARTNER_PROMOS = {
+  2: { name: 'Khmer Classics Week', code: 'KHMER15', value: 15 },
+  3: { name: 'Grill & Chill', code: 'EMBERS10', value: 10 }
+};
+
+let marketplaceSeeded = false;
+async function seedMarketplace(store) {
+  const { blobs } = await store.list({ prefix: 'restaurant/' });
+  if (blobs.length) return;
+  const saved = (await store.get('settings/restaurant', { type: 'json' })) || {};
+  const now = new Date().toISOString();
+  const base = {
+    ...RESTAURANT_SEEDS[0],
+    id: 1,
+    name: saved.name || RESTAURANT_SEEDS[0].name,
+    city: saved.city || RESTAURANT_SEEDS[0].city,
+    address: saved.address || RESTAURANT_SEEDS[0].address,
+    phone: saved.phone || RESTAURANT_SEEDS[0].phone,
+    hours: saved.hours || RESTAURANT_SEEDS[0].hours,
+    avg_cover: Number(saved.avg_cover) || RESTAURANT_SEEDS[0].avg_cover,
+    capacity: Number(saved.capacity) || RESTAURANT_SEEDS[0].capacity
+  };
+  for (const r of [base, { ...RESTAURANT_SEEDS[1], id: 2 }, { ...RESTAURANT_SEEDS[2], id: 3 }]) {
+    await store.setJSON(`restaurant/${r.id}`, { ...r, active: 1, created_at: now });
+  }
+  await loadMenu(store);
+  await loadTables(store);
+  await loadYieldRules(store);
+  for (const [rid, rows] of Object.entries(PARTNER_TABLES)) {
+    for (const [name, seats, zone, shape, x, y, rotation] of rows) {
+      const id = await nextCounter(store, 'table-counter', 12);
+      await store.setJSON(`table/${id}`, { id, name, seats, zone, shape, x, y, rotation, active: 1, restaurant_id: Number(rid), created_at: now });
+    }
+  }
+  for (const [rid, rows] of Object.entries(PARTNER_YIELD)) {
+    for (const rule of rows) {
+      const id = await nextCounter(store, 'yield-counter', 4);
+      await store.setJSON(`yield/rule/${id}`, { id, ...rule, active: 1, restaurant_id: Number(rid), created_at: now });
+    }
+  }
+  for (const [rid, promo] of Object.entries(PARTNER_PROMOS)) {
+    const id = await nextCounter(store, 'promo-counter');
+    await store.setJSON(`promo/${id}`, { id, name: promo.name, code: promo.code, type: 'percent', value: promo.value, start_date: null, end_date: null, days: [], start_time: null, end_time: null, min_covers: 0, max_uses: 0, used: 0, featured: 1, active: 1, auto_end: 0, occasions: [], restaurant_id: Number(rid), created_at: now });
+  }
+  const cats = await loadCategories(store);
+  const catId = (slug) => { const c = cats.find((x) => x.slug === slug); return c ? c.id : 1; };
+  const partnerMenu = {
+    2: [
+      { category: 'starters', name: 'Num Pang Croutons', description: 'Toasted baguette with pâté, pickles and chilli mayo.', price: 4.5, image: 'noodle-salad.jpg', tag: 'Classic', featured: true },
+      { category: 'mains', name: 'Amok de Mère', description: 'The house fish amok, steamed with fresh coconut cream.', price: 9.5, image: 'amok.jpg', tag: 'Signature', featured: true },
+      { category: 'mains', name: 'Prahok Ktis', description: 'Pork belly in fragrant prahok-coconut dip with greens.', price: 10.0, image: 'lok-lak.jpg', tag: null, featured: false },
+      { category: 'mains', name: 'Kampot Pepper Crab', description: 'Whole crab tossed in green Kampot pepper and butter.', price: 16.0, image: 'seafood-hotpot.jpg', tag: 'For Two', featured: true },
+      { category: 'grills-seafood', name: 'Honey-Glazed Chicken Wings', description: 'Charred wings with honey, lemongrass and crushed peanuts.', price: 7.5, image: 'lemongrass-chicken.jpg', tag: null, featured: false },
+      { category: 'desserts', name: 'Pandan Crepe Roulade', description: 'Rolled pandan crepe with young-coconut filling.', price: 4.5, image: 'pandan-cake.jpg', tag: 'Classic', featured: true },
+      { category: 'drinks', name: 'Sugar-Cane Juice', description: 'Pressed sugar cane with a squeeze of lime.', price: 2.5, image: 'coconut.jpg', tag: null, featured: false },
+      { category: 'drinks', name: 'Cambodian Iced Coffee', description: 'Strong espresso over sweetened condensed milk.', price: 3.0, image: 'thai-tea.jpg', tag: null, featured: false }
+    ],
+    3: [
+      { category: 'starters', name: 'Charcoal Corn Ribs', description: 'Smoky grilled corn with lime-chilli butter.', price: 5.0, image: 'summer-rolls.jpg', tag: 'New', featured: false },
+      { category: 'grills-seafood', name: 'Tomahawk for Two', description: 'Wagyu tomahawk, charred over open flame, jungle-spice rub.', price: 42.0, image: 'bbq-ribs.jpg', tag: 'Signature', featured: true },
+      { category: 'grills-seafood', name: 'Beef Satay Sticks', description: 'Overnight-marinated beef skewers with peanut relish.', price: 9.0, image: 'satay.jpg', tag: null, featured: false },
+      { category: 'grills-seafood', name: 'Smoked Ribs', description: '12-hour smoked pork ribs with tamarind barbecue glaze.', price: 14.5, image: 'bbq-ribs.jpg', tag: null, featured: true },
+      { category: 'mains', name: 'Chargrilled Sea Bass', description: 'Whole sea bass with garlic butter and grilled lemon.', price: 18.0, image: 'sea-bass.jpg', tag: 'Chef\u2019s Pick', featured: true },
+      { category: 'mains', name: 'Lok Lak Burger', description: 'Kampot-pepper beef patty, fried egg, cucumber relish.', price: 11.5, image: 'smash-burger.jpg', tag: null, featured: false },
+      { category: 'desserts', name: 'Grilled Pineapple', description: 'Caramelised pineapple with palm-sugar syrup.', price: 4.0, image: 'mango-sticky-rice.jpg', tag: 'Veg', featured: false },
+      { category: 'drinks', name: 'Angkor Draught', description: 'Local pale lager on tap, ice-cold. 330ml.', price: 3.5, image: 'craft-beer.jpg', tag: null, featured: false }
+    ]
+  };
+  for (const [rid, items] of Object.entries(partnerMenu)) {
+    for (const it of items) {
+      const id = await nextCounter(store, 'menu-counter', 25);
+      await store.setJSON(`menu/${id}`, { id, name: it.name, description: it.description, price: it.price, image: it.image, tag: it.tag || null, featured: it.featured, available: true, restaurant_id: Number(rid), category_id: catId(it.category) });
+    }
+  }
+  marketplaceSeeded = true;
+}
+
+async function loadRestaurants(store) {
+  await seedMarketplace(store);
+  const { blobs } = await store.list({ prefix: 'restaurant/' });
+  const values = (await Promise.all(blobs.map(({ key }) => store.get(key, { type: 'json' })))).filter(Boolean);
+  return values.sort((a, b) => a.id - b.id);
+}
+
+async function getRestaurantValue(store, value) {
+  if (value === undefined || value === null || value === '') return null;
+  const all = await loadRestaurants(store);
+  if (/^\d+$/.test(String(value))) return all.find((r) => Number(r.id) === Number(value)) || null;
+  return all.find((r) => r.slug === String(value)) || null;
+}
+
+async function restaurantIdOf(store, url, fallback = 1) {
+  const raw = url && (url.searchParams.get('restaurant') ?? url.searchParams.get('restaurant_id'));
+  if (raw === undefined || raw === null || raw === '') return Number(fallback) || 1;
+  const row = await getRestaurantValue(store, raw);
+  return row ? Number(row.id) : 1;
+}
+
+function settingsKey(rid) {
+  return Number(rid) === 1 ? 'settings/restaurant' : `settings/restaurant/${Number(rid)}`;
+}
+
+function netlifyPriceBand(avg) {
+  if (avg >= 20) return '$$$$';
+  if (avg >= 15) return '$$$';
+  if (avg >= 10) return '$$';
+  return '$';
+}
+
+async function netlifyPublicRestaurant(store, row) {
+  let hours = [];
+  try { hours = Array.isArray(row.hours) ? row.hours : JSON.parse(row.hours); } catch { hours = []; }
+  const published = (await storeReviews(store)).filter((r) => r.status === 'published' && belongsTo(r, row.id));
+  const count = published.length;
+  const avg = count ? published.reduce((sum, r) => sum + reviewOverall(r), 0) / count : 0;
+  const menuCount = (await loadMenu(store)).filter((m) => belongsTo(m, row.id)).length;
+  return {
+    id: Number(row.id),
+    slug: row.slug,
+    name: row.name,
+    city: row.city,
+    address: row.address,
+    phone: row.phone,
+    hours,
+    avg_cover: Number(row.avg_cover),
+    capacity: Number(row.capacity),
+    tagline: row.tagline,
+    avatar: row.avatar,
+    rating: count ? Math.round(avg * 10) / 10 : null,
+    reviews_count: count,
+    menu_count: menuCount
+  };
+}
+
+async function restaurantSettings(store, rid) {
+  const row = await getRestaurantValue(store, rid);
+  const saved = (await store.get(settingsKey(rid), { type: 'json' })) || {};
+  let hours = row ? (Array.isArray(row.hours) ? row.hours : (() => { try { return JSON.parse(row.hours); } catch { return []; } })()) : [];
+  const fees = (await store.get('settings/integrations', { type: 'json' })) || {};
+  return {
+    name: (row && row.name) || saved.name || 'SbyNhamHub',
+    phone: (row && row.phone) || saved.phone || '+855 12 345 678',
+    address: (row && row.address) || saved.address || '123 Riverside Walk, Phnom Penh',
+    city: (row && row.city) || saved.city || 'Phnom Penh',
+    hours,
+    avg_cover: Number((row && row.avg_cover) || saved.avg_cover || 15),
+    capacity: Number((row && row.capacity) || saved.capacity || 48),
+    fee_rate: Number(saved.fee_rate ?? 0.0095),
+    fee_flat: Number(saved.fee_flat ?? 0.5)
+  };
 }
 
 async function storeGetJson(event, key) {
@@ -427,6 +628,17 @@ function promoParseDays(promo) {
   try {
     const arr = JSON.parse(d);
     return Array.isArray(arr) ? arr.map(Number) : [];
+  } catch {
+    return [];
+  }
+}
+
+function promoParseOccasions(promo) {
+  const o = promo.occasions;
+  if (Array.isArray(o)) return o.map(String).filter(Boolean);
+  try {
+    const arr = JSON.parse(o);
+    return Array.isArray(arr) ? arr.map(String).filter(Boolean) : [];
   } catch {
     return [];
   }
@@ -446,11 +658,12 @@ function promoPublic(row) {
     end_time: row.end_time || '',
     used: row.used,
     max_uses: row.max_uses,
-    auto_end: Number(row.auto_end || 0)
+    auto_end: Number(row.auto_end || 0),
+    occasions: promoParseOccasions(row)
   };
 }
 
-function promoApplicable(row, { date = '', time = '', guests = 1 } = {}) {
+function promoApplicable(row, { date = '', time = '', guests = 1, occasion = '' } = {}) {
   if (!Number(row.active)) return false;
   if (row.max_uses > 0 && Number(row.used) >= Number(row.max_uses)) return false;
   if (row.start_date && String(row.start_date) > String(date)) return false;
@@ -463,6 +676,10 @@ function promoApplicable(row, { date = '', time = '', guests = 1 } = {}) {
   }
   if (row.start_time && String(time) < String(row.start_time)) return false;
   if (row.end_time && String(time) > String(row.end_time)) return false;
+  const occasions = promoParseOccasions(row);
+  if (occasions.length && occasion) {
+    if (!occasions.includes(String(occasion))) return false;
+  }
   return true;
 }
 
@@ -471,30 +688,155 @@ function promoDiscount(row, guests, avgCover) {
   return Math.round(Number(guests) * Number(avgCover) * (Number(row.value) / 100) * 100) / 100;
 }
 
-async function loadPromos(store) {
+async function loadPromos(store, rid) {
   const { blobs } = await store.list({ prefix: 'promo/' });
   if (!blobs.length) return [];
-  const values = await Promise.all(blobs.map(({ key }) => store.get(key, { type: 'json' })));
-  return values.filter(Boolean).sort((a, b) => b.id - a.id);
+  const values = (await Promise.all(blobs.map(({ key }) => store.get(key, { type: 'json' })))).filter(Boolean).sort((a, b) => b.id - a.id);
+  return rid === undefined ? values : values.filter((p) => belongsTo(p, rid));
 }
 
-async function findPromoByCode(store, code) {
+async function findPromoByCode(store, code, rid) {
   const clean = String(code || '').trim().toUpperCase();
   if (!clean) return null;
-  const promos = await loadPromos(store);
+  const promos = await loadPromos(store, rid);
   return promos.find((p) => p.code === clean) || null;
 }
 
-async function slotIsFullAt(store, date, time) {
+async function slotIsFullAt(store, date, time, rid) {
   if (!date || !time) return false;
-  const { blobs } = await store.list({ prefix: 'reservation/' });
-  const items = (await Promise.all(blobs.map(({ key }) => store.get(key, { type: 'json' })))).filter(Boolean);
+  const items = await storeReservations(store);
   const seats = items
-    .filter((r) => r.date === String(date) && r.time === String(time) && ['pending', 'confirmed', 'arrived'].includes(r.status))
+    .filter((r) => belongsTo(r, rid) && r.date === String(date) && r.time === String(time) && ['pending', 'confirmed', 'arrived'].includes(r.status))
     .reduce((sum, r) => sum + Number(r.guests || 0), 0);
-  const settings = (await store.get('settings/restaurant', { type: 'json' })) || {};
+  const settings = await restaurantSettings(store, rid);
   const capacity = Number(settings.capacity) || 48;
   return seats >= capacity;
+}
+
+const YIELD_DEFAULT_RULES = [
+  { name: 'Early-bird lunch', day_of_week: -1, start_time: '11:00', end_time: '13:00', min_covers: 0, discount_pct: 15, label: 'Early-bird lunch' },
+  { name: 'Weekday slow starter', day_of_week: -1, start_time: '17:30', end_time: '18:30', min_covers: 0, discount_pct: 10, label: 'Weekday happy hour' },
+  { name: 'Late-night wind-down', day_of_week: -1, start_time: '20:30', end_time: '21:30', min_covers: 0, discount_pct: 12, label: 'Late-night wind-down' },
+  { name: 'Sunday supper club', day_of_week: 0, start_time: '17:30', end_time: '21:00', min_covers: 4, discount_pct: 20, label: 'Sunday supper club' }
+];
+
+function yieldPublic(rule) {
+  return {
+    id: Number(rule.id),
+    name: rule.name,
+    day_of_week: Number(rule.day_of_week),
+    start_time: rule.start_time || '',
+    end_time: rule.end_time || '',
+    min_covers: Number(rule.min_covers),
+    discount_pct: Number(rule.discount_pct),
+    label: rule.label || '',
+    active: Number(rule.active),
+    created_at: rule.created_at || ''
+  };
+}
+
+let yieldSeeded = false;
+async function loadYieldRules(store, rid) {
+  const { blobs } = await store.list({ prefix: 'yield/rule/' });
+  if (!blobs.length && !yieldSeeded) {
+    yieldSeeded = true;
+    const now = new Date().toISOString();
+    const rules = YIELD_DEFAULT_RULES.map((r, i) => ({ id: i + 1, active: 1, restaurant_id: 1, created_at: now, ...r }));
+    await Promise.all(rules.map((r) => store.setJSON(`yield/rule/${r.id}`, r)));
+    return loadYieldRules(store, rid);
+  }
+  const values = (await Promise.all(blobs.map(({ key }) => store.get(key, { type: 'json' })))).filter(Boolean);
+  const sorted = values.sort((a, b) => a.id - b.id);
+  return rid === undefined ? sorted : sorted.filter((r) => belongsTo(r, rid));
+}
+
+function yieldParseTime(t) {
+  const m = String(t || '').match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+}
+
+async function yieldOfferFor(store, { date = '', time = '', guests = 1, rid = 1 } = {}) {
+  if (!date || !time) return null;
+  const t = yieldParseTime(time);
+  if (t === null) return null;
+  const rules = await loadYieldRules(store, rid);
+  const active = rules.filter((r) => Number(r.active) === 1);
+  if (!active.length) return null;
+  const dow = new Date(String(date) + 'T12:00:00').getDay();
+  const settings = await restaurantSettings(store, rid);
+  const capacity = Number(settings.capacity) || 48;
+  const avgCover = Number(settings.avg_cover) || 15;
+  const items = await storeReservations(store);
+  const seats = items
+    .filter((r) => belongsTo(r, rid) && r.date === String(date) && r.time === String(time) && ['pending', 'confirmed', 'arrived'].includes(r.status))
+    .reduce((sum, r) => sum + Number(r.guests || 0), 0);
+  for (const rule of active) {
+    if (Number(rule.day_of_week) >= 0 && Number(rule.day_of_week) !== dow) continue;
+    if (rule.start_time) {
+      const s = yieldParseTime(rule.start_time);
+      if (s !== null && t < s) continue;
+    }
+    if (rule.end_time) {
+      const e = yieldParseTime(rule.end_time);
+      if (e !== null && t > e) continue;
+    }
+    if (Number(rule.min_covers) > 0 && Number(guests) < Number(rule.min_covers)) continue;
+    if (seats >= capacity) continue;
+    const pct = Number(rule.discount_pct);
+    const discount = Math.round(Number(guests) * avgCover * (pct / 100) * 100) / 100;
+    return {
+      rule: yieldPublic(rule),
+      discount_pct: pct,
+      discount,
+      label: rule.label || `${pct}% off`
+    };
+  }
+  return null;
+}
+
+const TABLES_DEFAULT = [
+  { id: 1, name: 'T1', seats: 2, zone: 'window', shape: 'square', x: 5, y: 8, rotation: 0 },
+  { id: 2, name: 'T2', seats: 2, zone: 'window', shape: 'square', x: 16, y: 8, rotation: 0 },
+  { id: 3, name: 'T3', seats: 4, zone: 'window', shape: 'round', x: 8, y: 34, rotation: 0 },
+  { id: 4, name: 'T4', seats: 4, zone: 'window', shape: 'round', x: 20, y: 34, rotation: 0 },
+  { id: 5, name: 'T5', seats: 6, zone: 'main', shape: 'rectangle', x: 38, y: 6, rotation: 0 },
+  { id: 6, name: 'T6', seats: 4, zone: 'main', shape: 'round', x: 52, y: 6, rotation: 0 },
+  { id: 7, name: 'T7', seats: 4, zone: 'main', shape: 'round', x: 38, y: 30, rotation: 0 },
+  { id: 8, name: 'T8', seats: 4, zone: 'main', shape: 'round', x: 52, y: 30, rotation: 0 },
+  { id: 9, name: 'T9', seats: 8, zone: 'main', shape: 'rectangle', x: 40, y: 55, rotation: 0 },
+  { id: 10, name: 'T10', seats: 4, zone: 'patio', shape: 'round', x: 72, y: 10, rotation: 0 },
+  { id: 11, name: 'T11', seats: 2, zone: 'patio', shape: 'square', x: 82, y: 10, rotation: 0 },
+  { id: 12, name: 'T12', seats: 6, zone: 'patio', shape: 'round', x: 74, y: 40, rotation: 0 }
+];
+
+function tablePublic(t) {
+  return {
+    id: Number(t.id),
+    name: t.name,
+    seats: Number(t.seats),
+    zone: t.zone || 'main',
+    shape: t.shape || 'round',
+    x: Number(t.x) || 0,
+    y: Number(t.y) || 0,
+    rotation: Number(t.rotation) || 0,
+    active: t.active === undefined ? 1 : Number(t.active),
+    created_at: t.created_at || ''
+  };
+}
+
+let tablesSeeded = false;
+async function loadTables(store, rid) {
+  const { blobs } = await store.list({ prefix: 'table/' });
+  if (!blobs.length && !tablesSeeded) {
+    tablesSeeded = true;
+    const now = new Date().toISOString();
+    const rows = TABLES_DEFAULT.map((t) => ({ ...t, active: 1, restaurant_id: 1, created_at: now }));
+    await Promise.all(rows.map((t) => store.setJSON(`table/${t.id}`, t)));
+    return loadTables(store, rid);
+  }
+  const values = (await Promise.all(blobs.map(({ key }) => store.get(key, { type: 'json' })))).filter(Boolean);
+  const sorted = values.sort((a, b) => a.id - b.id);
+  return (rid === undefined ? sorted : sorted.filter((t) => belongsTo(t, rid))).map(tablePublic);
 }
 
 function requestUrl(event) {
@@ -520,6 +862,73 @@ function readBody(event) {
   }
 }
 
+let netlifyWebpush = null;
+function loadWebpush() {
+  if (netlifyWebpush) return netlifyWebpush;
+  try {
+    netlifyWebpush = require('web-push');
+  } catch {
+    return null;
+  }
+  return netlifyWebpush;
+}
+
+async function getVapid(store) {
+  const wp = loadWebpush();
+  if (!wp) return null;
+  const pub = process.env.VAPID_PUBLIC_KEY;
+  const priv = process.env.VAPID_PRIVATE_KEY;
+  const subj = process.env.VAPID_SUBJECT || 'mailto:ops@sbynhamhub.com';
+  if (pub && priv) return { publicKey: pub, privateKey: priv, subject: subj };
+  const saved = (await store.get('settings/vapid', { type: 'json' })) || {};
+  if (saved.publicKey && saved.privateKey) return { ...saved, subject: saved.subject || subj };
+  const fresh = wp.generateVAPIDKeys();
+  const keys = { publicKey: fresh.publicKey, privateKey: fresh.privateKey, subject: subj };
+  await store.setJSON('settings/vapid', keys);
+  return keys;
+}
+
+async function loadSubscriptions(store) {
+  const { blobs } = await store.list({ prefix: 'push/' });
+  const values = (await Promise.all(blobs.map(({ key }) => store.get(key, { type: 'json' })))).filter(Boolean);
+  return values.sort((a, b) => a.id - b.id);
+}
+
+async function integrationsConfig(store) {
+  const saved = (await store.get('settings/integrations', { type: 'json' })) || {};
+  return { webhook_url: '', sms_enabled: true, push_enabled: true, ...saved };
+}
+
+async function netlifySendSms(store, phone, message) {
+  const config = await integrationsConfig(store);
+  const url = config.webhook_url;
+  if (!url) return { sent: false, dev: true, reason: 'sms-not-configured' };
+  try {
+    const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ phone, message }) });
+    return { sent: res.ok, dev: false, status: res.status };
+  } catch (error) {
+    return { sent: false, dev: false, reason: error.message };
+  }
+}
+
+async function netlifyPushMatches(store, reservation, payload) {
+  const wp = loadWebpush();
+  const vapid = await getVapid(store);
+  if (!wp || !vapid) return [];
+  const targets = (await loadSubscriptions(store)).filter((s) => (reservation.email && String(s.email).trim().toLowerCase() === String(reservation.email).trim().toLowerCase()) || (reservation.phone && String(s.phone).trim() === String(reservation.phone).trim()));
+  const results = [];
+  for (const target of targets) {
+    try {
+      await wp.sendNotification({ endpoint: target.endpoint, keys: target.keys || {} }, JSON.stringify(payload), { vapidDetails: vapid });
+      results.push({ id: target.id, sent: true });
+    } catch (error) {
+      if ([404, 410].includes(Number(error?.statusCode))) await store.delete(`push/${target.id}`);
+      results.push({ id: target.id, sent: false });
+    }
+  }
+  return results;
+}
+
 exports.handler = async (event) => {
   const path = requestPath(event);
   const method = event.httpMethod;
@@ -535,7 +944,8 @@ exports.handler = async (event) => {
   }
   if (method === 'GET' && path === '/menu') {
     const store = await reservationStore(event);
-    let items = await loadMenu(store);
+    const rid = await restaurantIdOf(store, url);
+    let items = await loadMenu(store, rid);
     if (url.searchParams.get('category')) items = items.filter((item) => item.category_slug === url.searchParams.get('category'));
     if (url.searchParams.get('featured') === '1') items = items.filter((item) => item.featured);
     return json(items);
@@ -560,13 +970,14 @@ exports.handler = async (event) => {
     const { name = '', category_id = '', price = '', description = '', image = '', tag = '', featured = 0, available = 1 } = readBody(event);
     if (!String(name).trim()) return json({ error: 'Dish name is required' }, 400);
     const store = await reservationStore(event);
+    const rid = await restaurantIdOf(store, url);
     const cats = await loadCategories(store);
     const cat = cats.find((c) => c.id === Number(category_id));
     if (!cat) return json({ error: 'Invalid category' }, 400);
     const priceNum = Number(price);
     if (!Number.isFinite(priceNum) || priceNum < 0) return json({ error: 'Invalid price' }, 400);
     const id = await nextCounter(store, 'menu-counter', 25);
-    const item = { id, name: String(name).trim(), description: String(description || '').trim(), price: priceNum, image: String(image || 'plate.svg').trim(), tag: String(tag || '').trim() || null, featured: Boolean(featured), available: !(available === 0 || available === false || available === '0' || available === 'false'), category_id: cat.id, category: cat.name, category_slug: cat.slug };
+    const item = { id, name: String(name).trim(), description: String(description || '').trim(), price: priceNum, image: String(image || 'plate.svg').trim(), tag: String(tag || '').trim() || null, featured: Boolean(featured), available: !(available === 0 || available === false || available === '0' || available === 'false'), category_id: cat.id, category: cat.name, category_slug: cat.slug, restaurant_id: rid };
     await store.setJSON(`menu/${id}`, item);
     return json({ ok: true, item }, 201);
   }
@@ -575,9 +986,10 @@ exports.handler = async (event) => {
   if (menuMatch && method === 'PATCH') {
     if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
     const store = await reservationStore(event);
+    const rid = await restaurantIdOf(store, url);
     const key = `menu/${Number(menuMatch[1])}`;
     const item = await store.get(key, { type: 'json' });
-    if (!item) return json({ error: 'Dish not found' }, 404);
+    if (!item || !belongsTo(item, rid)) return json({ error: 'Dish not found' }, 404);
     const body = readBody(event);
     if (body.name !== undefined) {
       if (!String(body.name).trim()) return json({ error: 'Dish name is required' }, 400);
@@ -607,9 +1019,10 @@ exports.handler = async (event) => {
   if (menuMatch && method === 'DELETE') {
     if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
     const store = await reservationStore(event);
+    const rid = await restaurantIdOf(store, url);
     const key = `menu/${Number(menuMatch[1])}`;
     const item = await store.get(key, { type: 'json' });
-    if (!item) return json({ error: 'Dish not found' }, 404);
+    if (!item || !belongsTo(item, rid)) return json({ error: 'Dish not found' }, 404);
     await store.delete(key);
     return json({ ok: true });
   }
@@ -626,22 +1039,363 @@ exports.handler = async (event) => {
 
   if (method === 'GET' && path === '/promos/offers') {
     const store = await reservationStore(event);
-    const promos = await loadPromos(store);
+    const rid = await restaurantIdOf(store, url);
+    const promos = await loadPromos(store, rid);
     const date = url.searchParams.get('date') || '';
     const time = url.searchParams.get('time') || '';
     const guests = Number(url.searchParams.get('guests')) || 1;
     const shown = [];
     for (const p of promos) {
       if (!promoApplicable(p, { date, time, guests })) continue;
-      if (Number(p.auto_end) && await slotIsFullAt(store, date, time)) continue;
+      if (Number(p.auto_end) && await slotIsFullAt(store, date, time, rid)) continue;
       shown.push(promoPublic(p));
     }
     return json(shown);
   }
 
+  if (method === 'GET' && path === '/yield/offer') {
+    const store = await reservationStore(event);
+    const rid = await restaurantIdOf(store, url);
+    const offer = await yieldOfferFor(store, {
+      date: url.searchParams.get('date') || '',
+      time: url.searchParams.get('time') || '',
+      guests: Number(url.searchParams.get('guests')) || 1,
+      rid
+    });
+    return json(offer ? { applied: true, ...offer } : { applied: false });
+  }
+
+  if (method === 'GET' && path === '/yield/rules') {
+    if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
+    const store = await reservationStore(event);
+    const rid = await restaurantIdOf(store, url);
+    return json(await loadYieldRules(store, rid));
+  }
+
+  if (method === 'POST' && path === '/yield/rules') {
+    if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
+    const body = readBody(event);
+    const { name = '', day_of_week = -1, start_time = '', end_time = '', min_covers = 0, discount_pct = '', label = '', active = 1 } = body;
+    if (!String(name).trim()) return json({ error: 'Rule name is required' }, 400);
+    const dow = Number(day_of_week);
+    if (!Number.isInteger(dow) || dow < -1 || dow > 6) return json({ error: 'Day of week must be between -1 (any day) and 6' }, 400);
+    if (start_time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(start_time))) return json({ error: 'Invalid start time' }, 400);
+    if (end_time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(end_time))) return json({ error: 'Invalid end time' }, 400);
+    if (start_time && end_time && String(start_time) > String(end_time)) return json({ error: 'Start time must be before end time' }, 400);
+    const covers = Number(min_covers);
+    if (!Number.isInteger(covers) || covers < 0) return json({ error: 'Minimum covers must be 0 or more' }, 400);
+    const pct = Number(discount_pct);
+    if (!Number.isFinite(pct) || pct <= 0 || pct > 50) return json({ error: 'Discount must be between 1% and 50%' }, 400);
+    const store = await reservationStore(event);
+    const rid = await restaurantIdOf(store, url);
+    const rule = { id: await nextCounter(store, 'yield-counter'), name: String(name).trim(), day_of_week: dow, start_time: start_time || null, end_time: end_time || null, min_covers: covers, discount_pct: pct, label: String(label || '').trim(), active: active ? 1 : 0, restaurant_id: rid, created_at: new Date().toISOString() };
+    await store.setJSON(`yield/rule/${rule.id}`, rule);
+    return json({ ok: true, rule }, 201);
+  }
+
+  const yieldMatch = path.match(/^\/yield\/rules\/(\d+)$/);
+  if (yieldMatch && (method === 'PATCH' || method === 'DELETE')) {
+    if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
+    const store = await reservationStore(event);
+    const rid = await restaurantIdOf(store, url);
+    const key = `yield/rule/${Number(yieldMatch[1])}`;
+    const rule = await store.get(key, { type: 'json' });
+    if (!rule || !belongsTo(rule, rid)) return json({ error: 'Yield rule not found' }, 404);
+    if (method === 'DELETE') { await store.delete(key); return json({ ok: true }); }
+    const body = readBody(event);
+    if (body.name !== undefined) {
+      if (!String(body.name).trim()) return json({ error: 'Rule name is required' }, 400);
+      rule.name = String(body.name).trim();
+    }
+    if (body.day_of_week !== undefined) {
+      const dow = Number(body.day_of_week);
+      if (!Number.isInteger(dow) || dow < -1 || dow > 6) return json({ error: 'Day of week must be between -1 (any day) and 6' }, 400);
+      rule.day_of_week = dow;
+    }
+    if (body.start_time !== undefined) {
+      if (body.start_time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(body.start_time))) return json({ error: 'Invalid start time' }, 400);
+      rule.start_time = body.start_time || null;
+    }
+    if (body.end_time !== undefined) {
+      if (body.end_time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(body.end_time))) return json({ error: 'Invalid end time' }, 400);
+      rule.end_time = body.end_time || null;
+    }
+    if (body.min_covers !== undefined) {
+      const covers = Number(body.min_covers);
+      if (!Number.isInteger(covers) || covers < 0) return json({ error: 'Minimum covers must be 0 or more' }, 400);
+      rule.min_covers = covers;
+    }
+    if (body.discount_pct !== undefined) {
+      const pct = Number(body.discount_pct);
+      if (!Number.isFinite(pct) || pct <= 0 || pct > 50) return json({ error: 'Discount must be between 1% and 50%' }, 400);
+      rule.discount_pct = pct;
+    }
+    if (body.label !== undefined) rule.label = String(body.label || '').trim();
+    if (body.active !== undefined) rule.active = body.active ? 1 : 0;
+    await store.setJSON(key, rule);
+    return json({ ok: true, rule });
+  }
+
+  if (method === 'GET' && path === '/tables') {
+    if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
+    const store = await reservationStore(event);
+    const rid = await restaurantIdOf(store, url);
+    return json(await loadTables(store, rid));
+  }
+
+  if (method === 'POST' && path === '/tables') {
+    if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
+    const body = readBody(event);
+    const { name = '', seats = 4, zone = 'main', shape = 'round', x = 0, y = 0, rotation = 0, active = 1 } = body;
+    const clean = String(name).trim();
+    if (!clean) return json({ error: 'Table name is required' }, 400);
+    if (!/^[A-Za-z0-9 .-]{1,20}$/.test(clean)) return json({ error: 'Invalid table name' }, 400);
+    const n = Number(seats);
+    if (!Number.isInteger(n) || n < 1 || n > 20) return json({ error: 'Seats must be between 1 and 20' }, 400);
+    const store = await reservationStore(event);
+    const rid = await restaurantIdOf(store, url);
+    const existing = await loadTables(store, rid);
+    if (existing.some((t) => t.name === clean)) return json({ error: 'A table with that name already exists' }, 400);
+    const table = { id: await nextCounter(store, 'table-counter'), name: clean, seats: n, zone: String(zone || 'main'), shape: String(shape || 'round'), x: Number(x) || 0, y: Number(y) || 0, rotation: Number(rotation) || 0, active: active ? 1 : 0, restaurant_id: rid, created_at: new Date().toISOString() };
+    await store.setJSON(`table/${table.id}`, table);
+    return json({ ok: true, table }, 201);
+  }
+
+  const tableMatch = path.match(/^\/tables\/(\d+)$/);
+  if (tableMatch && (method === 'PATCH' || method === 'DELETE')) {
+    if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
+    const store = await reservationStore(event);
+    const rid = await restaurantIdOf(store, url);
+    const key = `table/${Number(tableMatch[1])}`;
+    const table = await store.get(key, { type: 'json' });
+    if (!table || !belongsTo(table, rid)) return json({ error: 'Table not found' }, 404);
+    if (method === 'DELETE') { await store.delete(key); return json({ ok: true }); }
+    const body = readBody(event);
+    if (body.name !== undefined) {
+      const clean = String(body.name).trim();
+      if (!clean) return json({ error: 'Table name is required' }, 400);
+      if (!/^[A-Za-z0-9 .-]{1,20}$/.test(clean)) return json({ error: 'Invalid table name' }, 400);
+      const existing = await loadTables(store, rid);
+      if (existing.some((t) => t.name === clean && t.id !== table.id)) return json({ error: 'A table with that name already exists' }, 400);
+      table.name = clean;
+    }
+    if (body.seats !== undefined) {
+      const n = Number(body.seats);
+      if (!Number.isInteger(n) || n < 1 || n > 20) return json({ error: 'Seats must be between 1 and 20' }, 400);
+      table.seats = n;
+    }
+    if (body.zone !== undefined) table.zone = String(body.zone || 'main');
+    if (body.shape !== undefined) table.shape = String(body.shape || 'round');
+    if (body.x !== undefined) table.x = Number(body.x) || 0;
+    if (body.y !== undefined) table.y = Number(body.y) || 0;
+    if (body.rotation !== undefined) table.rotation = Number(body.rotation) || 0;
+    if (body.active !== undefined) table.active = body.active ? 1 : 0;
+    await store.setJSON(key, table);
+    return json({ ok: true, table });
+  }
+
+  if (method === 'GET' && path === '/push/vapid') {
+    const store = await reservationStore(event);
+    const vapid = await getVapid(store);
+    return json({ supported: !!loadWebpush(), publicKey: vapid?.publicKey || '' });
+  }
+
+  if (method === 'POST' && path === '/push/subscribe') {
+    const store = await reservationStore(event);
+    const { endpoint = '', keys = {}, email = '', phone = '' } = readBody(event);
+    if (!endpoint || !/^https:\/\//.test(String(endpoint))) return json({ error: 'A valid push subscription endpoint is required' }, 400);
+    const subs = await loadSubscriptions(store);
+    const existing = subs.find((s) => s.endpoint === endpoint);
+    if (existing) {
+      existing.keys = keys || {};
+      existing.email = String(email || '').trim();
+      existing.phone = String(phone || '').trim();
+      await store.setJSON(`push/${existing.id}`, existing);
+      return json({ ok: true, id: existing.id }, 201);
+    }
+    const id = await nextCounter(store, 'push-counter');
+    const subscription = { id, endpoint, keys: keys || {}, email: String(email || '').trim(), phone: String(phone || '').trim(), created_at: new Date().toISOString() };
+    await store.setJSON(`push/${id}`, subscription);
+    return json({ ok: true, id }, 201);
+  }
+
+  if (path === '/integrations') {
+    const store = await reservationStore(event);
+    if (method === 'GET') {
+      if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
+      const config = await integrationsConfig(store);
+      const subs = await loadSubscriptions(store);
+      const vapid = await getVapid(store);
+      return json({ webhook_url: config.webhook_url || '', sms_enabled: !!config.sms_enabled, push_enabled: !!config.push_enabled, push_supported: !!loadWebpush(), vapid_public_key: vapid?.publicKey || '', subscriptions: subs.map((s) => ({ id: s.id, endpoint: String(s.endpoint).slice(0, 60) + '…', email: s.email, phone: s.phone, created_at: s.created_at })), subscription_count: subs.length });
+    }
+    if (method === 'PATCH') {
+      if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
+      const config = await integrationsConfig(store);
+      const body = readBody(event);
+      if (body.webhook_url !== undefined) {
+        const clean = String(body.webhook_url || '').trim();
+        if (clean && !/^https?:\/\//.test(clean)) return json({ error: 'Webhook URL must start with http(s)://' }, 400);
+        config.webhook_url = clean;
+      }
+      if (body.sms_enabled !== undefined) config.sms_enabled = !!body.sms_enabled;
+      if (body.push_enabled !== undefined) config.push_enabled = !!body.push_enabled;
+      await store.setJSON('settings/integrations', config);
+      return json({ ok: true, config: { webhook_url: config.webhook_url || '', sms_enabled: !!config.sms_enabled, push_enabled: !!config.push_enabled } });
+    }
+  }
+
+  if (method === 'POST' && path === '/push/test') {
+    if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
+    const store = await reservationStore(event);
+    const config = await integrationsConfig(store);
+    if (!config.push_enabled) return json({ error: 'Push notifications are disabled' }, 400);
+    const wp = loadWebpush();
+    if (!wp) return json({ error: 'web-push is not installed on the server' }, 400);
+    const vapid = await getVapid(store);
+    const subs = await loadSubscriptions(store);
+    if (!subs.length) return json({ error: 'No devices are subscribed yet' }, 400);
+    const payload = JSON.stringify({ title: 'SbyNhamHub test', body: 'Push notifications are working!', tag: 'test-push' });
+    const results = [];
+    for (const sub of subs) {
+      try {
+        await wp.sendNotification({ endpoint: sub.endpoint, keys: sub.keys || {} }, payload, { vapidDetails: vapid });
+        results.push({ id: sub.id, sent: true });
+      } catch (error) {
+        const gone = [404, 410].includes(Number(error?.statusCode));
+        if (gone) await store.delete(`push/${sub.id}`);
+        results.push({ id: sub.id, sent: false, reason: gone ? 'subscription-gone' : String(error?.message || error) });
+      }
+    }
+    return json({ ok: true, sent: results.filter((r) => r.sent).length, total: results.length, results });
+  }
+
+  if (method === 'POST' && path === '/sms/test') {
+    if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
+    const store = await reservationStore(event);
+    const config = await integrationsConfig(store);
+    const phone = String((readBody(event) || {}).phone || '').trim();
+    if (!config.sms_enabled) return json({ error: 'SMS reminders are disabled' }, 400);
+    if (!phone) return json({ error: 'A phone number is required to send a test SMS' }, 400);
+    const result = await netlifySendSms(store, phone, 'SbyNhamHub: this is a test SMS. SMS reminders are working!');
+    return json({ ok: true, ...result });
+  }
+
+  if (method === 'POST' && path === '/webhook/test') {
+    if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
+    const store = await reservationStore(event);
+    const config = await integrationsConfig(store);
+    const url = config.webhook_url;
+    if (!url) return json({ error: 'Set a webhook URL first' }, 400);
+    const payload = { event: 'test', message: 'SbyNhamHub webhook is working', sent_at: new Date().toISOString() };
+    try {
+      const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+      return json({ ok: true, status: res.status, payload });
+    } catch (error) {
+      return json({ ok: false, error: error.message, payload });
+    }
+  }
+
+  if (method === 'POST' && path === '/webhook/fire') {
+    if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
+    const store = await reservationStore(event);
+    const config = await integrationsConfig(store);
+    if (!config.webhook_url) return json({ fired: false });
+    const booking = (readBody(event) || {}).booking || {};
+    try {
+      const res = await fetch(config.webhook_url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ event: 'booking.created', booking }) });
+      return json({ fired: true, status: res.status });
+    } catch {
+      return json({ fired: false, status: 0 });
+    }
+  }
+
+  if (method === 'GET' && path === '/discover') {
+    const store = await reservationStore(event);
+    const rid = await restaurantIdOf(store, url);
+    const [cats, menuItems, promoRows, reviewRows, resvRows] = await Promise.all([
+      loadCategories(store),
+      loadMenu(store, rid),
+      loadPromos(store, rid),
+      storeReviews(store),
+      storeReservations(store)
+    ]);
+    const settings = await restaurantSettings(store, rid);
+    const capacity = Number(settings.capacity) || 48;
+    const city = settings.city || 'Phnom Penh';
+    const name = settings.name || 'SbyNhamHub';
+    const address = settings.address || '123 Riverside Walk, Phnom Penh';
+
+    const cuisine = url.searchParams.get('cuisine') || '';
+    const maxPrice = Number(url.searchParams.get('max_price'));
+    const minRating = Number(url.searchParams.get('min_rating')) || 0;
+    const date = url.searchParams.get('date') || '';
+    const guests = Number(url.searchParams.get('guests')) || 0;
+    const occasion = url.searchParams.get('occasion') || '';
+    const cityFilter = (url.searchParams.get('city') || '').trim();
+
+    let items = menuItems.filter((m) => m.available !== false);
+    if (cuisine) items = items.filter((i) => i.category_slug === String(cuisine));
+    if (Number.isFinite(maxPrice) && maxPrice >= 0) items = items.filter((i) => Number(i.price) <= maxPrice);
+    items = items.slice().sort((a, b) => Number(b.featured) - Number(a.featured) || String(a.category_slug).localeCompare(String(b.category_slug)) || String(a.name).localeCompare(String(b.name)));
+
+    const published = reviewRows.filter((r) => r.status === 'published' && belongsTo(r, rid));
+    const count = published.length;
+    const avg = count ? Math.round(published.reduce((sum, r) => sum + reviewOverall(r), 0) / count * 10) / 10 : 0;
+    const ratingMatched = !minRating || avg >= minRating;
+    const cityMatched = !cityFilter || cityFilter === city;
+
+    const avgPrice = items.length ? items.reduce((sum, i) => sum + Number(i.price), 0) / items.length : 0;
+    const band = avgPrice >= 20 ? '$$$$' : avgPrice >= 15 ? '$$$' : avgPrice >= 10 ? '$$' : '$';
+
+    const promos = promoRows
+      .filter((p) => Number(p.active) && Number(p.featured))
+      .filter((p) => promoApplicable(p, { date, time: '', guests: guests || 1, occasion }))
+      .map(promoPublic);
+
+    let availability = [];
+    if (/^\d{4}-\d{2}-\d{2}$/.test(String(date))) {
+      const booked = {};
+      for (const r of resvRows) {
+        if (belongsTo(r, rid) && r.date === String(date) && ['pending', 'confirmed', 'arrived'].includes(r.status)) booked[r.time] = (booked[r.time] || 0) + Number(r.guests || 0);
+      }
+      const now = new Date();
+      const isToday = String(date) === now.toISOString().slice(0, 10);
+      availability = [];
+      for (const slot of TIME_SLOTS) {
+        if (isToday) {
+          const [h, m] = slot.split(':').map(Number);
+          if (new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m).getTime() <= now.getTime() + 15 * 60 * 1000) continue;
+        }
+        const seats = booked[slot] || 0;
+        const remaining = capacity - seats;
+        let state = 'open';
+        if (remaining <= 0) state = 'full';
+        else if (guests > 0 && remaining < guests) state = 'limited';
+        else if (seats / capacity >= 0.8) state = 'limited';
+        const offer = state === 'full' ? null : await yieldOfferFor(store, { date: String(date), time: slot, guests: guests || 1, rid });
+        availability.push({ time: slot, booked: seats, remaining, capacity, state, yield: offer ? { label: offer.label, discount_pct: offer.discount_pct, discount: offer.discount } : null });
+      }
+    }
+
+    return json({
+      restaurant: { name, address, city, cuisine: cats.map((c) => c.name), price_band: band, verified: true },
+      rating: { count, avg },
+      categories: cats,
+      items,
+      promos,
+      availability,
+      occasions: VALID_OCCASIONS.filter(Boolean),
+      cities: CITIES,
+      capacity,
+      matched: ratingMatched && cityMatched,
+      filters: { cuisine, max_price: Number.isFinite(maxPrice) && maxPrice >= 0 ? maxPrice : '', min_rating: minRating || '', date, guests: guests || '', occasion, city: cityFilter }
+    });
+  }
+
   if (method === 'GET' && path === '/promos') {
     const store = await reservationStore(event);
-    const promos = await loadPromos(store);
+    const rid = await restaurantIdOf(store, url);
+    const promos = await loadPromos(store, rid);
     if (url.searchParams.get('all') === '1') {
       if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
       return json(promos);
@@ -653,7 +1407,7 @@ exports.handler = async (event) => {
   if (method === 'POST' && path === '/promos') {
     if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
     const body = readBody(event);
-    const { name = '', code = '', type = 'percent', value = '', start_date = '', end_date = '', days = [], start_time = '', end_time = '', min_covers = 0, max_uses = 0, featured = 0, active = 1, auto_end = 0 } = body;
+    const { name = '', code = '', type = 'percent', value = '', start_date = '', end_date = '', days = [], start_time = '', end_time = '', min_covers = 0, max_uses = 0, featured = 0, active = 1, auto_end = 0, occasions = [] } = body;
     if (!String(name).trim()) return json({ error: 'Promotion name is required' }, 400);
     if (!['percent', 'flat'].includes(String(type))) return json({ error: 'Discount type must be percent or flat' }, 400);
     const valueNum = Number(value);
@@ -664,7 +1418,8 @@ exports.handler = async (event) => {
       cleanCode = String(code).trim().toUpperCase();
       if (!/^[A-Z0-9_-]{2,20}$/.test(cleanCode)) return json({ error: 'Promo code must be 2-20 characters (letters, numbers, _ or -)' }, 400);
       const store = await reservationStore(event);
-      if (await findPromoByCode(store, cleanCode)) return json({ error: 'That promo code is already in use' }, 400);
+      const rid = await restaurantIdOf(store, url);
+      if (await findPromoByCode(store, cleanCode, rid)) return json({ error: 'That promo code is already in use' }, 400);
     }
     if (start_date && !/^\d{4}-\d{2}-\d{2}$/.test(String(start_date))) return json({ error: 'Invalid start date' }, 400);
     if (end_date && !/^\d{4}-\d{2}-\d{2}$/.test(String(end_date))) return json({ error: 'Invalid end date' }, 400);
@@ -678,8 +1433,11 @@ exports.handler = async (event) => {
     const uses = Number(max_uses);
     if (!Number.isInteger(covers) || covers < 0) return json({ error: 'Minimum covers must be 0 or more' }, 400);
     if (!Number.isInteger(uses) || uses < 0) return json({ error: 'Usage limit must be 0 (unlimited) or more' }, 400);
+    const occasionList = Array.isArray(occasions) ? occasions.map(String).filter(Boolean).map((o) => o.trim()).filter(Boolean) : [];
+    if (occasionList.length > 10) return json({ error: 'Too many occasion tags (max 10)' }, 400);
     const store = await reservationStore(event);
-    const promo = { id: await nextCounter(store, 'promo-counter'), name: String(name).trim(), code: cleanCode || null, type: String(type), value: valueNum, start_date: start_date || null, end_date: end_date || null, days: dayList, start_time: start_time || null, end_time: end_time || null, min_covers: covers, max_uses: uses, used: 0, featured: featured ? 1 : 0, active: active ? 1 : 0, auto_end: auto_end ? 1 : 0, created_at: new Date().toISOString() };
+    const rid = await restaurantIdOf(store, url);
+    const promo = { id: await nextCounter(store, 'promo-counter'), name: String(name).trim(), code: cleanCode || null, type: String(type), value: valueNum, start_date: start_date || null, end_date: end_date || null, days: dayList, start_time: start_time || null, end_time: end_time || null, min_covers: covers, max_uses: uses, used: 0, featured: featured ? 1 : 0, active: active ? 1 : 0, auto_end: auto_end ? 1 : 0, occasions: occasionList, restaurant_id: rid, created_at: new Date().toISOString() };
     await store.setJSON(`promo/${promo.id}`, promo);
     return json({ ok: true, promo }, 201);
   }
@@ -688,9 +1446,10 @@ exports.handler = async (event) => {
   if (promoMatch && (method === 'PATCH' || method === 'DELETE')) {
     if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
     const store = await reservationStore(event);
+    const rid = await restaurantIdOf(store, url);
     const key = `promo/${Number(promoMatch[1])}`;
     const promo = await store.get(key, { type: 'json' });
-    if (!promo) return json({ error: 'Promotion not found' }, 404);
+    if (!promo || !belongsTo(promo, rid)) return json({ error: 'Promotion not found' }, 404);
     if (method === 'DELETE') { await store.delete(key); return json({ ok: true }); }
     const body = readBody(event);
     if (body.name !== undefined) {
@@ -710,7 +1469,7 @@ exports.handler = async (event) => {
     if (body.code !== undefined) {
       const cleanCode = String(body.code).trim().toUpperCase();
       if (cleanCode && !/^[A-Z0-9_-]{2,20}$/.test(cleanCode)) return json({ error: 'Promo code must be 2-20 characters (letters, numbers, _ or -)' }, 400);
-      const clash = cleanCode ? (await loadPromos(store)).find((p) => p.code === cleanCode && p.id !== promo.id) : null;
+      const clash = cleanCode ? (await loadPromos(store, rid)).find((p) => p.code === cleanCode && p.id !== promo.id) : null;
       if (clash) return json({ error: 'That promo code is already in use' }, 400);
       promo.code = cleanCode || null;
     }
@@ -748,6 +1507,11 @@ exports.handler = async (event) => {
     if (body.featured !== undefined) promo.featured = body.featured ? 1 : 0;
     if (body.active !== undefined) promo.active = body.active ? 1 : 0;
     if (body.auto_end !== undefined) promo.auto_end = body.auto_end ? 1 : 0;
+    if (body.occasions !== undefined) {
+      const occasionList = Array.isArray(body.occasions) ? body.occasions.map(String).filter(Boolean).map((o) => o.trim()).filter(Boolean) : [];
+      if (occasionList.length > 10) return json({ error: 'Too many occasion tags (max 10)' }, 400);
+      promo.occasions = occasionList;
+    }
     await store.setJSON(key, promo);
     return json({ ok: true, promo });
   }
@@ -755,14 +1519,53 @@ exports.handler = async (event) => {
   if (path === '/settings') {
     const store = await reservationStore(event);
     if (method === 'GET') {
-      const saved = (await store.get('settings/restaurant', { type: 'json' })) || {};
-      return json({ name: saved.name || 'SbyNhamHub', phone: saved.phone || '+855 12 345 678', address: saved.address || '123 Riverside Walk, Phnom Penh', hours: saved.hours || DEFAULT_HOURS, avg_cover: saved.avg_cover || 15, fee_rate: saved.fee_rate || 0.0095, fee_flat: saved.fee_flat || 0.5 });
+      const rid = await restaurantIdOf(store, url);
+      const s = await restaurantSettings(store, rid);
+      return json({ name: s.name, phone: s.phone, address: s.address, city: s.city, hours: s.hours, avg_cover: s.avg_cover, capacity: s.capacity, fee_rate: s.fee_rate, fee_flat: s.fee_flat });
     }
     if (method === 'PATCH') {
       if (!authorized(event)) return json({ error: 'Unauthorized' }, 401);
-      const settings = readBody(event);
-      await store.setJSON('settings/restaurant', settings);
-      return json({ ok: true, settings });
+      const body = readBody(event);
+      const rid = await restaurantIdOf(store, url);
+      const row = await getRestaurantValue(store, rid);
+      if (!row) return json({ error: 'Restaurant not found' }, 404);
+      const current = await restaurantSettings(store, rid);
+      let avgCover = current.avg_cover;
+      if (body.avg_cover !== undefined) {
+        avgCover = Number(body.avg_cover);
+        if (!Number.isFinite(avgCover) || avgCover < 0) return json({ error: 'Average cover must be 0 or more' }, 400);
+      }
+      let feeRate = current.fee_rate;
+      if (body.fee_rate !== undefined) {
+        feeRate = Number(body.fee_rate);
+        if (!Number.isFinite(feeRate) || feeRate < 0 || feeRate > 0.1) return json({ error: 'Fee rate must be between 0 and 10%' }, 400);
+      }
+      let feeFlat = current.fee_flat;
+      if (body.fee_flat !== undefined) {
+        feeFlat = Number(body.fee_flat);
+        if (!Number.isFinite(feeFlat) || feeFlat < 0) return json({ error: 'Flat fee must be 0 or more' }, 400);
+      }
+      let seatCapacity = current.capacity;
+      if (body.capacity !== undefined) {
+        seatCapacity = Number(body.capacity);
+        if (!Number.isInteger(seatCapacity) || seatCapacity < 1 || seatCapacity > 1000) return json({ error: 'Seat capacity must be between 1 and 1000' }, 400);
+      }
+      const next = {
+        ...row,
+        name: body.name !== undefined ? String(body.name).trim() : row.name,
+        phone: body.phone !== undefined ? String(body.phone).trim() : row.phone,
+        address: body.address !== undefined ? String(body.address).trim() : row.address,
+        city: body.city !== undefined ? String(body.city).trim() : (row.city || 'Phnom Penh'),
+        hours: body.hours !== undefined ? (Array.isArray(body.hours) ? body.hours : []) : row.hours,
+        avg_cover: avgCover,
+        capacity: seatCapacity
+      };
+      if (JSON.stringify(next.hours).length > 10000) return json({ error: 'Hours data is too long' }, 400);
+      await store.setJSON(`restaurant/${row.id}`, next);
+      const key = settingsKey(rid);
+      const existing = (await store.get(key, { type: 'json' })) || {};
+      await store.setJSON(key, { ...existing, fee_rate: feeRate, fee_flat: feeFlat });
+      return json({ ok: true, settings: { name: next.name, phone: next.phone, address: next.address, city: next.city, hours: Array.isArray(next.hours) ? next.hours : (() => { try { return JSON.parse(next.hours); } catch { return []; } })(), avg_cover: Number(next.avg_cover), capacity: Number(next.capacity), fee_rate: Number(feeRate), fee_flat: Number(feeFlat) } });
     }
   }
 
@@ -770,6 +1573,200 @@ exports.handler = async (event) => {
     const { password, role = 'manager' } = readBody(event);
     if (!['manager', 'admin'].includes(role) || !secret(role)) return json({ error: `${role === 'admin' ? 'Admin' : 'Manager'} login is not configured.` }, 503);
     return password === secret(role) ? json({ ok: true, role, token: createToken(role) }) : json({ error: 'Invalid password' }, 401);
+  }
+
+  function slugify(value) {
+    return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  }
+
+  async function availabilityFor(store, row, { date = '', guests = 1, validParty = false } = {}) {
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(String(date))) return [];
+    const capacity = Number(row.capacity);
+    const booked = {};
+    for (const r of await storeReservations(store)) {
+      if (belongsTo(r, row.id) && r.date === String(date) && ['pending', 'confirmed', 'arrived'].includes(r.status)) booked[r.time] = (booked[r.time] || 0) + Number(r.guests || 0);
+    }
+    const now = new Date();
+    const isToday = String(date) === now.toISOString().slice(0, 10);
+    const out = [];
+    for (const slot of TIME_SLOTS) {
+      if (isToday) {
+        const [h, m] = slot.split(':').map(Number);
+        if (new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m).getTime() <= now.getTime() + 15 * 60 * 1000) continue;
+      }
+      const seats = booked[slot] || 0;
+      const remaining = capacity - seats;
+      let state = 'open';
+      if (remaining <= 0) state = 'full';
+      else if (validParty && remaining < guests) state = 'limited';
+      else if (seats / capacity >= 0.8) state = 'limited';
+      const offer = state === 'full' ? null : await yieldOfferFor(store, { date, time: slot, guests: validParty ? guests : 1, rid: Number(row.id) });
+      out.push({ time: slot, booked: seats, remaining, capacity, state, yield: offer ? { label: offer.label, discount_pct: offer.discount_pct, discount: offer.discount } : null });
+    }
+    return out;
+  }
+
+  if (method === 'GET' && path === '/marketplace') {
+    const store = await reservationStore(event);
+    const cityFilter = (url.searchParams.get('city') || '').trim();
+    const cuisine = (url.searchParams.get('cuisine') || '').trim();
+    const maxPriceRaw = url.searchParams.get('max_price');
+    const minRatingRaw = url.searchParams.get('min_rating');
+    const date = url.searchParams.get('date') || '';
+    const guestsRaw = url.searchParams.get('guests');
+    const occasionFilter = (url.searchParams.get('occasion') || '').trim();
+    const party = Number(guestsRaw);
+    const validParty = Number.isInteger(party) && party > 0 && party <= 20;
+    const ratingFilter = minRatingRaw !== null && Number.isFinite(Number(minRatingRaw)) && Number(minRatingRaw) > 0 ? Number(minRatingRaw) : 0;
+    const maxPrice = maxPriceRaw !== null && Number.isFinite(Number(maxPriceRaw)) && Number(maxPriceRaw) >= 0 ? Number(maxPriceRaw) : null;
+
+    const allRows = (await loadRestaurants(store)).filter((r) => Number(r.active) === 1);
+    const restaurants = await Promise.all(allRows.map(async (row) => {
+      const pub = await netlifyPublicRestaurant(store, row);
+      const matched = (cityFilter ? pub.city === cityFilter : true) && (ratingFilter ? (pub.rating ?? 0) >= ratingFilter : true);
+      return { ...pub, price_band: netlifyPriceBand(pub.avg_cover), matched, availability: matched ? await availabilityFor(store, row, { date, guests: validParty ? party : 1, validParty }) : [] };
+    }));
+
+    const cats = await loadCategories(store);
+    let dishItems = [];
+    if (cuisine) {
+      const cat = cats.find((c) => c.slug === cuisine);
+      if (cat) dishItems = (await loadMenu(store)).filter((m) => m.available !== false && Number(m.category_id) === Number(cat.id));
+      if (maxPrice !== null) dishItems = dishItems.filter((m) => Number(m.price) <= maxPrice);
+      dishItems = dishItems.slice().sort((a, b) => Number(b.featured) - Number(a.featured) || Number(a.price) - Number(b.price)).slice(0, 40);
+    } else if (maxPrice !== null) {
+      dishItems = (await loadMenu(store)).filter((m) => m.available !== false && Number(m.price) <= maxPrice).slice().sort((a, b) => Number(a.price) - Number(b.price)).slice(0, 40);
+    }
+    const dishMatched = new Set(dishItems.map((i) => Number(i.restaurant_id || 1)));
+
+    const promoRows = (await loadPromos(store)).filter((p) => Number(p.active) && Number(p.featured)).filter((p) => promoApplicable(p, { date, time: '', guests: validParty ? party : 1, occasion: occasionFilter }));
+    const promos = promoRows.map((p) => ({ ...promoPublic(p), restaurant_id: Number(p.restaurant_id || 1) }));
+
+    return json({
+      restaurants,
+      promos,
+      occasions: VALID_OCCASIONS.filter(Boolean),
+      cities: CITIES,
+      filters: {
+        city: cityFilter,
+        cuisine,
+        max_price: maxPrice,
+        min_rating: ratingFilter || '',
+        date: date || '',
+        guests: validParty ? party : '',
+        occasion: occasionFilter,
+        dish_matched_restaurant_ids: [...dishMatched]
+      }
+    });
+  }
+
+  if (method === 'GET' && path === '/restaurants') {
+    if (roleOf(event) !== 'admin') return json({ error: 'Admin access required' }, 403);
+    const store = await reservationStore(event);
+    const rows = await loadRestaurants(store);
+    const restaurants = await Promise.all(rows.map(async (row) => ({ ...(await netlifyPublicRestaurant(store, row)), active: Number(row.active), slug: row.slug })));
+    return json(restaurants);
+  }
+
+  if (method === 'POST' && path === '/restaurants') {
+    if (roleOf(event) !== 'admin') return json({ error: 'Admin access required' }, 403);
+    const body = readBody(event);
+    const { name = '', city = 'Phnom Penh', address = '', phone = '', hours = [], avg_cover = 15, capacity = 48, tagline = '', avatar = 'logo.svg' } = body;
+    if (!String(name).trim()) return json({ error: 'Restaurant name is required' }, 400);
+    let slug = slugify(name) || 'restaurant';
+    let base = slug;
+    let n = 1;
+    const store = await reservationStore(event);
+    const existing = await loadRestaurants(store);
+    while (existing.some((r) => r.slug === slug)) { slug = `${base}-${n++}`; }
+    const avg = Number(avg_cover);
+    if (!Number.isFinite(avg) || avg < 0) return json({ error: 'Average cover must be 0 or more' }, 400);
+    const cap = Number(capacity);
+    if (!Number.isInteger(cap) || cap < 1 || cap > 1000) return json({ error: 'Seat capacity must be between 1 and 1000' }, 400);
+    const id = await nextCounter(store, 'restaurant-counter', 3);
+    const row = { id, slug, name: String(name).trim(), city: String(city).trim(), address: String(address).trim(), phone: String(phone).trim(), hours: Array.isArray(hours) ? hours.slice(0, 12) : [], avg_cover: avg, capacity: cap, tagline: String(tagline || '').trim(), avatar: String(avatar || 'logo.svg').trim(), active: 1, created_at: new Date().toISOString() };
+    await store.setJSON(`restaurant/${id}`, row);
+    return json({ ok: true, restaurant: await netlifyPublicRestaurant(store, row) }, 201);
+  }
+
+  const restAdminMatch = path.match(/^\/restaurants\/(\d+)$/);
+  if (restAdminMatch && (method === 'PATCH' || method === 'DELETE')) {
+    if (roleOf(event) !== 'admin') return json({ error: 'Admin access required' }, 403);
+    const store = await reservationStore(event);
+    const id = Number(restAdminMatch[1]);
+    const row = await getRestaurantValue(store, id);
+    if (!row) return json({ error: 'Restaurant not found' }, 404);
+    if (method === 'DELETE') {
+      if (id === 1) return json({ error: 'The home restaurant cannot be removed.' }, 400);
+      row.active = 0;
+      await store.setJSON(`restaurant/${id}`, row);
+      return json({ ok: true });
+    }
+    const body = readBody(event);
+    if (body.name !== undefined) {
+      if (!String(body.name).trim()) return json({ error: 'Restaurant name is required' }, 400);
+      row.name = String(body.name).trim();
+    }
+    if (body.slug !== undefined) {
+      const clean = slugify(body.slug);
+      if (!clean) return json({ error: 'Invalid slug' }, 400);
+      if ((await loadRestaurants(store)).some((r) => r.slug === clean && Number(r.id) !== id)) return json({ error: 'That slug is already in use' }, 400);
+      row.slug = clean;
+    }
+    if (body.city !== undefined) row.city = String(body.city).trim();
+    if (body.address !== undefined) row.address = String(body.address).trim();
+    if (body.phone !== undefined) row.phone = String(body.phone).trim();
+    if (body.hours !== undefined) row.hours = Array.isArray(body.hours) ? body.hours.slice(0, 12) : [];
+    if (body.avg_cover !== undefined) {
+      const avg = Number(body.avg_cover);
+      if (!Number.isFinite(avg) || avg < 0) return json({ error: 'Average cover must be 0 or more' }, 400);
+      row.avg_cover = avg;
+    }
+    if (body.capacity !== undefined) {
+      const cap = Number(body.capacity);
+      if (!Number.isInteger(cap) || cap < 1 || cap > 1000) return json({ error: 'Seat capacity must be between 1 and 1000' }, 400);
+      row.capacity = cap;
+    }
+    if (body.tagline !== undefined) row.tagline = String(body.tagline).trim();
+    if (body.avatar !== undefined) row.avatar = String(body.avatar || 'logo.svg').trim();
+    if (body.active !== undefined) row.active = body.active ? 1 : 0;
+    await store.setJSON(`restaurant/${id}`, row);
+    return json({ ok: true, restaurant: { ...(await netlifyPublicRestaurant(store, row)), active: Number(row.active), slug: row.slug } });
+  }
+
+  const restMatch = path.match(/^\/restaurants\/([^/]+)$/);
+  if (restMatch && method === 'GET') {
+    const store = await reservationStore(event);
+    const row = await getRestaurantValue(store, restMatch[1]);
+    if (!row || Number(row.active) !== 1) return json({ error: 'Restaurant not found' }, 404);
+    const date = url.searchParams.get('date') || '';
+    const guestsRaw = url.searchParams.get('guests');
+    const party = Number(guestsRaw);
+    const validParty = Number.isInteger(party) && party > 0 && party <= 20;
+
+    const cats = await loadCategories(store);
+    const menuItems = (await loadMenu(store, Number(row.id))).filter((m) => m.available !== false);
+    const grouped = new Map();
+    for (const item of menuItems) {
+      const cat = cats.find((c) => Number(c.id) === Number(item.category_id)) || { name: 'Menu', slug: 'menu' };
+      const list = grouped.get(cat.slug) || { name: cat.name, slug: cat.slug, items: [] };
+      list.items.push({ id: item.id, name: item.name, description: item.description, price: Number(item.price), image: item.image, tag: item.tag, featured: Number(item.featured) });
+      grouped.set(cat.slug, list);
+    }
+
+    const promos = (await loadPromos(store, Number(row.id))).filter((p) => Number(p.active) === 1).filter((p) => promoApplicable(p, { date, time: '', guests: validParty ? party : 1 })).map(promoPublic);
+    const tables = (await loadTables(store, Number(row.id))).filter((t) => Number(t.active) === 1).map((t) => ({ name: t.name, seats: t.seats }));
+
+    return json({
+      ...(await netlifyPublicRestaurant(store, row)),
+      price_band: netlifyPriceBand(Number(row.avg_cover)),
+      categories: [...grouped.values()],
+      promos,
+      tables,
+      capacity: Number(row.capacity),
+      availability: await availabilityFor(store, row, { date, guests: validParty ? party : 1, validParty }),
+      occasions: VALID_OCCASIONS.filter(Boolean)
+    });
   }
 
   if (path.startsWith('/reservations') || path === '/stats' || path === '/analytics' || path === '/waitlist' || path === '/reminders') {
@@ -782,15 +1779,32 @@ exports.handler = async (event) => {
 
   if (path === '/guests' && !authorized(event)) return json({ error: 'Unauthorized' }, 401);
 
-  if (method === 'GET' && path === '/guests') return json(await guests(event));
+  if (method === 'GET' && path === '/guests') {
+    const store = await reservationStore(event);
+    const rid = await restaurantIdOf(store, url);
+    return json(await guests(event, rid));
+  }
 
   const guestMatch = path.match(/^\/guests\/([^/]+)$/);
   if (guestMatch && method === 'PATCH') {
-    const { preferences = '' } = readBody(event);
+    const body = readBody(event);
+    const { preferences = '', dietary, allergies, favourite_table = '', occasions, vip } = body;
     if (String(preferences).length > 1000) return json({ error: 'Preferences are too long' }, 400);
+    const listOf = (v) => (Array.isArray(v) ? v.map(String) : String(v || '').split(',').map((s) => s.trim())).filter(Boolean).slice(0, 20);
     const store = await reservationStore(event);
-    await store.setJSON(`guest/${guestMatch[1]}`, { preferences: String(preferences).trim(), updated_at: new Date().toISOString() });
-    return json({ ok: true });
+    const existing = (await store.get(`guest/${guestMatch[1]}`, { type: 'json' })) || {};
+    const profile = {
+      ...existing,
+      preferences: String(preferences).trim(),
+      dietary: JSON.stringify(listOf(dietary)),
+      allergies: JSON.stringify(listOf(allergies)),
+      favourite_table: String(favourite_table || '').trim().slice(0, 20),
+      occasions: JSON.stringify(listOf(occasions)),
+      vip: vip ? 1 : 0,
+      updated_at: new Date().toISOString()
+    };
+    await store.setJSON(`guest/${guestMatch[1]}`, profile);
+    return json({ ok: true, profile });
   }
 
   const personalise = (req) => {
@@ -874,7 +1888,7 @@ exports.handler = async (event) => {
 
   if (method === 'POST' && path === '/reservations') {
     const body = readBody(event);
-    const { name = '', email = '', phone = '', date = '', time = '', guests = '', occasion = '', notes = '', redeem_points = '', promo_code = '', source = 'online' } = body;
+    const { name = '', email = '', phone = '', date = '', time = '', guests = '', occasion = '', notes = '', redeem_points = '', promo_code = '', source = 'online', sms_opt_in = false } = body;
     const invalid = [];
     if (!String(name).trim()) invalid.push('name');
     if (!String(phone).trim()) invalid.push('phone');
@@ -887,6 +1901,14 @@ exports.handler = async (event) => {
     if (invalid.length) return json({ error: `Invalid fields: ${invalid.join(', ')}` }, 400);
     if (new Date(`${date} ${time}:00Z`).getTime() <= Date.now() - 15 * 60 * 1000) return json({ error: 'Please pick a future date and time.' }, 400);
 
+    const store = await reservationStore(event);
+    let rid = await restaurantIdOf(store, url);
+    if (body.restaurant !== undefined && body.restaurant !== null && String(body.restaurant).trim() !== '') {
+      const row = await getRestaurantValue(store, body.restaurant);
+      if (row) rid = Number(row.id);
+    }
+    const restaurant = await getRestaurantValue(store, rid);
+
     let points_redeemed = 0;
     let discount = 0;
     let pointsState = null;
@@ -895,7 +1917,6 @@ exports.handler = async (event) => {
     if (rp) {
       if (!String(email).trim()) return json({ error: 'Add an email to redeem points.' }, 400);
       if (!Number.isInteger(rp) || rp < POINTS_UNIT || rp % POINTS_UNIT !== 0) return json({ error: `Points must be a multiple of ${POINTS_UNIT}.` }, 400);
-      const store = await reservationStore(event);
       pointsKey = guestId({ email, phone });
       pointsState = await blobPointsState(store, pointsKey);
       if (pointsState.balance < rp) return json({ error: 'Not enough points for that email.' }, 400);
@@ -906,13 +1927,12 @@ exports.handler = async (event) => {
     let promo_id = 0;
     let promo_name = '';
     let promo_discount = 0;
-    const store = await reservationStore(event);
-    const settings = (await store.get('settings/restaurant', { type: 'json' })) || {};
+    const settings = await restaurantSettings(store, rid);
     const avgCover = Number(settings.avg_cover) || 15;
     if (String(promo_code).trim()) {
-      const promo = await findPromoByCode(store, promo_code);
+      const promo = await findPromoByCode(store, promo_code, rid);
       if (!promo) return json({ error: 'That promo code is not valid.' }, 400);
-      if (Number(promo.auto_end) && await slotIsFullAt(store, date, time)) return json({ error: 'That promo has ended — the restaurant is at capacity for this slot.' }, 400);
+      if (Number(promo.auto_end) && await slotIsFullAt(store, date, time, rid)) return json({ error: 'That promo has ended — the restaurant is at capacity for this slot.' }, 400);
       if (!promoApplicable(promo, { date, time, guests: partySize })) {
         if (promo.max_uses > 0 && Number(promo.used) >= Number(promo.max_uses)) return json({ error: 'That promo has reached its usage limit.' }, 400);
         return json({ error: 'That promo does not apply to your date, time or party size.' }, 400);
@@ -925,7 +1945,20 @@ exports.handler = async (event) => {
       discount += promo_discount;
     }
 
-    const reservation = { id: crypto.randomUUID(), name: String(name).trim(), email: String(email).trim(), phone: String(phone).trim(), date, time, guests: partySize, occasion: occasion || '', notes: String(notes || '').trim(), table: '', status: 'pending', points_awarded: 0, points_redeemed, discount, promo_id, promo_name, promo_discount, source: String(source), reminder_24h: 0, reminder_2h: 0, created_at: new Date().toISOString() };
+    let yield_rule_id = 0;
+    let yield_label = '';
+    let yield_discount = 0;
+    if (!promo_id) {
+      const offer = await yieldOfferFor(store, { date, time, guests: partySize, rid });
+      if (offer) {
+        yield_rule_id = offer.rule.id;
+        yield_label = offer.label;
+        yield_discount = offer.discount;
+        discount += yield_discount;
+      }
+    }
+
+    const reservation = { id: crypto.randomUUID(), name: String(name).trim(), email: String(email).trim(), phone: String(phone).trim(), date, time, guests: partySize, occasion: occasion || '', notes: String(notes || '').trim(), table: '', status: 'pending', points_awarded: 0, points_redeemed, discount, promo_id, promo_name, promo_discount, yield_rule_id, yield_label, yield_discount, source: String(source), sms_opt_in: sms_opt_in ? 1 : 0, reminder_24h: 0, reminder_2h: 0, restaurant_id: rid, created_at: new Date().toISOString() };
     await store.setJSON(`reservation/${reservation.id}`, reservation);
     if (points_redeemed) {
       await consumeBlobPoints(store, pointsKey, pointsState.ledger, points_redeemed, reservation.id, `Discount $${discount.toFixed(2)} on booking #${reservation.id}`);
@@ -933,18 +1966,35 @@ exports.handler = async (event) => {
       account.balance = pointsState.balance - points_redeemed;
       await store.setJSON(`points/${pointsKey}`, account);
     }
+    const venue = (restaurant && restaurant.name) || 'SbyNhamHub';
     try { await sendBookingConfirmation(reservation); } catch { /* email is best-effort */ }
+    if (reservation.sms_opt_in) {
+      try { await netlifySendSms(store, reservation.phone, `${venue}: table confirmed for ${reservation.date} at ${reservation.time}. Party of ${reservation.guests}. Ref #${reservation.id}`); } catch { /* best-effort */ }
+    }
+    try { await netlifyPushMatches(store, reservation, { title: `Your table at ${venue} is confirmed`, body: `${reservation.date} at ${reservation.time} · Party of ${reservation.guests}`, tag: `confirmed-${reservation.id}` }); } catch { /* best-effort */ }
+    const fireWebhook = async () => {
+      try {
+        const config = await integrationsConfig(store);
+        if (!config.webhook_url) return;
+        await fetch(config.webhook_url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ event: 'booking.created', booking: reservation }) });
+      } catch { /* best-effort */ }
+    };
+    fireWebhook();
     return json({ ok: true, reservation }, 201);
   }
 
   if (method === 'GET' && path === '/reservations') {
+    const store = await reservationStore(event);
+    const rid = await restaurantIdOf(store, url);
     const date = url.searchParams.get('date');
-    const items = sortReservations(await reservations(event)).filter((item) => !date || item.date === date);
+    const items = sortReservations((await storeReservations(store)).filter((r) => belongsTo(r, rid))).filter((item) => !date || item.date === date);
     return json(items);
   }
 
   if (method === 'GET' && path === '/stats') {
-    const items = await reservations(event);
+    const store = await reservationStore(event);
+    const rid = await restaurantIdOf(store, url);
+    const items = (await storeReservations(store)).filter((r) => belongsTo(r, rid));
     const today = new Date().toISOString().slice(0, 10);
     const todays = items.filter((item) => item.date === today);
     const by_status = VALID_STATUS.map((status) => ({ status, n: items.filter((item) => item.status === status).length })).filter((item) => item.n);
@@ -953,11 +2003,52 @@ exports.handler = async (event) => {
 
   if (method === 'GET' && path === '/admin/summary') {
     if (roleOf(event) !== 'admin') return json({ error: 'Admin access required' }, 403);
-    const items = await reservations(event);
+    const store = await reservationStore(event);
+    const rid = await restaurantIdOf(store, url);
+    const items = (await storeReservations(store)).filter((r) => belongsTo(r, rid));
     const today = new Date().toISOString().slice(0, 10);
     const todays = items.filter((item) => item.date === today);
     const recent = [...items].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, 6);
     return json({ total: items.length, today: todays.length, covers_today: todays.reduce((total, item) => total + Number(item.guests), 0), confirmed: items.filter((item) => item.status === 'confirmed').length, recent });
+  }
+
+  if (method === 'GET' && path === '/admin/platform') {
+    if (roleOf(event) !== 'admin') return json({ error: 'Admin access required' }, 403);
+    const store = await reservationStore(event);
+    const [rows, resvAll, menuAll, tablesAll] = await Promise.all([
+      loadRestaurants(store),
+      storeReservations(store),
+      loadMenu(store),
+      loadTables(store)
+    ]);
+    const today = new Date().toISOString().slice(0, 10);
+    const restaurants = await Promise.all(rows.map(async (row) => {
+      const rid = Number(row.id);
+      const resv = resvAll.filter((r) => belongsTo(r, rid));
+      const fees = (await store.get(settingsKey(rid), { type: 'json' })) || {};
+      return {
+        ...(await netlifyPublicRestaurant(store, row)),
+        active: Number(row.active),
+        slug: row.slug,
+        total_reservations: resv.length,
+        today_reservations: resv.filter((r) => r.date === today).length,
+        covers_today: resv.filter((r) => r.date === today).reduce((sum, r) => sum + Number(r.guests), 0),
+        menu_count: menuAll.filter((m) => belongsTo(m, rid)).length,
+        table_count: tablesAll.filter((t) => belongsTo(t, rid)).length,
+        fee_rate: Number(fees.fee_rate ?? 0.0095),
+        fee_flat: Number(fees.fee_flat ?? 0.5)
+      };
+    }));
+    const totals = restaurants.reduce(
+      (acc, r) => {
+        acc.total_reservations += r.total_reservations;
+        acc.today_reservations += r.today_reservations;
+        acc.covers_today += r.covers_today;
+        return acc;
+      },
+      { total_reservations: 0, today_reservations: 0, covers_today: 0, restaurants: restaurants.length }
+    );
+    return json({ restaurants, totals });
   }
 
   if (method === 'POST' && path === '/payments/pay') {
@@ -980,7 +2071,12 @@ exports.handler = async (event) => {
     if (processed.error) return json({ error: processed.error }, 400);
 
     const store = await reservationStore(event);
-    const settings = (await store.get('settings/restaurant', { type: 'json' })) || {};
+    let target = null;
+    if (String(reservation_id).trim()) {
+      target = await store.get(`reservation/${String(reservation_id).trim()}`, { type: 'json' });
+      if (!target) return json({ error: 'No booking found with that reference.' }, 404);
+    }
+    const settings = await restaurantSettings(store, Number(target?.restaurant_id) || 1);
     const feeRate = Number(settings.fee_rate) || PAY_FEE_RATE;
     const feeFlat = Number(settings.fee_flat) || PAY_FEE_FLAT;
     const tipAmount = computeTip(amt, tipPct);
@@ -988,9 +2084,7 @@ exports.handler = async (event) => {
     const total = round2(amt + tipAmount + feeTotal);
 
     let rid = 0;
-    if (String(reservation_id).trim()) {
-      const target = await store.get(`reservation/${String(reservation_id).trim()}`, { type: 'json' });
-      if (!target) return json({ error: 'No booking found with that reference.' }, 404);
+    if (target) {
       target.status = 'paid';
       await store.setJSON(`reservation/${target.id}`, target);
       rid = target.id;
@@ -1038,7 +2132,9 @@ exports.handler = async (event) => {
   }
 
   if (method === 'GET' && path === '/reviews/summary') {
-    const items = await reviews(event);
+    const store = await reservationStore(event);
+    const rid = await restaurantIdOf(store, url);
+    const items = (await storeReviews(store)).filter((r) => belongsTo(r, rid));
     const published = items.filter((item) => item.status === 'published');
     const count = published.length;
     const avg = count ? published.reduce((sum, item) => sum + reviewOverall(item), 0) / count : 0;
@@ -1048,9 +2144,11 @@ exports.handler = async (event) => {
   }
 
   if (method === 'GET' && path === '/reviews') {
+    const store = await reservationStore(event);
+    const rid = await restaurantIdOf(store, url);
     const all = url.searchParams.get('all') === '1';
     if (all && !authorized(event)) return json({ error: 'Unauthorized' }, 401);
-    const items = (await reviews(event)).sort((a, b) => String(b.id).localeCompare(String(a.id)));
+    const items = (await storeReviews(store)).filter((r) => belongsTo(r, rid)).sort((a, b) => String(b.id).localeCompare(String(a.id)));
     return json(all ? items : items.filter((item) => item.status === 'published').map(publicReview));
   }
 
@@ -1105,6 +2203,7 @@ exports.handler = async (event) => {
       status: 'pending',
       spam: spamReason ? 1 : 0,
       spam_reason: spamReason || '',
+      restaurant_id: Number(reservation.restaurant_id) || 1,
       created_at: new Date().toISOString()
     };
     await store.setJSON(`review/${review.id}`, review);
@@ -1119,9 +2218,10 @@ exports.handler = async (event) => {
     if (reply !== undefined && String(reply).length > 1000) return json({ error: 'Reply is too long' }, 400);
     if (spam !== undefined && ![0, 1].includes(Number(spam))) return json({ error: 'Invalid spam flag' }, 400);
     const store = await reservationStore(event);
+    const rid = await restaurantIdOf(store, url);
     const key = `review/${reviewMatch[1]}`;
     const review = await store.get(key, { type: 'json' });
-    if (!review) return json({ error: 'Review not found' }, 404);
+    if (!review || !belongsTo(review, rid)) return json({ error: 'Review not found' }, 404);
     if (status !== undefined) review.status = status;
     if (reply !== undefined) review.reply = String(reply).trim();
     if (review.status === 'published') {
@@ -1199,25 +2299,33 @@ exports.handler = async (event) => {
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(String(preferred_time))) invalid.push('preferred_time');
     if (invalid.length) return json({ error: `Invalid fields: ${invalid.join(', ')}` }, 400);
     const store = await reservationStore(event);
-    const entry = { id: await nextCounter(store, 'wait-counter'), name: String(name).trim(), phone: String(phone).trim(), email: String(email || '').trim(), party_size: partySize, preferred_date, preferred_time, notes: String(notes || '').trim(), status: 'waiting', created_at: new Date().toISOString() };
+    let rid = await restaurantIdOf(store, url);
+    const bodyRestaurant = readBody(event).restaurant;
+    if (bodyRestaurant !== undefined && String(bodyRestaurant).trim()) {
+      const row = await getRestaurantValue(store, bodyRestaurant);
+      if (row) rid = Number(row.id);
+    }
+    const entry = { id: await nextCounter(store, 'wait-counter'), name: String(name).trim(), phone: String(phone).trim(), email: String(email || '').trim(), party_size: partySize, preferred_date, preferred_time, notes: String(notes || '').trim(), status: 'waiting', restaurant_id: rid, created_at: new Date().toISOString() };
     await store.setJSON(`wait/${entry.id}`, entry);
     return json({ ok: true, entry }, 201);
   }
 
   if (method === 'GET' && path === '/waitlist') {
     const store = await reservationStore(event);
+    const rid = await restaurantIdOf(store, url);
     const { blobs } = await store.list({ prefix: 'wait/' });
     const values = await Promise.all(blobs.map(({ key }) => store.get(key, { type: 'json' })));
     const date = url.searchParams.get('date');
-    return json(values.filter(Boolean).sort((a, b) => `${a.preferred_date} ${a.preferred_time}`.localeCompare(`${b.preferred_date} ${b.preferred_time}`)).filter((item) => !date || item.preferred_date === date));
+    return json(values.filter(Boolean).filter((item) => belongsTo(item, rid)).sort((a, b) => `${a.preferred_date} ${a.preferred_time}`.localeCompare(`${b.preferred_date} ${b.preferred_time}`)).filter((item) => !date || item.preferred_date === date));
   }
 
   const waitMatch = path.match(/^\/waitlist\/(\d+)$/);
   if (waitMatch && (method === 'PATCH' || method === 'DELETE')) {
     const store = await reservationStore(event);
+    const rid = await restaurantIdOf(store, url);
     const key = `wait/${Number(waitMatch[1])}`;
     const entry = await store.get(key, { type: 'json' });
-    if (!entry) return json({ error: 'Waitlist entry not found' }, 404);
+    if (!entry || !belongsTo(entry, rid)) return json({ error: 'Waitlist entry not found' }, 404);
     if (method === 'DELETE') { await store.delete(key); return json({ ok: true }); }
     const { status } = readBody(event);
     if (!['waiting', 'notified', 'seated', 'cancelled'].includes(status)) return json({ error: 'Invalid status' }, 400);
@@ -1230,17 +2338,22 @@ exports.handler = async (event) => {
     const store = await reservationStore(event);
     const items = await reservations(event);
     const now = Date.now();
+    const config = await integrationsConfig(store);
     const sent = [];
     for (const reservation of items) {
       if (!['pending', 'confirmed'].includes(reservation.status)) continue;
       const hours = (new Date(`${reservation.date} ${reservation.time}:00Z`).getTime() - now) / 3600000;
       if (hours >= 20 && hours <= 26 && !reservation.reminder_24h) {
         try { await sendReminder(reservation, 24); } catch { /* best-effort */ }
+        if (config.sms_enabled && Number(reservation.sms_opt_in)) { try { await netlifySendSms(store, reservation.phone, `SbyNhamHub: ${reservation.name}, your table is tomorrow at ${reservation.time}. Party of ${reservation.guests}. Ref #${reservation.id}`); } catch { /* best-effort */ } }
+        if (config.push_enabled) { try { await netlifyPushMatches(store, reservation, { title: 'Your SbyNhamHub table is tomorrow', body: `${reservation.date} at ${reservation.time} · Party of ${reservation.guests}`, tag: `reminder-24h-${reservation.id}` }); } catch { /* best-effort */ } }
         reservation.reminder_24h = 1;
         await store.setJSON(`reservation/${reservation.id}`, reservation);
         sent.push({ id: reservation.id, kind: '24h' });
       } else if (hours >= 1 && hours <= 3 && !reservation.reminder_2h) {
         try { await sendReminder(reservation, 2); } catch { /* best-effort */ }
+        if (config.sms_enabled && Number(reservation.sms_opt_in)) { try { await netlifySendSms(store, reservation.phone, `SbyNhamHub: ${reservation.name}, your table is in 2 hours at ${reservation.time}. Party of ${reservation.guests}. Ref #${reservation.id}`); } catch { /* best-effort */ } }
+        if (config.push_enabled) { try { await netlifyPushMatches(store, reservation, { title: 'Your SbyNhamHub table is in 2 hours', body: `${reservation.date} at ${reservation.time} · Party of ${reservation.guests}`, tag: `reminder-2h-${reservation.id}` }); } catch { /* best-effort */ } }
         reservation.reminder_2h = 1;
         await store.setJSON(`reservation/${reservation.id}`, reservation);
         sent.push({ id: reservation.id, kind: '2h' });
@@ -1250,8 +2363,10 @@ exports.handler = async (event) => {
   }
 
   if (method === 'GET' && path === '/analytics') {
-    const items = await reservations(event);
-    const reviewsList = await reviews(event);
+    const store = await reservationStore(event);
+    const rid = await restaurantIdOf(store, url);
+    const items = (await storeReservations(store)).filter((r) => belongsTo(r, rid));
+    const reviewsList = (await storeReviews(store)).filter((r) => belongsTo(r, rid));
     const published = reviewsList.filter((item) => item.status === 'published');
 
     const now = new Date();
@@ -1296,7 +2411,9 @@ exports.handler = async (event) => {
     const topPromos = Object.values(promoMap).sort((a, b) => b.uses - a.uses).slice(0, 5);
     const reviewAvg = published.length ? published.reduce((sum, r) => sum + reviewOverall(r), 0) / published.length : 0;
 
-    const payRows = (await payments(event)).filter((p) => p.status === 'paid');
+    const allPay = await payments(event);
+    const ridSet = new Set(items.map((r) => r.id));
+    const payRows = allPay.filter((p) => p.status === 'paid' && (!p.reservation_id || ridSet.has(p.reservation_id)));
     const payRevenue = payRows.reduce((sum, p) => sum + p.total, 0);
     const payFees = payRows.reduce((sum, p) => sum + p.fee_total, 0);
     const payTips = payRows.reduce((sum, p) => sum + p.tip_amount, 0);
@@ -1326,10 +2443,15 @@ exports.handler = async (event) => {
     const key = `reservation/${match[1]}`;
     const reservation = await store.get(key, { type: 'json' });
     if (!reservation) return json({ error: 'Reservation not found' }, 404);
+    const rid = await restaurantIdOf(store, url, reservation.restaurant_id || 1);
+    if (!belongsTo(reservation, rid)) return json({ error: 'Reservation not found' }, 404);
     if (method === 'DELETE') { await store.delete(key); return json({ ok: true }); }
     const { status, table } = readBody(event);
     if (status !== undefined && !VALID_STATUS.includes(status)) return json({ error: 'Invalid status' }, 400);
-    if (table !== undefined && table !== '' && !VALID_TABLES.includes(table)) return json({ error: 'Invalid table' }, 400);
+    if (table !== undefined && table !== '') {
+      const valid = (await loadTables(store, rid)).filter((t) => Number(t.active) === 1).map((t) => t.name);
+      if (!valid.includes(String(table))) return json({ error: 'Invalid table' }, 400);
+    }
     if (status !== undefined) reservation.status = status;
     if (table !== undefined) reservation.table = table;
     await store.setJSON(key, reservation);

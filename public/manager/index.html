@@ -158,13 +158,13 @@
         <div class="manager-date-row"><div><p class="eyebrow">Restaurant menu</p><h2>Menu management</h2><span>Add, edit, price and de-list dishes. Changes go live instantly.</span></div><a class="btn btn-primary btn-sm" href="/menu">View public menu</a></div>
         <section class="manager-panel" style="margin-bottom:16px">
           <div class="manager-panel-head"><div><p class="eyebrow">Categories</p><h2>Dish categories</h2></div></div>
-          <div class="form-grid" style="grid-template-columns:1fr 200px auto">
+          <div class="menu-category-form">
             <div class="field"><label>New category</label><input class="input" id="catName" placeholder="e.g. Brunch"></div>
             <div class="field"><label>&nbsp;</label><button class="btn btn-secondary btn-block" id="addCatBtn">Add category</button></div>
             <div class="field"><label>&nbsp;</label><div id="catList" class="category-chips"></div></div>
           </div>
         </section>
-        <section class="manager-panel manager-table-panel">
+        <section class="manager-panel manager-table-panel menu-items-panel">
           <div class="manager-panel-head"><div><p class="eyebrow">Dishes</p><h2>Menu items</h2></div><button class="btn btn-secondary btn-sm" id="newDishBtn">+ Add dish</button></div>
           <div class="form-card" id="dishForm" style="display:none;margin:0 0 16px;border:1px dashed var(--brand)">
             <span class="eyebrow">New dish</span>

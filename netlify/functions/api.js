@@ -177,12 +177,11 @@ function authorized(event) {
 
 let activeEvent = null;
 
-async function reservationStore(event) {
-  // @netlify/blobs is ESM-only, while this function uses CommonJS.
-  const { connectLambda, getStore } = await import('@netlify/blobs');
-  // Netlify passes short-lived Blobs credentials in each Lambda event.
-  connectLambda(event);
-  return getStore('sbynhamhub-reservations');
+function reservationStore() {
+  // Vercel Blob store adapter (replaces Netlify Blobs). Storage is addressed by
+  // key only; the store is derived from BLOB_READ_WRITE_TOKEN in the runtime.
+  const { createVercelBlobStore } = require('../../server/lib/vercel-blob-store');
+  return createVercelBlobStore();
 }
 
 async function storeReservations(store) {

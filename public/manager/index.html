@@ -471,7 +471,7 @@
       async function load() {
         try {
           const headers = { Authorization: 'Bearer ' + token() };
-          const [stats, todayItems, tableItems] = await Promise.all([
+          const [stats, todayItems, filterResv] = await Promise.all([
             api('/api/stats', { headers }), api('/api/reservations?date=' + today, { headers }), api('/api/reservations?date=' + (filterDate.value || ''), { headers })
           ]);
           statGrid.innerHTML = `<div class="stat-card"><div class="val">${stats.total}</div><div class="lbl">Total bookings</div></div><div class="stat-card"><div class="val">${stats.today}</div><div class="lbl">Bookings today</div></div><div class="stat-card"><div class="val">${stats.covers_today}</div><div class="lbl">Covers today</div></div><div class="stat-card"><div class="val">${stats.confirmed}</div><div class="lbl">Confirmed bookings</div></div>`;
@@ -490,20 +490,20 @@
           document.getElementById('todayBookings').innerHTML = active.length ? active.map((r) => `<div class="timeline-booking"><strong>${escapeHTML(r.time)}</strong><div><b>${escapeHTML(r.name)}</b><span>${r.guests} guest${r.guests === 1 ? '' : 's'}${r.occasion ? ' - ' + escapeHTML(r.occasion) : ''}</span></div>${statusBadge(r.status)}</div>`).join('') : '<div class="empty-service"><strong>No bookings yet</strong><span>New reservations will appear here.</span></div>';
           const pending = todayItems.filter((r) => r.status === 'pending').length, confirmed = todayItems.filter((r) => r.status === 'confirmed').length, arrived = todayItems.filter((r) => r.status === 'arrived').length;
           document.getElementById('statusSummary').innerHTML = `<div><b>${pending}</b><span>Pending</span></div><div><b>${confirmed}</b><span>Confirmed</span></div><div><b>${arrived}</b><span>Arrived</span></div>`;
-          renderTable(tableItems);
+          renderTable(filterResv);
         } catch (err) { if (err.message === 'Unauthorized') { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem('sbynham_admin_token'); loginView.style.display = 'block'; dashView.style.display = 'none'; } toast(err.message, 'error'); }
       }
       async function lightRefresh() {
         try {
           const headers = { Authorization: 'Bearer ' + token() };
-          const [stats, todayItems, tableItems] = await Promise.all([
+          const [stats, todayItems, filterResv] = await Promise.all([
             api('/api/stats', { headers }), api('/api/reservations?date=' + today, { headers }), api('/api/reservations?date=' + (filterDate.value || ''), { headers })
           ]);
           statGrid.innerHTML = `<div class="stat-card"><div class="val">${stats.total}</div><div class="lbl">Total bookings</div></div><div class="stat-card"><div class="val">${stats.today}</div><div class="lbl">Bookings today</div></div><div class="stat-card"><div class="val">${stats.covers_today}</div><div class="lbl">Covers today</div></div><div class="stat-card"><div class="val">${stats.confirmed}</div><div class="lbl">Confirmed bookings</div></div>`;
           floorBookings = todayItems; renderFloor();
           const active = todayItems.filter((r) => !['cancelled','no-show'].includes(r.status));
           document.getElementById('todayBookings').innerHTML = active.length ? active.map((r) => `<div class="timeline-booking"><strong>${escapeHTML(r.time)}</strong><div><b>${escapeHTML(r.name)}</b><span>${r.guests} guest${r.guests === 1 ? '' : 's'}${r.occasion ? ' - ' + escapeHTML(r.occasion) : ''}</span></div>${statusBadge(r.status)}</div>`).join('') : '<div class="empty-service"><strong>No bookings yet</strong><span>New reservations will appear here.</span></div>';
-          renderTable(tableItems);
+          renderTable(filterResv);
         } catch (err) { if (err.message === 'Unauthorized') { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem('sbynham_admin_token'); loginView.style.display = 'block'; dashView.style.display = 'none'; } }
       }
       let editingDishId = '';

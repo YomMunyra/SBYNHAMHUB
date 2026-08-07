@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/api/index" },
+    { "source": "/", "destination": "/customer/index.html" },
+    { "source": "/menu", "destination": "/customer/menu.html" },
+    { "source": "/book", "destination": "/customer/book.html" },
+    { "source": "/reviews", "destination": "/customer/reviews.html" },
+    { "source": "/points", "destination": "/customer/points.html" },
+    { "source": "/taste", "destination": "/customer/taste.html" },
+    { "source": "/manage", "destination": "/customer/manage.html" },
+    { "source": "/discover", "destination": "/customer/discover.html" },
+    { "source": "/pay", "destination": "/customer/pay.html" },
+    { "source": "/receipt", "destination": "/customer/receipt.html" },
+    { "source": "/manager", "destination": "/manager/index.html" },
+    { "source": "/admin", "destination": "/admin/index.html" }
+  ]
+}

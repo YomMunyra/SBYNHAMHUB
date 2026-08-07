@@ -159,7 +159,7 @@
             <div class="flex" style="gap:10px"><button class="btn btn-primary" id="abSave">Save booking</button><button class="btn btn-ghost" id="abCancel">Cancel</button></div>
           </div>
         </div>
-        <div class="guest-layout">
+        <div class="booking-desk-layout">
           <section class="manager-panel manager-table-panel"><div class="table-wrap"><table class="data"><thead><tr><th>Date</th><th>Time</th><th>Guest</th><th>Contact</th><th>Party</th><th>Source</th><th>Status</th><th></th></tr></thead><tbody id="resBody"><tr><td colspan="8" style="text-align:center;color:#888780">Loading...</td></tr></tbody></table></div></section>
           <section class="manager-panel guest-detail" id="bookingGuestPanel" style="display:none">
             <p class="eyebrow">Guest on this booking</p>
@@ -187,7 +187,7 @@
             <div class="field"><label>&nbsp;</label><div id="catList" class="category-chips"></div></div>
           </div>
         </section>
-        <section class="manager-panel manager-table-panel">
+        <section class="manager-panel manager-table-panel menu-items-panel">
           <div class="manager-panel-head"><div><p class="eyebrow">Dishes</p><h2>Menu items</h2></div><button class="btn btn-secondary btn-sm" id="newDishBtn">+ Add dish</button></div>
           <div class="form-card" id="dishForm" style="display:none;margin:0 0 16px;border:1px dashed var(--brand)">
             <span class="eyebrow">New dish</span>
@@ -293,7 +293,7 @@
       const ADMIN_KEY = 'sbynham_admin_token';
       const loginView = document.getElementById('loginView'), dashView = document.getElementById('dashView');
       const resBody = document.getElementById('resBody'), statGrid = document.getElementById('statGrid'), filterDate = document.getElementById('filterDate');
-      const token = () => localStorage.getItem(ADMIN_KEY) || localStorage.getItem(TOKEN_KEY) || '';
+      const token = () => localStorage.getItem(ADMIN_KEY) || '';
       const today = new Date().toISOString().slice(0, 10);
       document.getElementById('todayLabel').textContent = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date(today + 'T12:00:00'));
 

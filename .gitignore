@@ -8,3 +8,6 @@ data/
 
 # Local Netlify folder
 .netlify
+
+.vercel
+.env*
